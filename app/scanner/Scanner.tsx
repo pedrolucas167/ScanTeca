@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import jsQR from "jsqr";
 import { playBeep } from "@/lib/beep";
 
 interface ScanResult {
@@ -10,19 +10,14 @@ interface ScanResult {
 }
 
 export default function Scanner() {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const scannerContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationRef = useRef<number | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const processingRef = useRef(false);
-
-  const getQrBox = useCallback(() => {
-    const width = scannerContainerRef.current?.clientWidth ?? 320;
-    const qrWidth = Math.min(Math.round(width * 0.75), 560);
-    const qrHeight = Math.round(qrWidth / 2);
-    return { width: qrWidth, height: qrHeight };
-  }, []);
 
   const handleScan = useCallback(async (isbn: string) => {
     if (processingRef.current) return;
@@ -62,6 +57,28 @@ export default function Scanner() {
     }
   }, []);
 
+  const scanFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !scanning) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+    if (code) {
+      handleScan(code.data);
+    }
+
+    animationRef.current = requestAnimationFrame(scanFrame);
+  }, [scanning, handleScan]);
+
   const startScanner = useCallback(async () => {
     try {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -72,55 +89,26 @@ export default function Scanner() {
         return;
       }
 
-      const container = scannerContainerRef.current;
-      if (!container || container.clientWidth === 0) {
-        setResult({
-          type: "error",
-          message: "Área do scanner não está pronta. Tente recarregar a página.",
-        });
-        return;
-      }
-
       setResult({ type: "info", message: "Solicitando permissão da câmera..." });
 
-      // Request permission first to avoid hard browser crashes
-      await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
 
-      const devices = await Html5Qrcode.getCameras();
-      if (!devices || devices.length === 0) {
-        setResult({
-          type: "error",
-          message: "Nenhuma câmera encontrada neste dispositivo.",
-        });
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) {
+        setResult({ type: "error", message: "Elemento de vídeo não encontrado." });
         return;
       }
 
-      // Prefer back camera on mobile; fallback to first available camera
-      const camera =
-        devices.find(
-          (d) => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("traseira")
-        ) ?? devices[devices.length - 1];
-
-      const scanner = new Html5Qrcode("scanner-region");
-      scannerRef.current = scanner;
-
-      const { width, height } = getQrBox();
-      await scanner.start(
-        camera.id,
-        {
-          fps: 10,
-          qrbox: { width, height },
-        },
-        (decodedText) => {
-          handleScan(decodedText);
-        },
-        () => {
-          // Ignore scan errors (no code found yet)
-        }
-      );
+      video.srcObject = stream;
+      await video.play();
 
       setScanning(true);
       setResult(null);
+      animationRef.current = requestAnimationFrame(scanFrame);
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
       const message = err instanceof Error ? err.message : String(err);
@@ -129,28 +117,31 @@ export default function Scanner() {
         message: `Erro ao iniciar câmera: ${message}`,
       });
     }
-  }, [handleScan, getQrBox]);
+  }, [scanFrame]);
 
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch {
-        // Scanner already stopped
-      }
-      scannerRef.current = null;
-      setScanning(false);
+  const stopScanner = useCallback(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
     }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setScanning(false);
   }, []);
 
   useEffect(() => {
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-      }
+      stopScanner();
     };
-  }, []);
+  }, [stopScanner]);
 
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-8">
@@ -182,12 +173,10 @@ export default function Scanner() {
       </div>
 
       <div
-        ref={scannerContainerRef}
-        id="scanner-region"
         className="w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
         style={{ minHeight: scanning ? 320 : 200 }}
       >
-        {!scanning && (
+        {!scanning ? (
           <div className="flex h-[200px] items-center justify-center text-zinc-400">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -207,8 +196,17 @@ export default function Scanner() {
               <line x1="7" y1="12" x2="17" y2="12" />
             </svg>
           </div>
+        ) : (
+          <video
+            ref={videoRef}
+            className="h-auto w-full rounded-xl"
+            playsInline
+            muted
+          />
         )}
       </div>
+
+      <canvas ref={canvasRef} className="hidden" />
 
       {loading && (
         <div className="mt-6 flex items-center gap-2 text-indigo-600">
