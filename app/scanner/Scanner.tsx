@@ -64,6 +64,23 @@ export default function Scanner() {
 
   const startScanner = useCallback(async () => {
     try {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+        setResult({
+          type: "error",
+          message: "Seu navegador não suporta acesso à câmera.",
+        });
+        return;
+      }
+
+      const container = scannerContainerRef.current;
+      if (!container || container.clientWidth === 0) {
+        setResult({
+          type: "error",
+          message: "Área do scanner não está pronta. Tente recarregar a página.",
+        });
+        return;
+      }
+
       const scanner = new Html5Qrcode("scanner-region");
       scannerRef.current = scanner;
 
@@ -73,7 +90,6 @@ export default function Scanner() {
         {
           fps: 10,
           qrbox: { width, height },
-          aspectRatio: 1.0,
         },
         (decodedText) => {
           handleScan(decodedText);
@@ -86,9 +102,10 @@ export default function Scanner() {
       setScanning(true);
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
+      const message = err instanceof Error ? err.message : String(err);
       setResult({
         type: "error",
-        message: "Não foi possível acessar a câmera. Verifique as permissões.",
+        message: `Erro ao iniciar câmera: ${message}`,
       });
     }
   }, [handleScan, getQrBox]);
@@ -147,7 +164,7 @@ export default function Scanner() {
         ref={scannerContainerRef}
         id="scanner-region"
         className="w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
-        style={{ minHeight: scanning ? 300 : 200 }}
+        style={{ minHeight: scanning ? 320 : 200 }}
       >
         {!scanning && (
           <div className="flex h-[200px] items-center justify-center text-zinc-400">
