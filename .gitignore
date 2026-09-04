@@ -33,6 +33,15 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# agent / ide metadata
+.agents/
+.claude/
+.cursor/
+.devin/
+.skills-lock.json
+.gitattributes
+.idea/
+
 # vercel
 .vercel
 
