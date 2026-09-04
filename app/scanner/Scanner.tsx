@@ -81,12 +81,32 @@ export default function Scanner() {
         return;
       }
 
+      setResult({ type: "info", message: "Solicitando permissão da câmera..." });
+
+      // Request permission first to avoid hard browser crashes
+      await navigator.mediaDevices.getUserMedia({ video: true });
+
+      const devices = await Html5Qrcode.getCameras();
+      if (!devices || devices.length === 0) {
+        setResult({
+          type: "error",
+          message: "Nenhuma câmera encontrada neste dispositivo.",
+        });
+        return;
+      }
+
+      // Prefer back camera on mobile; fallback to first available camera
+      const camera =
+        devices.find(
+          (d) => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("traseira")
+        ) ?? devices[devices.length - 1];
+
       const scanner = new Html5Qrcode("scanner-region");
       scannerRef.current = scanner;
 
       const { width, height } = getQrBox();
       await scanner.start(
-        { facingMode: "environment" },
+        camera.id,
         {
           fps: 10,
           qrbox: { width, height },
@@ -100,6 +120,7 @@ export default function Scanner() {
       );
 
       setScanning(true);
+      setResult(null);
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
       const message = err instanceof Error ? err.message : String(err);
