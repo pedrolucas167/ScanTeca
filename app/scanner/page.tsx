@@ -11,10 +11,18 @@ interface ScanResult {
 
 export default function ScannerPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerRef = useRef<HTMLDivElement>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const processingRef = useRef(false);
+
+  const getQrBox = useCallback(() => {
+    const width = scannerContainerRef.current?.clientWidth ?? 320;
+    const qrWidth = Math.min(Math.round(width * 0.75), 560);
+    const qrHeight = Math.round(qrWidth / 2);
+    return { width: qrWidth, height: qrHeight };
+  }, []);
 
   const handleScan = useCallback(async (isbn: string) => {
     if (processingRef.current) return;
@@ -59,11 +67,12 @@ export default function ScannerPage() {
       const scanner = new Html5Qrcode("scanner-region");
       scannerRef.current = scanner;
 
+      const { width, height } = getQrBox();
       await scanner.start(
         { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 300, height: 150 },
+          qrbox: { width, height },
           aspectRatio: 1.0,
         },
         (decodedText) => {
@@ -135,8 +144,9 @@ export default function ScannerPage() {
       </div>
 
       <div
+        ref={scannerContainerRef}
         id="scanner-region"
-        className="w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
         style={{ minHeight: scanning ? 300 : 200 }}
       >
         {!scanning && (

@@ -12,7 +12,7 @@ export default async function Home() {
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           📚 Catálogo de Livros
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
