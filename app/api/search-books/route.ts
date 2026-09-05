@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 interface GoogleBooksItem {
   id: string;
@@ -43,7 +44,10 @@ export async function POST(request: NextRequest) {
       ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=20&langRestrict=pt&key=${apiKey}`
       : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=20&langRestrict=pt`;
 
-    const res = await fetch(url);
+    const res = await fetchWithRetry(url, {
+      maxRetries: 3,
+      baseDelay: 500,
+    });
     if (!res.ok) {
       return NextResponse.json(
         { error: "Erro ao buscar no Google Books" },
