@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   BookOpen,
   Check,
+  Globe,
   PlusCircle,
   Search,
   Star,
@@ -200,6 +201,54 @@ export default function Catalog({ books }: { books: Book[] }) {
     const coverUrl = await searchAndSaveCover(editingBook);
     if (coverUrl && editingBook) {
       setEditingBook({ ...editingBook, coverUrl });
+    }
+  };
+
+  const handleSearchWikipediaCover = async () => {
+    if (!editingBook) return;
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/search-cover-wikipedia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editingBook.title }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.coverUrl) {
+        setEditingBook({ ...editingBook, coverUrl: data.coverUrl });
+
+        const saveRes = await fetch("/api/books", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingBook.id,
+            coverUrl: data.coverUrl,
+          }),
+        });
+
+        if (saveRes.ok) {
+          setBookList((prev) =>
+            prev.map((b) =>
+              b.id === editingBook.id ? { ...b, coverUrl: data.coverUrl } : b
+            )
+          );
+          setMessage(`Capa encontrada na Wikipédia para ${editingBook.title}`);
+          setTimeout(() => setMessage(null), 3000);
+        } else {
+          const saveData = await saveRes.json();
+          setMessage(saveData.error || "Erro ao salvar capa");
+        }
+      } else {
+        setMessage(data.error || "Nenhuma capa encontrada na Wikipédia");
+      }
+    } catch {
+      setMessage("Erro ao buscar capa na Wikipédia");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -514,6 +563,15 @@ export default function Catalog({ books }: { books: Book[] }) {
                 className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
               >
                 {loading ? "Buscando..." : <span className="flex items-center justify-center gap-2"><Search className="h-4 w-4" /> Buscar capa automaticamente</span>}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSearchWikipediaCover}
+                disabled={loading}
+                className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                {loading ? "Buscando..." : <span className="flex items-center justify-center gap-2"><Globe className="h-4 w-4" /> Buscar capa na Wikipédia</span>}
               </button>
             </div>
 

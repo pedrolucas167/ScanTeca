@@ -222,7 +222,22 @@ export async function findBookCover({
     console.error("Open Library search error:", err);
   }
 
-  // 5. Try Wikipedia / Wikimedia for popular books
+  // 5. Try Wikipedia / Wikimedia for popular books (last resort)
+  const wikiCover = await findWikipediaCover(title);
+  if (wikiCover) {
+    console.log("[findBookCover] cover found via Wikipedia");
+    return wikiCover;
+  }
+
+  console.log("[findBookCover] no cover found");
+  return null;
+}
+
+export async function findWikipediaCover(
+  title?: string
+): Promise<string | null> {
+  if (!title) return null;
+
   try {
     const searchTitle = title.trim();
     const wikiRes = await fetch(
@@ -233,17 +248,26 @@ export async function findBookCover({
       const pages = wikiData?.query?.pages || {};
       for (const pageId in pages) {
         const thumb = pages[pageId]?.thumbnail?.source;
-        if (thumb) {
-          console.log("[findBookCover] cover found via Wikipedia");
-          return thumb;
-        }
+        if (thumb) return thumb;
+      }
+    }
+
+    // Try Portuguese Wikipedia too
+    const ptWikiRes = await fetch(
+      `https://pt.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(searchTitle)}&prop=pageimages&format=json&origin=*&pithumbsize=500&redirects=1`
+    );
+    if (ptWikiRes.ok) {
+      const ptWikiData = (await ptWikiRes.json()) as WikipediaApiResponse;
+      const pages = ptWikiData?.query?.pages || {};
+      for (const pageId in pages) {
+        const thumb = pages[pageId]?.thumbnail?.source;
+        if (thumb) return thumb;
       }
     }
   } catch (err) {
     console.error("Wikipedia search error:", err);
   }
 
-  console.log("[findBookCover] no cover found");
   return null;
 }
 
