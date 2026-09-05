@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { playBeep } from "@/lib/beep";
 
@@ -21,6 +22,7 @@ interface BarcodeDetectorConstructor {
 }
 
 export default function Scanner() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -31,6 +33,7 @@ export default function Scanner() {
   const [manualIsbn, setManualIsbn] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
   const processingRef = useRef(false);
+  const lastReadingsRef = useRef<string[]>([]);
 
   const handleScan = useCallback(async (isbn: string) => {
     if (processingRef.current) return;
@@ -52,8 +55,12 @@ export default function Scanner() {
       if (res.ok) {
         setResult({
           type: "success",
-          message: `✓ ${data.book.title} — ${data.message}`,
+          message: `✓ ${data.book.title} — redirecionando para o catálogo...`,
         });
+        stopScanner();
+        setTimeout(() => {
+          router.push("/");
+        }, 1200);
       } else {
         setResult({
           type: "error",
@@ -69,6 +76,20 @@ export default function Scanner() {
       }, 3000);
     }
   }, []);
+
+  const onBarcodeRead = useCallback(
+    (raw: string) => {
+      const buffer = lastReadingsRef.current;
+      buffer.push(raw);
+      if (buffer.length > 3) buffer.shift();
+
+      // Require 3 consecutive identical readings before accepting
+      if (buffer.length === 3 && buffer.every((r) => r === raw)) {
+        handleScan(raw);
+      }
+    },
+    [handleScan]
+  );
 
   const stopScanner = useCallback(() => {
     if (intervalRef.current) {
@@ -138,12 +159,12 @@ export default function Scanner() {
           try {
             const barcodes = await detector.detect(video);
             if (barcodes.length > 0) {
-              handleScan(barcodes[0].rawValue);
+              onBarcodeRead(barcodes[0].rawValue);
             }
           } catch {
             // Ignore per-frame detection errors
           }
-        }, 400);
+        }, 250);
       } else {
         // Fallback: ZXing
         const reader = new BrowserMultiFormatReader();
@@ -151,7 +172,7 @@ export default function Scanner() {
           video,
           (res) => {
             if (res) {
-              handleScan(res.getText());
+              onBarcodeRead(res.getText());
             }
           }
         );
