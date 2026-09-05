@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  ArrowDownAZ,
+  ArrowDownZA,
   BookOpen,
   Check,
   Globe,
@@ -51,6 +53,10 @@ export default function Catalog({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [collectionFilter, setCollectionFilter] = useState<string>("");
+  const [ratingFilter, setRatingFilter] = useState<string>("");
+  const [sortBy, setSortBy] = useState<
+    "title-asc" | "title-desc" | "author-asc" | "author-desc" | "newest" | "oldest" | "rating"
+  >("newest");
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [bookList, setBookList] = useState<Book[]>(books);
   const [libraryName, setLibraryName] = useState(initialLibraryName);
@@ -66,7 +72,7 @@ export default function Catalog({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return bookList.filter((book) => {
+    const result = bookList.filter((book) => {
       const matchesQuery =
         !q ||
         book.title.toLowerCase().includes(q) ||
@@ -75,9 +81,33 @@ export default function Catalog({
       const matchesStatus = !statusFilter || book.status === statusFilter;
       const matchesCollection =
         !collectionFilter || book.collection === collectionFilter;
-      return matchesQuery && matchesStatus && matchesCollection;
+      const matchesRating =
+        !ratingFilter || book.rating === Number(ratingFilter);
+      return matchesQuery && matchesStatus && matchesCollection && matchesRating;
     });
-  }, [bookList, query, statusFilter, collectionFilter]);
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case "title-asc":
+          return a.title.localeCompare(b.title, "pt-BR");
+        case "title-desc":
+          return b.title.localeCompare(a.title, "pt-BR");
+        case "author-asc":
+          return a.author.localeCompare(b.author, "pt-BR");
+        case "author-desc":
+          return b.author.localeCompare(a.author, "pt-BR");
+        case "rating":
+          return (b.rating ?? 0) - (a.rating ?? 0);
+        case "oldest":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "newest":
+        default:
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+
+    return result;
+  }, [bookList, query, statusFilter, collectionFilter, ratingFilter, sortBy]);
 
   const handleEdit = (book: Book) => {
     setEditingBook({ ...book });
@@ -448,6 +478,42 @@ export default function Catalog({
                 </option>
               ))}
             </select>
+            <select
+              value={ratingFilter}
+              onChange={(e) => setRatingFilter(e.target.value)}
+              className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+            >
+              <option value="">Todas as avaliações</option>
+              <option value="5">5 estrelas</option>
+              <option value="4">4 estrelas</option>
+              <option value="3">3 estrelas</option>
+              <option value="2">2 estrelas</option>
+              <option value="1">1 estrela</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                Ordenar por:
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+              >
+                <option value="newest">Mais recentes</option>
+                <option value="oldest">Mais antigos</option>
+                <option value="title-asc">Título (A-Z)</option>
+                <option value="title-desc">Título (Z-A)</option>
+                <option value="author-asc">Autor (A-Z)</option>
+                <option value="author-desc">Autor (Z-A)</option>
+                <option value="rating">Melhor avaliados</option>
+              </select>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {filtered.length} {filtered.length === 1 ? "livro" : "livros"}
+            </p>
           </div>
         </div>
 
@@ -461,12 +527,12 @@ export default function Catalog({
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <BookOpen className="mb-4 h-16 w-16 text-zinc-300 dark:text-zinc-700" />
             <h2 className="text-xl font-semibold text-foreground">
-              {query || statusFilter || collectionFilter
+              {query || statusFilter || collectionFilter || ratingFilter
                 ? "Nenhum livro encontrado"
                 : "Nenhum livro cadastrado"}
             </h2>
             <p className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-              {query || statusFilter || collectionFilter
+              {query || statusFilter || collectionFilter || ratingFilter
                 ? "Tente ajustar os filtros."
                 : "Use o scanner ou adicione manualmente livros ao seu catálogo."}
             </p>
