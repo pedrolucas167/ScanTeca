@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { BookStatus } from "@prisma/client";
+import { findBookCover } from "@/lib/book-cover";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const effectiveCoverUrl = coverUrl ||
+      (await findBookCover({ title, author, isbn: cleanedIsbn || undefined }));
+
     const book = await prisma.book.create({
       data: {
         isbn: cleanedIsbn || "MANUAL",
@@ -55,7 +59,7 @@ export async function POST(request: NextRequest) {
         author: author || "Autor desconhecido",
         publishedDate: publishedDate || null,
         synopsis: synopsis || null,
-        coverUrl: coverUrl || null,
+        coverUrl: effectiveCoverUrl || null,
         status: (status as BookStatus) || BookStatus.TO_READ,
         collection: collection || "Minha Biblioteca",
         notes: notes || null,
@@ -106,12 +110,22 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // If coverUrl is being cleared, try to find a new one automatically
+    let effectiveCoverUrl = coverUrl;
+    if (coverUrl === "" || coverUrl === undefined) {
+      effectiveCoverUrl = await findBookCover({
+        title: existing.title,
+        author: existing.author,
+        isbn: existing.isbn,
+      });
+    }
+
     const data: Record<string, unknown> = {};
     if (title !== undefined) data.title = title;
     if (author !== undefined) data.author = author || "Autor desconhecido";
     if (publishedDate !== undefined) data.publishedDate = publishedDate || null;
     if (synopsis !== undefined) data.synopsis = synopsis || null;
-    if (coverUrl !== undefined) data.coverUrl = coverUrl || null;
+    if (coverUrl !== undefined) data.coverUrl = effectiveCoverUrl || null;
     if (status !== undefined) data.status = status as BookStatus;
     if (collection !== undefined) data.collection = collection || "Minha Biblioteca";
     if (notes !== undefined) data.notes = notes || null;

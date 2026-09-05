@@ -108,6 +108,37 @@ export default function Catalog({ books }: { books: Book[] }) {
     }
   };
 
+  const handleSearchCover = async () => {
+    if (!editingBook) return;
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/search-cover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editingBook.title,
+          author: editingBook.author,
+          isbn: editingBook.isbn,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.coverUrl) {
+        setEditingBook({ ...editingBook, coverUrl: data.coverUrl });
+        setMessage("✓ Capa encontrada");
+      } else {
+        setMessage(data.error || "Nenhuma capa encontrada");
+      }
+    } catch {
+      setMessage("Erro ao buscar capa");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
@@ -380,6 +411,14 @@ export default function Catalog({ books }: { books: Book[] }) {
                 }
                 className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
               />
+              <button
+                type="button"
+                onClick={handleSearchCover}
+                disabled={loading}
+                className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+              >
+                {loading ? "Buscando..." : "🔍 Buscar capa automaticamente"}
+              </button>
             </div>
 
             <div className="mb-4">

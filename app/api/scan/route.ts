@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { findBookCover } from "@/lib/book-cover";
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -141,6 +142,16 @@ export async function POST(request: NextRequest) {
         { error: "Nenhum livro encontrado para este ISBN" },
         { status: 404 }
       );
+    }
+
+    // Try to find a cover if missing
+    if (!bookData.coverUrl) {
+      const extraCover = await findBookCover({
+        title: bookData.title,
+        author: bookData.author,
+        isbn: cleaned,
+      });
+      if (extraCover) bookData.coverUrl = extraCover;
     }
 
     const book = await prisma.book.create({
