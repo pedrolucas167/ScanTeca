@@ -96,6 +96,13 @@ export default function Scanner() {
 
       setResult({ type: "info", message: "Solicitando permissão da câmera..." });
 
+      // Show the scanner element BEFORE start() — html5-qrcode measures it
+      // to size the <video>; with display:none it renders 0x0 (black screen).
+      setScanning(true);
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r))
+      );
+
       const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
         verbose: false,
         formatsToSupport: [
@@ -117,9 +124,12 @@ export default function Scanner() {
           qrbox: { width: 280, height: 160 },
           aspectRatio: 1.777778,
           disableFlip: false,
+          // videoConstraints replaces the facingMode param entirely in
+          // html5-qrcode, so facingMode must live inside it.
           videoConstraints: {
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
         },
         (decodedText) => {
@@ -132,7 +142,6 @@ export default function Scanner() {
         }
       );
 
-      setScanning(true);
       setResult({ type: "info", message: "Aponte para o código de barras..." });
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
