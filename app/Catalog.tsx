@@ -51,6 +51,16 @@ const statusClasses: Record<string, string> = {
   WISHLIST: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
+const isKnownAuthor = (author: string | null | undefined) => {
+  if (!author) return false;
+  const a = author.trim().toLowerCase();
+  return (
+    a.length > 0 &&
+    a !== "autor desconhecido" &&
+    a !== "[author not identified]"
+  );
+};
+
 const literaryQuotes = [
   { text: "Sempre imaginei que o paraíso fosse uma espécie de biblioteca.", author: "Jorge Luis Borges" },
   { text: "Um quarto sem livros é como um corpo sem alma.", author: "Cícero" },
@@ -132,20 +142,22 @@ export default function Catalog({
   const stats = useMemo(() => {
     const read = bookList.filter((b) => b.status === "READ");
     const totalPages = read.reduce((sum, b) => sum + (b.pages ?? 0), 0);
+    const allPages = bookList.reduce((sum, b) => sum + (b.pages ?? 0), 0);
     const rated = bookList.filter((b) => b.rating !== null);
     const avgRating =
       rated.length > 0
         ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length
         : 0;
 
-    const stackMeters = Math.round(totalPages * 0.08) / 1000;
+    const stackMeters = Math.round(allPages * 0.08) / 1000;
 
-    const readingHours = Math.round(totalPages / 40);
+    const readingHours = Math.round(allPages / 40);
 
     const authorCount = new Map<string, number>();
     for (const b of bookList) {
-      if (b.author && b.author !== "Autor desconhecido") {
-        authorCount.set(b.author, (authorCount.get(b.author) ?? 0) + 1);
+      if (isKnownAuthor(b.author)) {
+        const author = b.author.trim();
+        authorCount.set(author, (authorCount.get(author) ?? 0) + 1);
       }
     }
     const topAuthor =
