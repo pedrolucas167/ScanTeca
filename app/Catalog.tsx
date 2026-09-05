@@ -108,8 +108,7 @@ export default function Catalog({ books }: { books: Book[] }) {
     }
   };
 
-  const handleSearchCover = async () => {
-    if (!editingBook) return;
+  const searchAndSaveCover = async (book: Book) => {
     setLoading(true);
     setMessage(null);
 
@@ -118,17 +117,36 @@ export default function Catalog({ books }: { books: Book[] }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: editingBook.title,
-          author: editingBook.author,
-          isbn: editingBook.isbn,
+          title: book.title,
+          author: book.author,
+          isbn: book.isbn,
         }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.coverUrl) {
-        setEditingBook({ ...editingBook, coverUrl: data.coverUrl });
-        setMessage("✓ Capa encontrada");
+        const saveRes = await fetch("/api/books", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: book.id,
+            coverUrl: data.coverUrl,
+          }),
+        });
+
+        const saveData = await saveRes.json();
+
+        if (saveRes.ok) {
+          setBookList((prev) =>
+            prev.map((b) => (b.id === book.id ? { ...b, coverUrl: data.coverUrl } : b))
+          );
+          setMessage(`✓ Capa encontrada para ${book.title}`);
+          setTimeout(() => setMessage(null), 3000);
+          return data.coverUrl;
+        } else {
+          setMessage(saveData.error || "Erro ao salvar capa");
+        }
       } else {
         setMessage(data.error || "Nenhuma capa encontrada");
       }
@@ -136,6 +154,15 @@ export default function Catalog({ books }: { books: Book[] }) {
       setMessage("Erro ao buscar capa");
     } finally {
       setLoading(false);
+    }
+    return null;
+  };
+
+  const handleSearchCover = async () => {
+    if (!editingBook) return;
+    const coverUrl = await searchAndSaveCover(editingBook);
+    if (coverUrl && editingBook) {
+      setEditingBook({ ...editingBook, coverUrl });
     }
   };
 
@@ -268,6 +295,13 @@ export default function Catalog({ books }: { books: Book[] }) {
                         <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                       </svg>
                       <span className="mt-1 text-xs">Sem capa</span>
+                      <button
+                        onClick={() => searchAndSaveCover(book)}
+                        disabled={loading}
+                        className="mt-2 rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {loading ? "Buscando..." : "🔍 Buscar capa"}
+                      </button>
                     </div>
                   )}
                 </div>
