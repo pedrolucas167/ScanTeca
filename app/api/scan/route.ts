@@ -52,6 +52,14 @@ export async function POST(request: NextRequest) {
 
     const cleaned = isbn.replace(/[^0-9X]/gi, "");
 
+    // Validate ISBN length (10 or 13 digits)
+    if (cleaned.length !== 10 && cleaned.length !== 13) {
+      return NextResponse.json(
+        { error: `ISBN inválido: ${cleaned} (deve ter 10 ou 13 dígitos)` },
+        { status: 400 }
+      );
+    }
+
     const existing = await prisma.book.findUnique({
       where: {
         isbn_userId: {
@@ -81,50 +89,50 @@ export async function POST(request: NextRequest) {
       coverUrl: string | null;
     } | null = null;
 
-    // Try Google Books first
+    // Try Open Library first (more reliable for ISBN lookups)
     try {
-      const res = await fetch(googleUrl);
-      if (res.ok) {
-        const data = (await res.json()) as GoogleBooksVolume;
-        if (data.items && data.totalItems > 0) {
-          const info = data.items[0].volumeInfo;
+      const olRes = await fetch(
+        `https://openlibrary.org/api/books?bibkeys=ISBN:${cleaned}&format=json&jscmd=data`
+      );
+      if (olRes.ok) {
+        const olData = (await olRes.json()) as OpenLibraryResponse;
+        const key = `ISBN:${cleaned}`;
+        const olBook = olData[key];
+        if (olBook) {
           bookData = {
-            title: info.title ?? "Título desconhecido",
-            author: info.authors?.join(", ") ?? "Autor desconhecido",
-            publishedDate: info.publishedDate ?? null,
-            synopsis: info.description ?? null,
-            coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
+            title: olBook.title ?? "Título desconhecido",
+            author: olBook.authors?.map((a) => a.name).join(", ") ?? "Autor desconhecido",
+            publishedDate: olBook.publish_date ?? null,
+            synopsis: null,
+            coverUrl: olBook.cover?.medium ?? olBook.cover?.small ?? null,
           };
         }
-      } else {
-        console.error(`Google Books API: status=${res.status}`);
       }
     } catch (err) {
-      console.error("Google Books API error:", err);
+      console.error("Open Library API error:", err);
     }
 
-    // Fallback to Open Library if Google Books failed or returned nothing
+    // Fallback to Google Books if Open Library returned nothing
     if (!bookData) {
       try {
-        const olRes = await fetch(
-          `https://openlibrary.org/api/books?bibkeys=ISBN:${cleaned}&format=json&jscmd=data`
-        );
-        if (olRes.ok) {
-          const olData = (await olRes.json()) as OpenLibraryResponse;
-          const key = `ISBN:${cleaned}`;
-          const olBook = olData[key];
-          if (olBook) {
+        const res = await fetch(googleUrl);
+        if (res.ok) {
+          const data = (await res.json()) as GoogleBooksVolume;
+          if (data.items && data.totalItems > 0) {
+            const info = data.items[0].volumeInfo;
             bookData = {
-              title: olBook.title ?? "Título desconhecido",
-              author: olBook.authors?.map((a) => a.name).join(", ") ?? "Autor desconhecido",
-              publishedDate: olBook.publish_date ?? null,
-              synopsis: null,
-              coverUrl: olBook.cover?.medium ?? olBook.cover?.small ?? null,
+              title: info.title ?? "Título desconhecido",
+              author: info.authors?.join(", ") ?? "Autor desconhecido",
+              publishedDate: info.publishedDate ?? null,
+              synopsis: info.description ?? null,
+              coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
             };
           }
+        } else {
+          console.error(`Google Books API: status=${res.status}`);
         }
       } catch (err) {
-        console.error("Open Library API error:", err);
+        console.error("Google Books API error:", err);
       }
     }
 
