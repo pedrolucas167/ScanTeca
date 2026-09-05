@@ -861,31 +861,8 @@ export default function Catalog({
             href="/scanner"
             className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-indigo-700"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-              <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-              <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-              <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-              <line x1="7" y1="12" x2="17" y2="12" />
-            </svg>
-            Escanear
-          </Link>
-          <Link
-            href="/search-add"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-indigo-300 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
-          >
-            <Search className="h-4 w-4" />
-            Buscar Livro
+            <PlusCircle className="h-4 w-4" />
+            Adicionar livro
           </Link>
           <Link
             href="/manual-add"

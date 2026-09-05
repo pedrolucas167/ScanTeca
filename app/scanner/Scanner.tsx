@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import type { IScannerControls } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
-import { ScanLine } from "lucide-react";
 import { playBeep } from "@/lib/beep";
 
 interface ScanResult {
@@ -169,12 +168,7 @@ export default function Scanner() {
   }, [stopScanner]);
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-8">
-      <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold text-foreground">
-        <ScanLine className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-        Scanner de Código de Barras
-      </h1>
-
+    <div className="flex flex-1 flex-col items-center">
       <p className="mb-6 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
         Aponte a câmera para o código de barras (ISBN) do livro. O livro será
         automaticamente cadastrado no catálogo.

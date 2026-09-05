@@ -86,7 +86,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
                     <line x1="7" y1="12" x2="17" y2="12" />
                   </svg>
-                  <span className="hidden sm:inline">Scanner</span>
+                  <span className="hidden sm:inline">Adicionar</span>
                 </Link>
                 <Show when="signed-out">
                   <SignInButton mode="modal">
