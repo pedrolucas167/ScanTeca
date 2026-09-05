@@ -94,6 +94,7 @@ export default function Catalog({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [shareEnabled, setShareEnabled] = useState(initialShareEnabled);
   const [shareId, setShareId] = useState<string | null>(initialShareId);
+  const [copied, setCopied] = useState(false);
 
   // Citação literária rotativa (muda a cada dia)
   const quote = literaryQuotes[
@@ -611,11 +612,13 @@ export default function Catalog({
         if (data.setting.shareEnabled && data.setting.shareId) {
           const url = `${window.location.origin}/shared/${data.setting.shareId}`;
           await navigator.clipboard.writeText(url).catch(() => {});
-          setMessage(`Link público ativado e copiado: ${url}`);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+          setMessage("Link público ativado e copiado!");
         } else {
           setMessage("Link público desativado");
         }
-        setTimeout(() => setMessage(null), 6000);
+        setTimeout(() => setMessage(null), 4000);
       } else {
         setMessage(data.error || "Erro ao atualizar compartilhamento");
       }
@@ -624,6 +627,14 @@ export default function Catalog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCopyLink = async () => {
+    if (!shareId) return;
+    const url = `${window.location.origin}/shared/${shareId}`;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -775,7 +786,7 @@ export default function Catalog({
                 }`}
               >
                 <Share2 className="h-3.5 w-3.5" />
-                {shareEnabled ? "Link ativo" : "Compartilhar"}
+                {shareEnabled ? "Desativar link" : "Compartilhar"}
               </button>
             </div>
 
@@ -818,6 +829,25 @@ export default function Catalog({
               </button>
             </div>
           </div>
+
+          {/* Share link panel */}
+          {shareEnabled && shareId && (
+            <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 dark:border-green-800 dark:bg-green-900/20">
+              <Share2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-green-800 dark:text-green-300">
+                {typeof window !== "undefined"
+                  ? `${window.location.origin}/shared/${shareId}`
+                  : `/shared/${shareId}`}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="shrink-0 rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700"
+              >
+                {copied ? "Copiado!" : "Copiar"}
+              </button>
+            </div>
+          )}
 
           {/* Stats panel */}
           {showStats && (
