@@ -104,6 +104,41 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </nav>
           </header>
           {children}
+          <footer className="border-t border-zinc-200 bg-white py-6 text-center dark:border-zinc-800 dark:bg-zinc-950">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Feito com 💜 por{" "}
+              <a
+                href="https://portfoliomarques.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Pedro Marques
+              </a>
+            </p>
+            <div className="mt-2 flex items-center justify-center gap-4 text-sm">
+              <a
+                href="https://portfoliomarques.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
+              >
+                Portfólio
+              </a>
+              <span className="text-zinc-300 dark:text-zinc-700">·</span>
+              <a
+                href="https://www.linkedin.com/in/pedromarquesdev/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
+              >
+                LinkedIn
+              </a>
+            </div>
+            <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+              © {new Date().getFullYear()} Scanteca. Todos os direitos reservados.
+            </p>
+          </footer>
         </ClerkProvider>
       </body>
     </html>
