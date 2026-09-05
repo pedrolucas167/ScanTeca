@@ -23,6 +23,16 @@ export default function Scanner() {
   const [showManualInput, setShowManualInput] = useState(false);
   const processingRef = useRef(false);
 
+  const stopScanner = useCallback(() => {
+    if (scannerRef.current?.isScanning) {
+      scannerRef.current
+        .stop()
+        .catch((err) => console.error("Erro ao parar scanner:", err));
+    }
+    scannerRef.current = null;
+    setScanning(false);
+  }, []);
+
   const handleScan = useCallback(
     async (isbn: string) => {
       if (processingRef.current) return;
@@ -71,18 +81,8 @@ export default function Scanner() {
         setLoading(false);
       }
     },
-    [router]
+    [router, stopScanner]
   );
-
-  const stopScanner = useCallback(() => {
-    if (scannerRef.current?.isScanning) {
-      scannerRef.current
-        .stop()
-        .catch((err) => console.error("Erro ao parar scanner:", err));
-    }
-    scannerRef.current = null;
-    setScanning(false);
-  }, []);
 
   const startScanner = useCallback(async () => {
     try {
@@ -188,8 +188,8 @@ export default function Scanner() {
         <p>
           Algumas obras podem não ser encontradas automaticamente (especialmente
           livros nacionais, independentes ou sem ISBN registrado). Se isso
-          acontecer, você poderá adicionar o livro manualmente em "Adicionar
-          Manual".
+          acontecer, você poderá adicionar o livro manualmente em
+          &ldquo;Adicionar Manual&rdquo;.
         </p>
       </div>
 
