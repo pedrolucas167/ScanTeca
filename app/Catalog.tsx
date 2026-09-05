@@ -41,12 +41,21 @@ const statusClasses: Record<string, string> = {
   WISHLIST: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
-export default function Catalog({ books }: { books: Book[] }) {
+export default function Catalog({
+  books,
+  libraryName: initialLibraryName,
+}: {
+  books: Book[];
+  libraryName: string;
+}) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [collectionFilter, setCollectionFilter] = useState<string>("");
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [bookList, setBookList] = useState<Book[]>(books);
+  const [libraryName, setLibraryName] = useState(initialLibraryName);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(initialLibraryName);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -204,6 +213,35 @@ export default function Catalog({ books }: { books: Book[] }) {
     }
   };
 
+  const handleSaveLibraryName = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/library-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setLibraryName(data.setting.name);
+        setIsEditingName(false);
+        setMessage("Nome da biblioteca atualizado");
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setMessage(data.error || "Erro ao salvar nome");
+      }
+    } catch {
+      setMessage("Erro de rede ao salvar nome");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearchWikipediaCover = async () => {
     if (!editingBook) return;
     setLoading(true);
@@ -259,6 +297,51 @@ export default function Catalog({ books }: { books: Book[] }) {
           <BookOpen className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
           Scanteca
         </h1>
+
+        <div className="mx-auto mt-4 flex max-w-lg flex-col items-center justify-center gap-2 sm:flex-row">
+          {isEditingName ? (
+            <div className="flex w-full items-center justify-center gap-2 sm:w-auto">
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveLibraryName();
+                  if (e.key === "Escape") {
+                    setIsEditingName(false);
+                    setNameInput(libraryName);
+                  }
+                }}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-center text-lg font-semibold text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:w-64 dark:border-zinc-600 dark:bg-zinc-800"
+                autoFocus
+              />
+              <button
+                onClick={handleSaveLibraryName}
+                disabled={loading}
+                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-70"
+              >
+                Salvar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsEditingName(true)}
+              className="group flex items-center gap-2 rounded-lg border border-transparent px-3 py-1 text-lg font-semibold text-foreground hover:border-zinc-200 hover:bg-white/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/50"
+            >
+              {libraryName}
+              <span className="text-xs font-normal text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-zinc-500">
+                (editar)
+              </span>
+            </button>
+          )}
+          <span className="hidden text-zinc-300 dark:text-zinc-700 sm:inline">
+            ·
+          </span>
+          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            {bookList.length} {bookList.length === 1 ? "livro" : "livros"}
+          </p>
+        </div>
+
         <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
           Organize seus livros: lidos, a ler e lista de desejos.
         </p>

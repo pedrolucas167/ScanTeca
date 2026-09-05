@@ -12,10 +12,20 @@ export default async function Home() {
     redirect("/sign-in");
   }
 
-  const books = await prisma.book.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-  });
+  const [books, setting] = await Promise.all([
+    prisma.book.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.librarySetting.upsert({
+      where: { userId },
+      update: {},
+      create: {
+        userId,
+        name: "Minha Biblioteca",
+      },
+    }),
+  ]);
 
-  return <Catalog books={books} />;
+  return <Catalog books={books} libraryName={setting.name} />;
 }

@@ -50,3 +50,9 @@ model Review {
   @@index([bookId])
   @@index([userId])
 }
+
+model LibrarySetting {
+  id     String @id @default(cuid())
+  userId String @unique
+  name   String @default("Minha Biblioteca")
+}
