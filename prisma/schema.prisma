@@ -25,6 +25,9 @@ model Book {
   collection    String     @default("Minha Biblioteca")
   notes         String?
   rating        Int?
+  genre         String?
+  pages         Int?
+  customOrder   Int?
   userId        String
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -34,6 +37,7 @@ model Book {
   @@index([userId])
   @@index([status])
   @@index([collection])
+  @@index([genre])
 }
 
 model Review {

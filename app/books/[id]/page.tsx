@@ -119,11 +119,15 @@ export default async function BookDetailPage({
                 {book.author}
               </p>
 
-              {book.publishedDate && (
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
-                  {book.publishedDate}
-                </p>
-              )}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500 dark:text-zinc-500">
+                {book.publishedDate && <span>{book.publishedDate}</span>}
+                {book.genre && (
+                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
+                    {book.genre}
+                  </span>
+                )}
+                {book.pages && <span>{book.pages} páginas</span>}
+              </div>
 
               {book.rating ? (
                 <div className="mt-2 flex items-center gap-1">

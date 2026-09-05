@@ -21,6 +21,8 @@ export default function ManualAddPage() {
     collection: "Minha Biblioteca",
     notes: "",
     rating: "" as string,
+    genre: "",
+    pages: "" as string,
   });
 
   const handleSearchCoverByTitle = async () => {
@@ -168,15 +170,43 @@ export default function ManualAddPage() {
           />
         </div>
 
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Data de publicação
+            </label>
+            <input
+              type="text"
+              value={form.publishedDate}
+              onChange={(e) => setForm({ ...form, publishedDate: e.target.value })}
+              placeholder="Ex: 2019"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Páginas
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={form.pages}
+              onChange={(e) => setForm({ ...form, pages: e.target.value })}
+              placeholder="Ex: 320"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
+            />
+          </div>
+        </div>
+
         <div className="mb-4">
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Data de publicação
+            Gênero
           </label>
           <input
             type="text"
-            value={form.publishedDate}
-            onChange={(e) => setForm({ ...form, publishedDate: e.target.value })}
-            placeholder="Ex: 2019"
+            value={form.genre}
+            onChange={(e) => setForm({ ...form, genre: e.target.value })}
+            placeholder="Ex: Ficção, Romance, Fantasia..."
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
         </div>

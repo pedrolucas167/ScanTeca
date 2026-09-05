@@ -4,11 +4,14 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ArrowDownAZ,
-  ArrowDownZA,
+  BarChart3,
   BookOpen,
-  Check,
+  Download,
   Globe,
+  GripVertical,
+  LayoutGrid,
+  Library,
+  List,
   PlusCircle,
   Search,
   Star,
@@ -26,6 +29,9 @@ interface Book {
   collection: string;
   notes: string | null;
   rating: number | null;
+  genre: string | null;
+  pages: number | null;
+  customOrder: number | null;
   createdAt: Date;
   updatedAt: Date;
   userId: string;
@@ -54,8 +60,13 @@ export default function Catalog({
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [collectionFilter, setCollectionFilter] = useState<string>("");
   const [ratingFilter, setRatingFilter] = useState<string>("");
+  const [yearFilter, setYearFilter] = useState<string>("");
+  const [genreFilter, setGenreFilter] = useState<string>("");
+  const [noCoverOnly, setNoCoverOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "shelf">("grid");
+  const [showStats, setShowStats] = useState(false);
   const [sortBy, setSortBy] = useState<
-    "title-asc" | "title-desc" | "author-asc" | "author-desc" | "newest" | "oldest" | "rating"
+    "title-asc" | "title-desc" | "author-asc" | "author-desc" | "newest" | "oldest" | "rating" | "custom"
   >("newest");
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [bookList, setBookList] = useState<Book[]>(books);
@@ -64,11 +75,54 @@ export default function Catalog({
   const [nameInput, setNameInput] = useState(initialLibraryName);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   const collections = useMemo(
     () => Array.from(new Set(bookList.map((b) => b.collection))).sort(),
     [bookList]
   );
+
+  const genres = useMemo(
+    () =>
+      Array.from(
+        new Set(bookList.map((b) => b.genre).filter((g): g is string => !!g))
+      ).sort(),
+    [bookList]
+  );
+
+  const years = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          bookList
+            .map((b) => {
+              const match = b.publishedDate?.match(/\d{4}/);
+              return match ? match[0] : null;
+            })
+            .filter((y): y is string => !!y)
+        )
+      ).sort((a, b) => Number(b) - Number(a)),
+    [bookList]
+  );
+
+  const stats = useMemo(() => {
+    const read = bookList.filter((b) => b.status === "READ");
+    const totalPages = read.reduce((sum, b) => sum + (b.pages ?? 0), 0);
+    const rated = bookList.filter((b) => b.rating !== null);
+    const avgRating =
+      rated.length > 0
+        ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length
+        : 0;
+    return {
+      total: bookList.length,
+      read: read.length,
+      toRead: bookList.filter((b) => b.status === "TO_READ").length,
+      wishlist: bookList.filter((b) => b.status === "WISHLIST").length,
+      totalPages,
+      avgRating: Math.round(avgRating * 10) / 10,
+      noCover: bookList.filter((b) => !b.coverUrl).length,
+    };
+  }, [bookList]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -77,13 +131,26 @@ export default function Catalog({
         !q ||
         book.title.toLowerCase().includes(q) ||
         book.author.toLowerCase().includes(q) ||
-        book.isbn.toLowerCase().includes(q);
+        book.isbn.toLowerCase().includes(q) ||
+        (book.genre?.toLowerCase().includes(q) ?? false);
       const matchesStatus = !statusFilter || book.status === statusFilter;
       const matchesCollection =
         !collectionFilter || book.collection === collectionFilter;
       const matchesRating =
         !ratingFilter || book.rating === Number(ratingFilter);
-      return matchesQuery && matchesStatus && matchesCollection && matchesRating;
+      const matchesYear =
+        !yearFilter || (book.publishedDate?.includes(yearFilter) ?? false);
+      const matchesGenre = !genreFilter || book.genre === genreFilter;
+      const matchesNoCover = !noCoverOnly || !book.coverUrl;
+      return (
+        matchesQuery &&
+        matchesStatus &&
+        matchesCollection &&
+        matchesRating &&
+        matchesYear &&
+        matchesGenre &&
+        matchesNoCover
+      );
     });
 
     result.sort((a, b) => {
@@ -100,6 +167,8 @@ export default function Catalog({
           return (b.rating ?? 0) - (a.rating ?? 0);
         case "oldest":
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "custom":
+          return (a.customOrder ?? 999999) - (b.customOrder ?? 999999);
         case "newest":
         default:
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -107,7 +176,7 @@ export default function Catalog({
     });
 
     return result;
-  }, [bookList, query, statusFilter, collectionFilter, ratingFilter, sortBy]);
+  }, [bookList, query, statusFilter, collectionFilter, ratingFilter, yearFilter, genreFilter, noCoverOnly, sortBy]);
 
   const handleEdit = (book: Book) => {
     setEditingBook({ ...book });
@@ -160,6 +229,8 @@ export default function Catalog({
           collection: editingBook.collection,
           notes: editingBook.notes,
           rating: editingBook.rating,
+          genre: editingBook.genre,
+          pages: editingBook.pages,
         }),
       });
 
@@ -357,6 +428,104 @@ export default function Catalog({
     }
   };
 
+  const handleExportCSV = () => {
+    const headers = [
+      "Título",
+      "Autor",
+      "ISBN",
+      "Publicação",
+      "Gênero",
+      "Status",
+      "Coleção",
+      "Avaliação",
+      "Páginas",
+      "Capa",
+      "Sinopse",
+      "Notas",
+    ];
+
+    const escape = (v: string | number | null | undefined) => {
+      const s = v === null || v === undefined ? "" : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const rows = filtered.map((b) =>
+      [
+        escape(b.title),
+        escape(b.author),
+        escape(b.isbn),
+        escape(b.publishedDate),
+        escape(b.genre),
+        escape(statusLabels[b.status] ?? b.status),
+        escape(b.collection),
+        escape(b.rating),
+        escape(b.pages),
+        escape(b.coverUrl),
+        escape(b.synopsis),
+        escape(b.notes),
+      ].join(",")
+    );
+
+    const csv = "\uFEFF" + [headers.map(escape).join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `scanteca-catalogo-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessage(`Catálogo exportado (${filtered.length} livros)`);
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  const handleDragStart = (id: string) => {
+    setDraggedId(id);
+  };
+
+  const handleDrop = async (targetId: string) => {
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      return;
+    }
+
+    const ids = filtered.map((b) => b.id);
+    const fromIndex = ids.indexOf(draggedId);
+    const toIndex = ids.indexOf(targetId);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedId(null);
+      return;
+    }
+
+    const reordered = [...filtered];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    // Assign customOrder based on new positions
+    const updated = reordered.map((b, i) => ({ ...b, customOrder: i }));
+    setBookList((prev) =>
+      prev.map((b) => updated.find((u) => u.id === b.id) ?? b)
+    );
+    setSortBy("custom");
+    setDraggedId(null);
+
+    // Persist order
+    try {
+      await Promise.all(
+        updated.map((b) =>
+          fetch("/api/books", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: b.id, customOrder: b.customOrder }),
+          })
+        )
+      );
+      setMessage("Ordem personalizada salva");
+      setTimeout(() => setMessage(null), 3000);
+    } catch {
+      setMessage("Erro ao salvar ordem");
+    }
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
@@ -448,18 +617,131 @@ export default function Catalog({
 
       <section className="flex-1 px-4 py-8">
         <div className="mx-auto mb-6 max-w-6xl space-y-3">
+          {/* Toolbar: stats, export, view mode */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowStats((s) => !s)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                  showStats
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+                    : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                }`}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Estatísticas
+              </button>
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Exportar CSV
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600 dark:bg-zinc-800">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                title="Grade"
+                className={`rounded-md p-1.5 transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+                    : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                title="Lista compacta"
+                className={`rounded-md p-1.5 transition-colors ${
+                  viewMode === "list"
+                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+                    : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                }`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("shelf")}
+                title="Estante"
+                className={`rounded-md p-1.5 transition-colors ${
+                  viewMode === "shelf"
+                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+                    : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                }`}
+              >
+                <Library className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Stats panel */}
+          {showStats && (
+            <div className="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-6 dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {stats.total}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Total</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {stats.read}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Lidos</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {stats.toRead}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">A ler</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {stats.wishlist}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Desejos</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {stats.totalPages.toLocaleString("pt-BR")}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Páginas lidas
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="flex items-center justify-center gap-1 text-2xl font-bold text-yellow-500">
+                  {stats.avgRating}
+                  <Star className="h-4 w-4 fill-current" />
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Média de avaliação
+                </p>
+              </div>
+            </div>
+          )}
+
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por título, autor ou ISBN..."
+            placeholder="Buscar por título, autor, ISBN ou gênero..."
             className="w-full rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
-          <div className="flex flex-col gap-3 sm:flex-row">
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
             >
               <option value="">Todos os status</option>
               <option value="READ">Lidos</option>
@@ -469,7 +751,7 @@ export default function Catalog({
             <select
               value={collectionFilter}
               onChange={(e) => setCollectionFilter(e.target.value)}
-              className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
             >
               <option value="">Todas as coleções</option>
               {collections.map((c) => (
@@ -479,9 +761,33 @@ export default function Catalog({
               ))}
             </select>
             <select
+              value={genreFilter}
+              onChange={(e) => setGenreFilter(e.target.value)}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+            >
+              <option value="">Todos os gêneros</option>
+              {genres.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+            <select
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+            >
+              <option value="">Todos os anos</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <select
               value={ratingFilter}
               onChange={(e) => setRatingFilter(e.target.value)}
-              className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
             >
               <option value="">Todas as avaliações</option>
               <option value="5">5 estrelas</option>
@@ -493,23 +799,40 @@ export default function Catalog({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Ordenar por:
-              </span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
-              >
-                <option value="newest">Mais recentes</option>
-                <option value="oldest">Mais antigos</option>
-                <option value="title-asc">Título (A-Z)</option>
-                <option value="title-desc">Título (Z-A)</option>
-                <option value="author-asc">Autor (A-Z)</option>
-                <option value="author-desc">Autor (Z-A)</option>
-                <option value="rating">Melhor avaliados</option>
-              </select>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                  Ordenar:
+                </span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+                >
+                  <option value="newest">Mais recentes</option>
+                  <option value="oldest">Mais antigos</option>
+                  <option value="title-asc">Título (A-Z)</option>
+                  <option value="title-desc">Título (Z-A)</option>
+                  <option value="author-asc">Autor (A-Z)</option>
+                  <option value="author-desc">Autor (Z-A)</option>
+                  <option value="rating">Melhor avaliados</option>
+                  <option value="custom">Ordem personalizada</option>
+                </select>
+              </div>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={noCoverOnly}
+                  onChange={(e) => setNoCoverOnly(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 dark:border-zinc-600"
+                />
+                Somente sem capa
+              </label>
+              {sortBy === "custom" && (
+                <span className="text-xs text-indigo-600 dark:text-indigo-400">
+                  Arraste os cards para reordenar
+                </span>
+              )}
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               {filtered.length} {filtered.length === 1 ? "livro" : "livros"}
@@ -527,24 +850,161 @@ export default function Catalog({
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <BookOpen className="mb-4 h-16 w-16 text-zinc-300 dark:text-zinc-700" />
             <h2 className="text-xl font-semibold text-foreground">
-              {query || statusFilter || collectionFilter || ratingFilter
+              {query || statusFilter || collectionFilter || ratingFilter || yearFilter || genreFilter || noCoverOnly
                 ? "Nenhum livro encontrado"
                 : "Nenhum livro cadastrado"}
             </h2>
             <p className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-              {query || statusFilter || collectionFilter || ratingFilter
+              {query || statusFilter || collectionFilter || ratingFilter || yearFilter || genreFilter || noCoverOnly
                 ? "Tente ajustar os filtros."
                 : "Use o scanner ou adicione manualmente livros ao seu catálogo."}
             </p>
           </div>
+        ) : viewMode === "list" ? (
+          /* ===== LIST VIEW ===== */
+          <div className="mx-auto max-w-6xl divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            {filtered.map((book) => (
+              <div
+                key={book.id}
+                draggable={sortBy === "custom"}
+                onDragStart={() => handleDragStart(book.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(book.id)}
+                onClick={() => (window.location.href = `/books/${book.id}`)}
+                className={`group flex cursor-pointer items-center gap-4 p-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
+                  draggedId === book.id ? "opacity-50" : ""
+                }`}
+              >
+                {sortBy === "custom" && (
+                  <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-zinc-400" />
+                )}
+                <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">
+                  {book.coverUrl ? (
+                    <Image
+                      src={book.coverUrl}
+                      alt={`Capa de ${book.title}`}
+                      fill
+                      className="object-cover"
+                      sizes="44px"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-zinc-400">
+                      <BookOpen className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-foreground">
+                    {book.title}
+                  </h3>
+                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    {book.author}
+                    {book.publishedDate ? ` · ${book.publishedDate}` : ""}
+                    {book.genre ? ` · ${book.genre}` : ""}
+                  </p>
+                </div>
+                <span
+                  className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline ${statusClasses[book.status]}`}
+                >
+                  {statusLabels[book.status]}
+                </span>
+                {book.rating ? (
+                  <span className="hidden shrink-0 items-center gap-0.5 text-xs text-yellow-500 sm:flex">
+                    <Star className="h-3 w-3 fill-current" />
+                    {book.rating}
+                  </span>
+                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(book);
+                    }}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(book);
+                    }}
+                    className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400"
+                  >
+                    Remover
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : viewMode === "shelf" ? (
+          /* ===== SHELF VIEW ===== */
+          <div className="mx-auto max-w-6xl">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+              {filtered.map((book) => (
+                <div
+                  key={book.id}
+                  draggable={sortBy === "custom"}
+                  onDragStart={() => handleDragStart(book.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDrop(book.id)}
+                  onClick={() => (window.location.href = `/books/${book.id}`)}
+                  className={`group relative cursor-pointer ${
+                    draggedId === book.id ? "opacity-50" : ""
+                  }`}
+                >
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-zinc-100 shadow-md transition-transform group-hover:-translate-y-1 group-hover:shadow-xl dark:bg-zinc-800">
+                    {book.coverUrl ? (
+                      <Image
+                        src={book.coverUrl}
+                        alt={`Capa de ${book.title}`}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 16vw"
+                      />
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center p-2 text-center text-zinc-400">
+                        <BookOpen className="mb-1 h-8 w-8" />
+                        <span className="line-clamp-3 text-[10px] font-medium">
+                          {book.title}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <p className="line-clamp-1 text-[10px] font-medium text-white">
+                        {book.title}
+                      </p>
+                      <p className="line-clamp-1 text-[9px] text-zinc-300">
+                        {book.author}
+                      </p>
+                    </div>
+                  </div>
+                  {/* shelf line */}
+                  <div className="mx-1 mt-1 h-1.5 rounded-b-sm bg-amber-900/20 dark:bg-amber-100/10" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
+          /* ===== GRID VIEW ===== */
           <div className="mx-auto grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((book) => (
               <article
                 key={book.id}
+                draggable={sortBy === "custom"}
+                onDragStart={() => handleDragStart(book.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(book.id)}
                 onClick={() => (window.location.href = `/books/${book.id}`)}
-                className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 ${
+                  draggedId === book.id ? "opacity-50" : ""
+                }`}
               >
+                {sortBy === "custom" && (
+                  <div className="absolute left-2 top-2 z-10 rounded bg-black/50 p-1 text-white">
+                    <GripVertical className="h-4 w-4 cursor-grab" />
+                  </div>
+                )}
                 <div className="relative flex h-56 items-center justify-center bg-zinc-100 dark:bg-zinc-800">
                   {book.coverUrl ? (
                     <Image
@@ -609,11 +1069,15 @@ export default function Catalog({
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     {book.author}
                   </p>
-                  {book.publishedDate && (
-                    <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
-                      {book.publishedDate}
-                    </p>
-                  )}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-400 dark:text-zinc-500">
+                    {book.publishedDate && <span>{book.publishedDate}</span>}
+                    {book.genre && (
+                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] dark:bg-zinc-800">
+                        {book.genre}
+                      </span>
+                    )}
+                    {book.pages && <span>{book.pages} págs</span>}
+                  </div>
                   {book.synopsis && (
                     <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
                       {book.synopsis}
@@ -701,21 +1165,65 @@ export default function Catalog({
               </button>
             </div>
 
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Data de publicação
+                </label>
+                <input
+                  type="text"
+                  value={editingBook.publishedDate || ""}
+                  onChange={(e) =>
+                    setEditingBook({
+                      ...editingBook,
+                      publishedDate: e.target.value || null,
+                    })
+                  }
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Páginas
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editingBook.pages ?? ""}
+                  onChange={(e) =>
+                    setEditingBook({
+                      ...editingBook,
+                      pages: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  placeholder="Ex: 320"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+                />
+              </div>
+            </div>
+
             <div className="mb-4">
               <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Data de publicação
+                Gênero
               </label>
               <input
                 type="text"
-                value={editingBook.publishedDate || ""}
+                value={editingBook.genre || ""}
                 onChange={(e) =>
                   setEditingBook({
                     ...editingBook,
-                    publishedDate: e.target.value || null,
+                    genre: e.target.value || null,
                   })
                 }
+                placeholder="Ex: Ficção, Romance, Fantasia..."
+                list="genre-suggestions"
                 className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
               />
+              <datalist id="genre-suggestions">
+                {genres.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
             </div>
 
             <div className="mb-4">

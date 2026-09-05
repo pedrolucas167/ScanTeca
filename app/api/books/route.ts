@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { isbn, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating } = body;
+    const { isbn, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = body;
 
     if (!title || typeof title !== "string") {
       return NextResponse.json(
@@ -64,6 +64,9 @@ export async function POST(request: NextRequest) {
         collection: collection || "Minha Biblioteca",
         notes: notes || null,
         rating: rating ?? null,
+        genre: genre || null,
+        pages: pages ? Number(pages) : null,
+        customOrder: customOrder ?? null,
         userId,
       },
     });
@@ -90,7 +93,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating } = body;
+    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = body;
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
@@ -130,6 +133,9 @@ export async function PATCH(request: NextRequest) {
     if (collection !== undefined) data.collection = collection || "Minha Biblioteca";
     if (notes !== undefined) data.notes = notes || null;
     if (rating !== undefined) data.rating = rating ?? null;
+    if (genre !== undefined) data.genre = genre || null;
+    if (pages !== undefined) data.pages = pages ? Number(pages) : null;
+    if (customOrder !== undefined) data.customOrder = customOrder ?? null;
 
     const book = await prisma.book.update({
       where: { id },
