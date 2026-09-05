@@ -201,7 +201,7 @@ export default function Scanner() {
       </div>
 
       <div
-        className="w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
+        className="relative w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
         style={{ minHeight: scanning ? 320 : 200 }}
       >
         <video
@@ -210,6 +210,30 @@ export default function Scanner() {
           playsInline
           muted
         />
+
+        {scanning && (
+          <>
+            {/* Scan frame overlay */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="relative h-32 w-4/5 max-w-sm">
+                {/* Corner brackets */}
+                <span className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-indigo-500" />
+                <span className="absolute right-0 top-0 h-6 w-6 border-r-4 border-t-4 border-indigo-500" />
+                <span className="absolute bottom-0 left-0 h-6 w-6 border-b-4 border-l-4 border-indigo-500" />
+                <span className="absolute bottom-0 right-0 h-6 w-6 border-b-4 border-r-4 border-indigo-500" />
+                {/* Animated scan line */}
+                <span className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 animate-pulse bg-indigo-500/80" />
+              </div>
+            </div>
+
+            {/* Status badge */}
+            <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+              <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-green-400 align-middle" />
+              Escaneando...
+            </div>
+          </>
+        )}
+
         {!scanning && (
           <div className="flex h-[200px] items-center justify-center text-zinc-400">
             <svg
