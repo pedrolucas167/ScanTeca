@@ -145,7 +145,13 @@ export default function Scanner() {
         className="w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
         style={{ minHeight: scanning ? 320 : 200 }}
       >
-        {!scanning ? (
+        <video
+          ref={videoRef}
+          className={`h-auto w-full rounded-xl ${scanning ? "block" : "hidden"}`}
+          playsInline
+          muted
+        />
+        {!scanning && (
           <div className="flex h-[200px] items-center justify-center text-zinc-400">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -165,13 +171,6 @@ export default function Scanner() {
               <line x1="7" y1="12" x2="17" y2="12" />
             </svg>
           </div>
-        ) : (
-          <video
-            ref={videoRef}
-            className="h-auto w-full rounded-xl"
-            playsInline
-            muted
-          />
         )}
       </div>
 
