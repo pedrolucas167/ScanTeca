@@ -307,14 +307,21 @@ export function isTitleSimilar(query: string, found: string): boolean {
     foundWords.some((fw) => fw === w || fw.startsWith(w) || w.startsWith(fw))
   );
 
-  // Match if most query words appear in found title
+  // Short titles (<=3 significant words): every word must appear, otherwise
+  // generic words like "bem"/"mal" match unrelated books.
+  if (queryWords.length <= 3) return common.length === queryWords.length;
+
+  // Longer titles (often include subtitle): match if most query words appear
   return common.length >= Math.max(1, Math.ceil(queryWords.length * 0.5));
 }
 
 export function isAuthorSimilar(query: string, found: string): boolean {
   const queryWords = normalize(query);
   const foundWords = normalize(found);
-  if (queryWords.length === 0 || foundWords.length === 0) return true;
+  // No author to verify against → accept. But when we DO have an author and
+  // the candidate has none, we can't confirm it's the same book → reject.
+  if (queryWords.length === 0) return true;
+  if (foundWords.length === 0) return false;
   return queryWords.some((w) =>
     foundWords.some((fw) => fw === w || fw.includes(w) || w.includes(fw))
   );

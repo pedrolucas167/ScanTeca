@@ -1,4 +1,4 @@
-import { isTitleSimilar, isAuthorSimilar } from "./book-cover";
+import { isTitleSimilar, isAuthorSimilar, normalize } from "./book-cover";
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -142,11 +142,12 @@ async function findGoogleBooksSynopsisByTitleAuthor(
         if (!info.description) continue;
 
         const foundTitle = (info.title || "").toLowerCase();
-        const foundAuthor = (info.authors?.[0] || "").toLowerCase();
+        const foundAuthors = info.authors || [];
 
         if (
           isTitleSimilar(queryTitle, foundTitle) &&
-          (!queryAuthor || isAuthorSimilar(queryAuthor, foundAuthor))
+          (!queryAuthor ||
+            foundAuthors.some((a) => isAuthorSimilar(queryAuthor, a)))
         ) {
           return cleanSynopsis(info.description);
         }
@@ -186,10 +187,14 @@ async function findOpenLibrarySynopsisByTitleAuthor(
         if (!doc) continue;
 
         const foundTitle = (doc.title || "").toLowerCase();
-        const foundAuthor = (doc.author_name?.[0] || "").toLowerCase();
+        const foundAuthors = doc.author_name || [];
 
         if (!isTitleSimilar(queryTitle, foundTitle)) continue;
-        if (queryAuthor && !isAuthorSimilar(queryAuthor, foundAuthor)) continue;
+        if (
+          queryAuthor &&
+          !foundAuthors.some((a) => isAuthorSimilar(queryAuthor, a))
+        )
+          continue;
 
         const workKey = doc.key;
         if (!workKey) continue;
@@ -211,34 +216,52 @@ async function findOpenLibrarySynopsisByTitleAuthor(
   return null;
 }
 
-async function findWikipediaSynopsis(title: string): Promise<string | null> {
+async function findWikipediaSynopsis(
+  title: string,
+  author?: string
+): Promise<string | null> {
   const searchTitle = title.trim();
   if (!searchTitle) return null;
 
-  const urls = [
-    `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
-      searchTitle
-    )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`,
-    `https://pt.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
-      searchTitle
-    )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`,
-  ];
+  // Last significant word of the author name — used to confirm the article
+  // is about the right book (rejects disambiguation/wrong-subject pages).
+  const authorWords = author ? normalize(author) : [];
+  const authorLastName = authorWords[authorWords.length - 1];
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
+  const candidates = [`${searchTitle} ${author || ""}`.trim(), searchTitle];
 
-      const data = (await res.json()) as WikipediaExtractResponse;
-      const pages = data?.query?.pages || {};
+  for (const candidate of candidates) {
+    const urls = [
+      `https://pt.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+        candidate
+      )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`,
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+        candidate
+      )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`,
+    ];
 
-      for (const pageId in pages) {
-        const extract = pages[pageId]?.extract;
-        const cleaned = cleanSynopsis(extract);
-        if (cleaned) return cleaned;
+    for (const url of urls) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+
+        const data = (await res.json()) as WikipediaExtractResponse;
+        const pages = data?.query?.pages || {};
+
+        for (const pageId in pages) {
+          const extract = pages[pageId]?.extract;
+          if (!extract) continue;
+          if (
+            authorLastName &&
+            !extract.toLowerCase().includes(authorLastName)
+          )
+            continue;
+          const cleaned = cleanSynopsis(extract);
+          if (cleaned) return cleaned;
+        }
+      } catch (err) {
+        console.error("[findSynopsis] Wikipedia error:", err);
       }
-    } catch (err) {
-      console.error("[findSynopsis] Wikipedia error:", err);
     }
   }
 
@@ -278,9 +301,7 @@ export async function findSynopsis({
   );
   if (olSearchSynopsis) return olSearchSynopsis;
 
-  const wikiSynopsis = await findWikipediaSynopsis(
-    `${title} ${author || ""}`.trim()
-  );
+  const wikiSynopsis = await findWikipediaSynopsis(title, author);
   if (wikiSynopsis) return wikiSynopsis;
 
   return null;
