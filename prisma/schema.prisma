@@ -9,12 +9,16 @@ datasource db {
 
 model Book {
   id              String   @id @default(cuid())
-  isbn            String   @unique
+  isbn            String
   title           String
   author          String
   publishedDate   String?
   synopsis        String?
   coverUrl        String?
+  userId          String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@unique([isbn, userId])
+  @@index([userId])
 }

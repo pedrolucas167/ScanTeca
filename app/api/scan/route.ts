@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
 interface GoogleBooksVolume {
@@ -19,6 +20,15 @@ interface GoogleBooksVolume {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { isbn } = body as { isbn: string };
 
@@ -32,7 +42,12 @@ export async function POST(request: NextRequest) {
     const cleaned = isbn.replace(/[^0-9X]/gi, "");
 
     const existing = await prisma.book.findUnique({
-      where: { isbn: cleaned },
+      where: {
+        isbn_userId: {
+          isbn: cleaned,
+          userId,
+        },
+      },
     });
 
     if (existing) {
@@ -42,13 +57,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}`
-    );
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const url = apiKey
+      ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}&key=${apiKey}`
+      : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}`;
+
+    const res = await fetch(url);
 
     if (!res.ok) {
+      const errorBody = await res.text().catch(() => "");
+      console.error(
+        `Google Books API falhou: status=${res.status} body=${errorBody}`
+      );
       return NextResponse.json(
-        { error: "Falha ao consultar Google Books API" },
+        {
+          error: `Falha ao consultar Google Books API (status ${res.status})`,
+        },
         { status: 502 }
       );
     }
@@ -72,6 +96,7 @@ export async function POST(request: NextRequest) {
         publishedDate: info.publishedDate ?? null,
         synopsis: info.description ?? null,
         coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
+        userId,
       },
     });
 
