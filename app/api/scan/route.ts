@@ -18,6 +18,17 @@ interface GoogleBooksVolume {
   }[];
 }
 
+interface OpenLibraryBook {
+  title?: string;
+  authors?: { name: string }[];
+  publish_date?: string;
+  cover?: { medium?: string; small?: string };
+}
+
+interface OpenLibraryResponse {
+  [key: string]: OpenLibraryBook;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -58,44 +69,80 @@ export async function POST(request: NextRequest) {
     }
 
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-    const url = apiKey
+    const googleUrl = apiKey
       ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}&key=${apiKey}`
       : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}`;
 
-    const res = await fetch(url);
+    let bookData: {
+      title: string;
+      author: string;
+      publishedDate: string | null;
+      synopsis: string | null;
+      coverUrl: string | null;
+    } | null = null;
 
-    if (!res.ok) {
-      const errorBody = await res.text().catch(() => "");
-      console.error(
-        `Google Books API falhou: status=${res.status} body=${errorBody}`
-      );
-      return NextResponse.json(
-        {
-          error: `Falha ao consultar Google Books API (status ${res.status})`,
-        },
-        { status: 502 }
-      );
+    // Try Google Books first
+    try {
+      const res = await fetch(googleUrl);
+      if (res.ok) {
+        const data = (await res.json()) as GoogleBooksVolume;
+        if (data.items && data.totalItems > 0) {
+          const info = data.items[0].volumeInfo;
+          bookData = {
+            title: info.title ?? "Título desconhecido",
+            author: info.authors?.join(", ") ?? "Autor desconhecido",
+            publishedDate: info.publishedDate ?? null,
+            synopsis: info.description ?? null,
+            coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
+          };
+        }
+      } else {
+        console.error(`Google Books API: status=${res.status}`);
+      }
+    } catch (err) {
+      console.error("Google Books API error:", err);
     }
 
-    const data = (await res.json()) as GoogleBooksVolume;
+    // Fallback to Open Library if Google Books failed or returned nothing
+    if (!bookData) {
+      try {
+        const olRes = await fetch(
+          `https://openlibrary.org/api/books?bibkeys=ISBN:${cleaned}&format=json&jscmd=data`
+        );
+        if (olRes.ok) {
+          const olData = (await olRes.json()) as OpenLibraryResponse;
+          const key = `ISBN:${cleaned}`;
+          const olBook = olData[key];
+          if (olBook) {
+            bookData = {
+              title: olBook.title ?? "Título desconhecido",
+              author: olBook.authors?.map((a) => a.name).join(", ") ?? "Autor desconhecido",
+              publishedDate: olBook.publish_date ?? null,
+              synopsis: null,
+              coverUrl: olBook.cover?.medium ?? olBook.cover?.small ?? null,
+            };
+          }
+        }
+      } catch (err) {
+        console.error("Open Library API error:", err);
+      }
+    }
 
-    if (!data.items || data.totalItems === 0) {
+    if (!bookData) {
       return NextResponse.json(
         { error: "Nenhum livro encontrado para este ISBN" },
         { status: 404 }
       );
     }
 
-    const info = data.items[0].volumeInfo;
-
     const book = await prisma.book.create({
       data: {
         isbn: cleaned,
-        title: info.title ?? "Título desconhecido",
-        author: info.authors?.join(", ") ?? "Autor desconhecido",
-        publishedDate: info.publishedDate ?? null,
-        synopsis: info.description ?? null,
-        coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
+        title: bookData.title,
+        author: bookData.author,
+        publishedDate: bookData.publishedDate,
+        synopsis: bookData.synopsis,
+        coverUrl: bookData.coverUrl,
         userId,
       },
     });
