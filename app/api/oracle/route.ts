@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Vector similarity search (cosine distance)
+    // 2. Vector similarity search (cosine distance) — no distance threshold,
+    // always return the 5 closest books even if similarity is weak.
     const vector = `[${questionEmbedding.join(",")}]`;
     const similarBooks = await prisma.$queryRaw<SimilarBook[]>`
       SELECT id, title, author, "publishedDate", synopsis, genre,
@@ -66,8 +67,14 @@ export async function POST(request: NextRequest) {
       FROM "Book"
       WHERE "userId" = ${userId} AND embedding IS NOT NULL
       ORDER BY embedding <=> ${vector}::vector
-      LIMIT 4
+      LIMIT 5
     `;
+
+    // Diagnostic: which books the vector search actually retrieved
+    console.log(
+      "[oracle] Livros retornados pela busca vetorial:",
+      similarBooks.map((b) => `${b.title} (dist=${Number(b.distance).toFixed(4)})`)
+    );
 
     // 3. Build context
     const context =
