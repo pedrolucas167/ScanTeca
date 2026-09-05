@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { playBeep } from "@/lib/beep";
 
 interface ScanResult {
@@ -8,9 +9,22 @@ interface ScanResult {
   message: string;
 }
 
+// BarcodeDetector may not be in TS lib types
+interface BarcodeDetectorResult {
+  rawValue: string;
+}
+interface BarcodeDetectorInstance {
+  detect(source: CanvasImageSource): Promise<BarcodeDetectorResult[]>;
+}
+interface BarcodeDetectorConstructor {
+  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
+}
+
 export default function Scanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const zxingControlsRef = useRef<IScannerControls | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +68,29 @@ export default function Scanner() {
     }
   }, []);
 
+  const stopScanner = useCallback(() => {
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    if (zxingControlsRef.current) {
+      zxingControlsRef.current.stop();
+      zxingControlsRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setScanning(false);
+  }, []);
+
   const startScanner = useCallback(async () => {
     try {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -82,7 +119,41 @@ export default function Scanner() {
       await video.play();
 
       setScanning(true);
-      setResult(null);
+      setResult({ type: "info", message: "Aponte para o código de barras..." });
+
+      const BarcodeDetectorCtor = (
+        window as unknown as { BarcodeDetector?: BarcodeDetectorConstructor }
+      ).BarcodeDetector;
+
+      if (BarcodeDetectorCtor) {
+        // Native BarcodeDetector (Chrome, Edge, Safari 15.4+)
+        const detector = new BarcodeDetectorCtor({
+          formats: ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"],
+        });
+
+        intervalRef.current = window.setInterval(async () => {
+          if (processingRef.current) return;
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              handleScan(barcodes[0].rawValue);
+            }
+          } catch {
+            // Ignore per-frame detection errors
+          }
+        }, 400);
+      } else {
+        // Fallback: ZXing
+        const reader = new BrowserMultiFormatReader();
+        zxingControlsRef.current = await reader.decodeFromVideoElement(
+          video,
+          (res) => {
+            if (res) {
+              handleScan(res.getText());
+            }
+          }
+        );
+      }
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
       const message = err instanceof Error ? err.message : String(err);
@@ -90,21 +161,9 @@ export default function Scanner() {
         type: "error",
         message: `Erro ao iniciar câmera: ${message}`,
       });
+      stopScanner();
     }
-  }, []);
-
-  const stopScanner = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    setScanning(false);
-  }, []);
+  }, [handleScan, stopScanner]);
 
   useEffect(() => {
     return () => {
