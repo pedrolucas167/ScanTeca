@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import jsQR from "jsqr";
 import { playBeep } from "@/lib/beep";
 
 interface ScanResult {
@@ -11,9 +10,7 @@ interface ScanResult {
 
 export default function Scanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animationRef = useRef<number | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,28 +54,6 @@ export default function Scanner() {
     }
   }, []);
 
-  const scanFrame = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !scanning) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-    if (code) {
-      handleScan(code.data);
-    }
-
-    animationRef.current = requestAnimationFrame(scanFrame);
-  }, [scanning, handleScan]);
-
   const startScanner = useCallback(async () => {
     try {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -108,7 +83,6 @@ export default function Scanner() {
 
       setScanning(true);
       setResult(null);
-      animationRef.current = requestAnimationFrame(scanFrame);
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
       const message = err instanceof Error ? err.message : String(err);
@@ -117,14 +91,9 @@ export default function Scanner() {
         message: `Erro ao iniciar câmera: ${message}`,
       });
     }
-  }, [scanFrame]);
+  }, []);
 
   const stopScanner = useCallback(() => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
-
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -205,8 +174,6 @@ export default function Scanner() {
           />
         )}
       </div>
-
-      <canvas ref={canvasRef} className="hidden" />
 
       {loading && (
         <div className="mt-6 flex items-center gap-2 text-indigo-600">
