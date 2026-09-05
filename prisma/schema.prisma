@@ -7,18 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BookStatus {
+  READ
+  TO_READ
+  WISHLIST
+}
+
 model Book {
-  id              String   @id @default(cuid())
-  isbn            String
-  title           String
-  author          String
-  publishedDate   String?
-  synopsis        String?
-  coverUrl        String?
-  userId          String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String     @id @default(cuid())
+  isbn          String
+  title         String
+  author        String
+  publishedDate String?
+  synopsis      String?
+  coverUrl      String?
+  status        BookStatus @default(TO_READ)
+  collection    String     @default("Minha Biblioteca")
+  notes         String?
+  rating        Int?
+  userId        String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@unique([isbn, userId])
   @@index([userId])
+  @@index([status])
+  @@index([collection])
 }

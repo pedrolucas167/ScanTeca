@@ -16,6 +16,10 @@ export default function ManualAddPage() {
     publishedDate: "",
     synopsis: "",
     coverUrl: "",
+    status: "TO_READ" as "READ" | "TO_READ" | "WISHLIST",
+    collection: "Minha Biblioteca",
+    notes: "",
+    rating: "" as string,
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,6 +149,70 @@ export default function ManualAddPage() {
             onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
             placeholder="Resumo do livro..."
             rows={3}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Coleção / Estante
+          </label>
+          <input
+            type="text"
+            value={form.collection}
+            onChange={(e) => setForm({ ...form, collection: e.target.value })}
+            placeholder="Ex: Estante da Sala"
+            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Status
+          </label>
+          <select
+            value={form.status}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                status: e.target.value as "READ" | "TO_READ" | "WISHLIST",
+              })
+            }
+            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+          >
+            <option value="TO_READ">A ler</option>
+            <option value="READ">Lido</option>
+            <option value="WISHLIST">Desejo</option>
+          </select>
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Avaliação
+          </label>
+          <select
+            value={form.rating}
+            onChange={(e) => setForm({ ...form, rating: e.target.value })}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+          >
+            <option value="">Sem avaliação</option>
+            <option value="1">1 estrela</option>
+            <option value="2">2 estrelas</option>
+            <option value="3">3 estrelas</option>
+            <option value="4">4 estrelas</option>
+            <option value="5">5 estrelas</option>
+          </select>
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Notas pessoais
+          </label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Minhas anotações..."
+            rows={2}
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
         </div>
