@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
       updateData.shareEnabled = shareEnabled;
       createData.shareEnabled = shareEnabled;
       if (shareEnabled) {
-        // Generate shareId if enabling and none exists
         const existing = await prisma.librarySetting.findUnique({
           where: { userId },
         });

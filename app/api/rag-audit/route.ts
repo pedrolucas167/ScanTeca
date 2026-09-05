@@ -10,12 +10,6 @@ interface AuditRow {
   hasSynopsis: boolean;
 }
 
-/**
- * GET /api/rag-audit
- * Diagnóstico do RAG: lista os livros do usuário logado indicando
- * quais têm embedding nulo e quais têm sinopse vazia/nula —
- * as duas causas mais comuns de "livros fantasmas" no Oráculo.
- */
 export async function GET() {
   try {
     const { userId } = await auth();
@@ -46,8 +40,6 @@ export async function GET() {
         hasEmbedding: b.hasEmbedding,
         hasSynopsis: b.hasSynopsis,
       })),
-      // Livros problemáticos: sem embedding (invisíveis ao Oráculo)
-      // ou sem sinopse (embedding fraco, caem no ranking vetorial)
       ghosts: books
         .filter((b) => !b.hasEmbedding || !b.hasSynopsis)
         .map((b) => ({

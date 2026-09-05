@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
 
     const cleaned = isbn.replace(/[^0-9X]/gi, "");
 
-    // Validate ISBN length (10 or 13 digits)
     if (cleaned.length !== 10 && cleaned.length !== 13) {
       return NextResponse.json(
         { error: `ISBN inválido: ${cleaned} (deve ter 10 ou 13 dígitos)` },
@@ -151,7 +150,6 @@ export async function POST(request: NextRequest) {
       console.error("Open Library API error:", err);
     }
 
-    // If author is missing, try to find it by title
     if (bookData && (bookData.author === "Autor desconhecido" || !bookData.author)) {
       try {
         const searchRes = await fetch(
@@ -195,7 +193,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fallback to Google Books if Open Library returned nothing
     if (!bookData) {
       try {
         const res = await fetch(googleUrl);
@@ -228,7 +225,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enrich with Google Books data (genre/pages) if missing
     if (!bookData.genre || !bookData.pages) {
       try {
         const res = await fetch(googleUrl);
@@ -249,7 +245,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Try to find a cover if missing
     if (!bookData.coverUrl) {
       const extraCover = await findBookCover({
         title: bookData.title,

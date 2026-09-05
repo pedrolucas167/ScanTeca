@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Embed the question
     const questionEmbedding = await generateEmbedding(question.trim());
     if (!questionEmbedding) {
       return new Response(
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Vector similarity search (cosine distance) — no distance threshold,
+    // Vector similarity search (cosine distance) — no distance threshold,
     // always return the 5 closest books even if similarity is weak.
     const vector = `[${questionEmbedding.join(",")}]`;
     const similarBooks = await prisma.$queryRaw<SimilarBook[]>`
@@ -70,13 +69,11 @@ export async function POST(request: NextRequest) {
       LIMIT 5
     `;
 
-    // Diagnostic: which books the vector search actually retrieved
     console.log(
       "[oracle] Livros retornados pela busca vetorial:",
       similarBooks.map((b) => `${b.title} (dist=${Number(b.distance).toFixed(4)})`)
     );
 
-    // 3. Build context
     const context =
       similarBooks.length > 0
         ? similarBooks
@@ -99,7 +96,6 @@ ${context}
 
 Pergunta do usuário: ${question.trim()}`;
 
-    // 4. Call OpenRouter chat completions with streaming
     const llmRes = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
       headers: {
@@ -124,7 +120,6 @@ Pergunta do usuário: ${question.trim()}`;
       );
     }
 
-    // 5. Stream: parse SSE and forward only the text deltas
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
@@ -133,7 +128,6 @@ Pergunta do usuário: ${question.trim()}`;
         const reader = llmRes.body!.getReader();
         let buffer = "";
 
-        // Send the sources first as a JSON line
         const sources = similarBooks.map((b) => ({
           id: b.id,
           title: b.title,
@@ -169,7 +163,6 @@ Pergunta do usuário: ${question.trim()}`;
                   );
                 }
               } catch {
-                // skip malformed chunks
               }
             }
           }

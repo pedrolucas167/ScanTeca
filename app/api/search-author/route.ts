@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
     const searchTitle = title ? title.trim() : "";
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
 
-    // 1. Try by ISBN first
     if (cleanedIsbn) {
       try {
         const res = await fetch(
@@ -80,7 +79,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Try by title
     if (searchTitle) {
       try {
         const res = await fetch(

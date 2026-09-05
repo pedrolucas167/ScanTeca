@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Generate and store embedding
     const embedding = await generateEmbedding(
       bookToEmbeddingText({
         title: book.title,

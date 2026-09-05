@@ -57,7 +57,6 @@ export async function findBookCover({
 
   const candidates: string[] = [];
 
-  // 1. Try by ISBN (Google Books) - check multiple results
   if (cleanedIsbn) {
     try {
       const url = apiKey
@@ -79,7 +78,6 @@ export async function findBookCover({
       console.error("Google Books cover search error:", err);
     }
 
-    // 2. Try by ISBN (Open Library)
     try {
       const res = await fetch(
         `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanedIsbn}&format=json&jscmd=data`
@@ -103,7 +101,6 @@ export async function findBookCover({
   const queryTitle = title.toLowerCase().trim();
   const queryAuthor = (author || "").toLowerCase().trim();
 
-  // 3. Try by title + author (Google Books) - check multiple results
   try {
     const queries = [
       encodeParams(title, author || ""),
@@ -141,7 +138,6 @@ export async function findBookCover({
     console.error("Google Books title search error:", err);
   }
 
-  // 4. Try by title (Open Library search) - check multiple results
   try {
     const searchQueries = [
       `${title} ${author || ""}`.trim(),
@@ -212,11 +208,9 @@ export async function findBookCover({
     console.error("Open Library search error:", err);
   }
 
-  // 5. Try Wikipedia / Wikimedia for popular books (last resort)
   const wikiCover = await findWikipediaCover(`${title} ${author || ""}`.trim());
   if (wikiCover) candidates.push(wikiCover);
 
-  // Validate candidates and return the first working image
   for (const url of candidates) {
     if (await isValidImageUrl(url)) {
       console.log("[findBookCover] valid cover found:", url);
@@ -236,10 +230,8 @@ async function isValidImageUrl(url: string): Promise<boolean> {
     const contentType = res.headers.get("content-type") || "";
     const contentLength = res.headers.get("content-length");
 
-    // Must be an image
     if (!contentType.startsWith("image/")) return false;
 
-    // Reject very small images (likely 1x1 placeholders or error images)
     const size = contentLength ? Number(contentLength) : null;
     if (size !== null && size < 1024) {
       console.log("[findBookCover] rejecting small image:", url, "size:", size);

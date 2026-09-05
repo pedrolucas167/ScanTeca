@@ -1,5 +1,5 @@
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const EMBEDDING_MODEL = "openai/text-embedding-3-small"; // 1536 dims
+const EMBEDDING_MODEL = "openai/text-embedding-3-small";
 
 export async function generateEmbedding(text: string): Promise<number[] | null> {
   const apiKey = process.env.OPENROUTER_API_KEY;

@@ -97,7 +97,6 @@ export default function Catalog({
   const [shareId, setShareId] = useState<string | null>(initialShareId);
   const [copied, setCopied] = useState(false);
 
-  // Citação literária rotativa (muda a cada dia)
   const quote = literaryQuotes[
     Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % literaryQuotes.length
   ];
@@ -139,13 +138,10 @@ export default function Catalog({
         ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length
         : 0;
 
-    // Pilha imaginária: ~0.08mm por página
     const stackMeters = Math.round(totalPages * 0.08) / 1000;
 
-    // Horas de leitura: ~40 páginas/hora
     const readingHours = Math.round(totalPages / 40);
 
-    // Autor mais presente
     const authorCount = new Map<string, number>();
     for (const b of bookList) {
       if (b.author && b.author !== "Autor desconhecido") {
@@ -157,7 +153,6 @@ export default function Catalog({
         ? [...authorCount.entries()].sort((a, b) => b[1] - a[1])[0]
         : null;
 
-    // Obra mais antiga
     const oldest = bookList
       .map((b) => {
         const m = b.publishedDate?.match(/\d{4}/);
@@ -166,7 +161,6 @@ export default function Catalog({
       .filter((x): x is { title: string; year: number } => !!x)
       .sort((a, b) => a.year - b.year)[0] ?? null;
 
-    // Ritmo: livros lidos por mês desde o primeiro
     const readDates = read
       .map((b) => new Date(b.createdAt).getTime())
       .sort((a, b) => a - b);
@@ -571,7 +565,6 @@ export default function Catalog({
     const [moved] = reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
 
-    // Assign customOrder based on new positions
     const updated = reordered.map((b, i) => ({ ...b, customOrder: i }));
     setBookList((prev) =>
       prev.map((b) => updated.find((u) => u.id === b.id) ?? b)
@@ -579,7 +572,6 @@ export default function Catalog({
     setSortBy("custom");
     setDraggedId(null);
 
-    // Persist order
     try {
       await Promise.all(
         updated.map((b) =>
@@ -693,7 +685,6 @@ export default function Catalog({
           </p>
         </div>
 
-        {/* Ornamento tipográfico */}
         <div className="mx-auto mt-5 flex max-w-xs items-center gap-3">
           <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
           <span className="font-serif text-sm italic text-zinc-400 dark:text-zinc-500">
@@ -753,7 +744,6 @@ export default function Catalog({
 
       <section className="flex-1 px-4 py-8">
         <div className="mx-auto mb-6 max-w-6xl space-y-3">
-          {/* Toolbar: stats, export, view mode */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
@@ -838,7 +828,6 @@ export default function Catalog({
             </div>
           </div>
 
-          {/* Share link panel */}
           {shareEnabled && shareId && (
             <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 dark:border-green-800 dark:bg-green-900/20">
               <Share2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
@@ -857,7 +846,6 @@ export default function Catalog({
             </div>
           )}
 
-          {/* Stats panel */}
           {showStats && (
             <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
               <p className="mb-4 text-center font-serif text-sm italic text-zinc-500 dark:text-zinc-400">
@@ -913,7 +901,6 @@ export default function Catalog({
                 </div>
               </div>
 
-              {/* Detalhes de curador */}
               <div className="mt-4 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 sm:grid-cols-3 dark:border-zinc-800">
                 {stats.topAuthor && (
                   <div className="text-center">
@@ -1081,7 +1068,6 @@ export default function Catalog({
             </p>
           </div>
         ) : viewMode === "list" ? (
-          /* ===== LIST VIEW ===== */
           <div className="mx-auto max-w-6xl divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {filtered.map((book) => (
               <div
@@ -1158,7 +1144,6 @@ export default function Catalog({
             ))}
           </div>
         ) : viewMode === "shelf" ? (
-          /* ===== SHELF VIEW ===== */
           <div className="mx-auto max-w-6xl">
             <div className="grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
               {filtered.map((book) => (
@@ -1199,14 +1184,12 @@ export default function Catalog({
                       </p>
                     </div>
                   </div>
-                  {/* shelf line */}
                   <div className="mx-1 mt-1 h-1.5 rounded-b-sm bg-amber-900/20 dark:bg-amber-100/10" />
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          /* ===== GRID VIEW ===== */
           <div className="mx-auto grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((book) => (
               <article
@@ -1341,7 +1324,6 @@ export default function Catalog({
         )}
       </section>
 
-      {/* Edit Modal */}
       {editingBook && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">

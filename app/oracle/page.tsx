@@ -94,7 +94,6 @@ export default function OraclePage() {
               });
             }
           } catch {
-            // skip malformed
           }
         }
       }
@@ -109,7 +108,6 @@ export default function OraclePage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Header */}
       <div className="border-b border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <Link
@@ -130,7 +128,6 @@ export default function OraclePage() {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.length === 0 && (
@@ -212,7 +209,6 @@ export default function OraclePage() {
         </div>
       </div>
 
-      {/* Input */}
       <div className="border-t border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950">
         <form
           onSubmit={handleSubmit}
