@@ -30,25 +30,29 @@ export async function findBookCover({
   isbn?: string;
 }): Promise<string | null> {
   const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : "";
-  let coverUrl: string | null = null;
-
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
 
-  // 1. Try by ISBN (Google Books)
+  console.log("[findBookCover] title:", title, "author:", author, "isbn:", cleanedIsbn);
+
+  // 1. Try by ISBN (Google Books) - check multiple results
   if (cleanedIsbn) {
     try {
       const url = apiKey
-        ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}&key=${apiKey}`
-        : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}`;
+        ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}&maxResults=10&key=${apiKey}`
+        : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}&maxResults=10`;
       const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as GoogleBooksVolume;
         if (data.items && data.totalItems > 0) {
-          const info = data.items[0].volumeInfo;
-          coverUrl =
-            info.imageLinks?.thumbnail ??
-            info.imageLinks?.smallThumbnail ??
-            null;
+          for (const item of data.items) {
+            const img =
+              item.volumeInfo.imageLinks?.thumbnail ??
+              item.volumeInfo.imageLinks?.smallThumbnail;
+            if (img) {
+              console.log("[findBookCover] cover found via Google Books ISBN");
+              return img;
+            }
+          }
         }
       }
     } catch (err) {
@@ -56,86 +60,134 @@ export async function findBookCover({
     }
 
     // 2. Try by ISBN (Open Library)
-    if (!coverUrl) {
-      try {
-        const res = await fetch(
-          `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanedIsbn}&format=json&jscmd=data`
-        );
-        if (res.ok) {
-          const data = (await res.json()) as OpenLibraryResponse;
-          const book = data[`ISBN:${cleanedIsbn}`];
-          coverUrl = book?.cover?.medium ?? book?.cover?.small ?? null;
-        }
-      } catch (err) {
-        console.error("Open Library cover search error:", err);
-      }
-    }
-  }
-
-  // 3. Try by title + author (Google Books)
-  if (!coverUrl && title) {
     try {
-      const q = encodeParams(title, author || "", cleanedIsbn || "");
-      const url = apiKey
-        ? `https://www.googleapis.com/books/v1/volumes?q=${q}&key=${apiKey}`
-        : `https://www.googleapis.com/books/v1/volumes?q=${q}`;
-      const res = await fetch(url);
+      const res = await fetch(
+        `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanedIsbn}&format=json&jscmd=data`
+      );
       if (res.ok) {
-        const data = (await res.json()) as GoogleBooksVolume;
-        if (data.items && data.totalItems > 0) {
-          const info = data.items[0].volumeInfo;
-          const foundTitle = info.title?.toLowerCase() || "";
-          const queryTitle = title.toLowerCase();
-          const titleMatch =
-            foundTitle.includes(queryTitle) ||
-            queryTitle.includes(foundTitle) ||
-            foundTitle.split(" ").some((word) => queryTitle.includes(word));
-
-          if (titleMatch) {
-            coverUrl =
-              info.imageLinks?.thumbnail ??
-              info.imageLinks?.smallThumbnail ??
-              null;
-          }
+        const data = (await res.json()) as OpenLibraryResponse;
+        const book = data[`ISBN:${cleanedIsbn}`];
+        const cover = book?.cover?.medium ?? book?.cover?.small;
+        if (cover) {
+          console.log("[findBookCover] cover found via Open Library ISBN");
+          return cover;
         }
       }
     } catch (err) {
-      console.error("Google Books title search error:", err);
+      console.error("Open Library cover search error:", err);
     }
   }
 
-  // 4. Try by title (Open Library search)
-  if (!coverUrl && title) {
-    try {
-      const res = await fetch(
-        `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=3${author ? `&author=${encodeURIComponent(author)}` : ""}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const firstDoc = data?.docs?.[0];
-        if (firstDoc?.isbn?.[0]) {
+  if (!title) {
+    console.log("[findBookCover] no title, giving up");
+    return null;
+  }
+
+  const queryTitle = title.toLowerCase().trim();
+  const queryAuthor = (author || "").toLowerCase().trim();
+
+  // 3. Try by title + author (Google Books) - check multiple results
+  try {
+    const q = encodeParams(title, author || "");
+    const url = apiKey
+      ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10&key=${apiKey}`
+      : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = (await res.json()) as GoogleBooksVolume;
+      if (data.items && data.totalItems > 0) {
+        for (const item of data.items) {
+          const info = item.volumeInfo;
+          const img =
+            info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail;
+          if (!img) continue;
+
+          const foundTitle = (info.title || "").toLowerCase();
+          const foundAuthor = (info.authors?.[0] || "").toLowerCase();
+
+          if (
+            isTitleSimilar(queryTitle, foundTitle) &&
+            (!queryAuthor || isAuthorSimilar(queryAuthor, foundAuthor))
+          ) {
+            console.log("[findBookCover] cover found via Google Books title/author");
+            return img;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Google Books title search error:", err);
+  }
+
+  // 4. Try by title (Open Library search) - check multiple results
+  try {
+    const res = await fetch(
+      `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=10${author ? `&author=${encodeURIComponent(author)}` : ""}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data?.docs || [];
+      for (const doc of docs) {
+        const isbns: string[] = doc?.isbn || [];
+        if (isbns.length === 0) continue;
+
+        for (const olIsbn of isbns.slice(0, 3)) {
           const olRes = await fetch(
-            `https://openlibrary.org/api/books?bibkeys=ISBN:${firstDoc.isbn[0]}&format=json&jscmd=data`
+            `https://openlibrary.org/api/books?bibkeys=ISBN:${olIsbn}&format=json&jscmd=data`
           );
           if (olRes.ok) {
             const olData = (await olRes.json()) as OpenLibraryResponse;
-            const book = olData[`ISBN:${firstDoc.isbn[0]}`];
-            coverUrl = book?.cover?.medium ?? book?.cover?.small ?? null;
+            const book = olData[`ISBN:${olIsbn}`];
+            const cover = book?.cover?.medium ?? book?.cover?.small;
+            if (cover) {
+              console.log("[findBookCover] cover found via Open Library title search");
+              return cover;
+            }
           }
         }
       }
-    } catch (err) {
-      console.error("Open Library search error:", err);
     }
+  } catch (err) {
+    console.error("Open Library search error:", err);
   }
 
-  return coverUrl;
+  console.log("[findBookCover] no cover found");
+  return null;
 }
 
-function encodeParams(title: string, author: string, isbn: string) {
+function encodeParams(title: string, author: string) {
   const parts: string[] = [];
-  if (isbn) parts.push(`isbn:${isbn}`);
   if (title) parts.push(`intitle:${title}`);
   if (author) parts.push(`inauthor:${author}`);
   return parts.join("+");
+}
+
+function normalize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9áàâãéêíóôõúç\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+}
+
+function isTitleSimilar(query: string, found: string): boolean {
+  const queryWords = normalize(query);
+  const foundWords = normalize(found);
+  if (queryWords.length === 0 || foundWords.length === 0) return false;
+
+  const common = queryWords.filter((w) =>
+    foundWords.some((fw) => fw === w || fw.startsWith(w) || w.startsWith(fw))
+  );
+
+  // Match if most query words appear in found title
+  return common.length >= Math.max(1, Math.ceil(queryWords.length * 0.5));
+}
+
+function isAuthorSimilar(query: string, found: string): boolean {
+  const queryWords = normalize(query);
+  const foundWords = normalize(found);
+  if (queryWords.length === 0 || foundWords.length === 0) return true;
+  return queryWords.some((w) =>
+    foundWords.some((fw) => fw === w || fw.includes(w) || w.includes(fw))
+  );
 }
