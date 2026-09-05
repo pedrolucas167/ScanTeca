@@ -290,6 +290,43 @@ export default function Catalog({
     }
   };
 
+  const handleSearchAuthor = async () => {
+    if (!editingBook) return;
+
+    if (!editingBook.title.trim()) {
+      setMessage("Preencha o título para buscar o autor");
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/search-author", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editingBook.title,
+          isbn: editingBook.isbn,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.author) {
+        setEditingBook({ ...editingBook, author: data.author });
+        setMessage(`Autor encontrado: ${data.author}`);
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setMessage(data.error || "Nenhum autor encontrado");
+      }
+    } catch {
+      setMessage("Erro ao buscar autor");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
@@ -588,6 +625,14 @@ export default function Catalog({
                 }
                 className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
               />
+              <button
+                type="button"
+                onClick={handleSearchAuthor}
+                disabled={loading}
+                className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                {loading ? "Buscando..." : "Buscar autor"}
+              </button>
             </div>
 
             <div className="mb-4">
