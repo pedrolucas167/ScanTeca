@@ -14,10 +14,31 @@ interface GoogleBooksVolume {
 
 interface OpenLibraryBook {
   cover?: { medium?: string; small?: string };
+  works?: { key: string }[];
 }
 
 interface OpenLibraryResponse {
   [key: string]: OpenLibraryBook;
+}
+
+interface OpenLibrarySearchDoc {
+  title?: string;
+  author_name?: string[];
+  isbn?: string[];
+  cover_i?: number;
+  cover?: { medium?: string; small?: string };
+}
+
+interface WikipediaPage {
+  thumbnail?: {
+    source?: string;
+  };
+}
+
+interface WikipediaApiResponse {
+  query?: {
+    pages?: Record<string, WikipediaPage>;
+  };
 }
 
 export async function findBookCover({
@@ -122,26 +143,76 @@ export async function findBookCover({
   // 4. Try by title (Open Library search) - check multiple results
   try {
     const res = await fetch(
-      `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=10${author ? `&author=${encodeURIComponent(author)}` : ""}`
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(`${title} ${author || ""}`.trim())}&limit=20`
     );
     if (res.ok) {
       const data = await res.json();
-      const docs = data?.docs || [];
+      const docs = (data?.docs || []) as OpenLibrarySearchDoc[];
       for (const doc of docs) {
-        const isbns: string[] = doc?.isbn || [];
-        if (isbns.length === 0) continue;
+        if (!doc) continue;
 
-        for (const olIsbn of isbns.slice(0, 3)) {
-          const olRes = await fetch(
-            `https://openlibrary.org/api/books?bibkeys=ISBN:${olIsbn}&format=json&jscmd=data`
-          );
-          if (olRes.ok) {
-            const olData = (await olRes.json()) as OpenLibraryResponse;
-            const book = olData[`ISBN:${olIsbn}`];
-            const cover = book?.cover?.medium ?? book?.cover?.small;
-            if (cover) {
-              console.log("[findBookCover] cover found via Open Library title search");
-              return cover;
+        const foundTitle = (doc.title || "").toLowerCase();
+        const foundAuthor = (doc.author_name?.[0] || "").toLowerCase();
+
+        // Prefer exact title matches for popular books
+        const titleMatch = isTitleSimilar(queryTitle, foundTitle);
+        const authorMatch = !queryAuthor || isAuthorSimilar(queryAuthor, foundAuthor);
+
+        if (!titleMatch) continue;
+
+        // Try cover_i first (best source for Open Library covers)
+        if (doc.cover_i) {
+          const coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+          try {
+            const headRes = await fetch(coverUrl, { method: "HEAD" });
+            if (headRes.ok) {
+              console.log("[findBookCover] cover found via Open Library cover_i");
+              return coverUrl;
+            }
+          } catch {
+            // ignore, try next
+          }
+        }
+
+        // Try cover from API
+        if (doc.cover) {
+          const cover = doc.cover?.medium ?? doc.cover?.small;
+          if (cover) {
+            console.log("[findBookCover] cover found via Open Library search doc");
+            return cover;
+          }
+        }
+
+        // Try ISBNs
+        const isbns: string[] = doc?.isbn || [];
+        if (isbns.length > 0 && authorMatch) {
+          for (const olIsbn of isbns.slice(0, 3)) {
+            const olRes = await fetch(
+              `https://openlibrary.org/api/books?bibkeys=ISBN:${olIsbn}&format=json&jscmd=data`
+            );
+            if (olRes.ok) {
+              const olData = (await olRes.json()) as OpenLibraryResponse;
+              const book = olData[`ISBN:${olIsbn}`];
+
+              if (book?.works?.[0]?.key) {
+                const workRes = await fetch(
+                  `https://openlibrary.org${book.works[0].key}.json`
+                );
+                if (workRes.ok) {
+                  const work = await workRes.json();
+                  if (work.covers?.[0]) {
+                    const coverUrl = `https://covers.openlibrary.org/b/id/${work.covers[0]}-L.jpg`;
+                    console.log("[findBookCover] cover found via Open Library work covers");
+                    return coverUrl;
+                  }
+                }
+              }
+
+              const cover = book?.cover?.medium ?? book?.cover?.small;
+              if (cover) {
+                console.log("[findBookCover] cover found via Open Library title search");
+                return cover;
+              }
             }
           }
         }
@@ -149,6 +220,27 @@ export async function findBookCover({
     }
   } catch (err) {
     console.error("Open Library search error:", err);
+  }
+
+  // 5. Try Wikipedia / Wikimedia for popular books
+  try {
+    const searchTitle = title.trim();
+    const wikiRes = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(searchTitle)}&prop=pageimages&format=json&origin=*&pithumbsize=500&redirects=1`
+    );
+    if (wikiRes.ok) {
+      const wikiData = (await wikiRes.json()) as WikipediaApiResponse;
+      const pages = wikiData?.query?.pages || {};
+      for (const pageId in pages) {
+        const thumb = pages[pageId]?.thumbnail?.source;
+        if (thumb) {
+          console.log("[findBookCover] cover found via Wikipedia");
+          return thumb;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Wikipedia search error:", err);
   }
 
   console.log("[findBookCover] no cover found");
