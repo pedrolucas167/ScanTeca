@@ -105,14 +105,8 @@ export default function Scanner() {
 
       const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
         verbose: false,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
-        ],
+        // ISBN-13 only — every ISBN-10 is also encoded as EAN-13 (978 prefix)
+        formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
       });
 
       scannerRef.current = qrScanner;
@@ -120,8 +114,9 @@ export default function Scanner() {
       await qrScanner.start(
         { facingMode: "environment" },
         {
-          fps: 10,
-          qrbox: { width: 280, height: 160 },
+          fps: 20,
+          // Narrow rectangle forces horizontal barcode alignment
+          qrbox: { width: 250, height: 100 },
           aspectRatio: 1.777778,
           disableFlip: false,
           // videoConstraints replaces the facingMode param entirely in
@@ -130,7 +125,11 @@ export default function Scanner() {
             facingMode: { ideal: "environment" },
             width: { ideal: 1280 },
             height: { ideal: 720 },
-          },
+            // Continuous autofocus where supported (Chrome/Android);
+            // ignored gracefully on iOS/Safari. focusMode is non-standard
+            // in TS's DOM types, hence the double cast.
+            advanced: [{ focusMode: "continuous" }],
+          } as unknown as MediaTrackConstraints,
         },
         (decodedText) => {
           if (!processingRef.current) {
@@ -229,7 +228,7 @@ export default function Scanner() {
         {scanning && (
           <>
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="relative h-32 w-4/5 max-w-sm">
+              <div className="relative h-[100px] w-[250px]">
                 <span className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-indigo-500" />
                 <span className="absolute right-0 top-0 h-6 w-6 border-r-4 border-t-4 border-indigo-500" />
                 <span className="absolute bottom-0 left-0 h-6 w-6 border-b-4 border-l-4 border-indigo-500" />
