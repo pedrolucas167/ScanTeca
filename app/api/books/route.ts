@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { BookStatus } from "@prisma/client";
 import { findBookCover } from "@/lib/book-cover";
+import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,6 +71,22 @@ export async function POST(request: NextRequest) {
         userId,
       },
     });
+
+    // Generate and store embedding
+    const embedding = await generateEmbedding(
+      bookToEmbeddingText({
+        title: book.title,
+        author: book.author,
+        synopsis: book.synopsis,
+        genre: book.genre,
+      })
+    );
+    if (embedding) {
+      const vector = `[${embedding.join(",")}]`;
+      await prisma.$executeRaw`
+        UPDATE "Book" SET embedding = ${vector}::vector WHERE id = ${book.id}
+      `;
+    }
 
     return NextResponse.json(
       { book, message: "Livro adicionado com sucesso" },

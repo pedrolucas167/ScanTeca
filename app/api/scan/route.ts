@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { findBookCover } from "@/lib/book-cover";
+import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -271,6 +272,22 @@ export async function POST(request: NextRequest) {
         userId,
       },
     });
+
+    // Generate and store embedding (adds ~1s latency to the response)
+    const embedding = await generateEmbedding(
+      bookToEmbeddingText({
+        title: bookData.title,
+        author: bookData.author,
+        synopsis: bookData.synopsis,
+        genre: bookData.genre,
+      })
+    );
+    if (embedding) {
+      const vector = `[${embedding.join(",")}]`;
+      await prisma.$executeRaw`
+        UPDATE "Book" SET embedding = ${vector}::vector WHERE id = ${book.id}
+      `;
+    }
 
     return NextResponse.json({ book, message: "Livro adicionado com sucesso" }, { status: 201 });
   } catch (error) {

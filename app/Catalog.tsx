@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Search,
   Share2,
+  Sparkles,
   Star,
 } from "lucide-react";
 
@@ -788,6 +789,13 @@ export default function Catalog({
                 <Share2 className="h-3.5 w-3.5" />
                 {shareEnabled ? "Desativar link" : "Compartilhar"}
               </button>
+              <Link
+                href="/oracle"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Oráculo
+              </Link>
             </div>
 
             <div className="flex items-center gap-1 rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600 dark:bg-zinc-800">
