@@ -142,6 +142,50 @@ export async function POST(request: NextRequest) {
       console.error("Open Library API error:", err);
     }
 
+    // If author is missing, try to find it by title
+    if (bookData && (bookData.author === "Autor desconhecido" || !bookData.author)) {
+      try {
+        const searchRes = await fetch(
+          `https://openlibrary.org/search.json?q=${encodeURIComponent(bookData.title)}&limit=5`
+        );
+        if (searchRes.ok) {
+          const searchData = (await searchRes.json()) as {
+            docs?: { author_name?: string[]; title?: string }[];
+          };
+          const docs = searchData?.docs || [];
+          for (const doc of docs) {
+            if (doc?.author_name?.length) {
+              bookData.author = doc.author_name.join(", ");
+              console.log("[scan] author found via Open Library search:", bookData.author);
+              break;
+            }
+          }
+        }
+
+        if (bookData.author === "Autor desconhecido" || !bookData.author) {
+          const googleSearchUrl = apiKey
+            ? `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`intitle:${bookData.title}`)}&maxResults=5&key=${apiKey}`
+            : `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`intitle:${bookData.title}`)}&maxResults=5`;
+
+          const googleRes = await fetch(googleSearchUrl);
+          if (googleRes.ok) {
+            const googleData = (await googleRes.json()) as GoogleBooksVolume;
+            if (googleData.items && googleData.totalItems > 0) {
+              for (const item of googleData.items) {
+                if (item.volumeInfo.authors?.length) {
+                  bookData.author = item.volumeInfo.authors.join(", ");
+                  console.log("[scan] author found via Google Books search:", bookData.author);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Author lookup error:", err);
+      }
+    }
+
     // Fallback to Google Books if Open Library returned nothing
     if (!bookData) {
       try {

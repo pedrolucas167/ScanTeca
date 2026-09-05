@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-import { Camera, Check, ScanLine } from "lucide-react";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { ScanLine } from "lucide-react";
 import { playBeep } from "@/lib/beep";
 
 interface ScanResult {
@@ -11,107 +11,76 @@ interface ScanResult {
   message: string;
 }
 
-// BarcodeDetector may not be in TS lib types
-interface BarcodeDetectorResult {
-  rawValue: string;
-}
-interface BarcodeDetectorInstance {
-  detect(source: CanvasImageSource): Promise<BarcodeDetectorResult[]>;
-}
-interface BarcodeDetectorConstructor {
-  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
-}
+const SCANNER_ELEMENT_ID = "html5qr-code-scanner";
 
 export default function Scanner() {
   const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<number | null>(null);
-  const zxingControlsRef = useRef<IScannerControls | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [manualIsbn, setManualIsbn] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
   const processingRef = useRef(false);
-  const lastReadingsRef = useRef<string[]>([]);
 
-  const handleScan = useCallback(async (isbn: string) => {
-    if (processingRef.current) return;
-    processingRef.current = true;
+  const handleScan = useCallback(
+    async (isbn: string) => {
+      if (processingRef.current) return;
+      processingRef.current = true;
 
-    playBeep();
-    setLoading(true);
-    setResult({ type: "info", message: `ISBN detectado: ${isbn}. Buscando...` });
-
-    try {
-      const res = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isbn }),
+      playBeep();
+      setLoading(true);
+      setResult({
+        type: "info",
+        message: `ISBN ${isbn} detectado. Buscando...`,
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        setResult({
-          type: "success",
-          message: `${data.book.title} — redirecionando para o catálogo...`,
+      try {
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isbn }),
         });
-        stopScanner();
+
+        const data = await res.json();
+
+        if (res.ok) {
+          setResult({
+            type: "success",
+            message: `${data.book.title} — redirecionando para o catálogo...`,
+          });
+          stopScanner();
+          setTimeout(() => {
+            router.push("/");
+          }, 1200);
+        } else {
+          setResult({
+            type: "error",
+            message: data.error || "Erro desconhecido",
+          });
+          setTimeout(() => {
+            processingRef.current = false;
+          }, 1500);
+        }
+      } catch {
+        setResult({ type: "error", message: "Erro de rede ao enviar ISBN" });
         setTimeout(() => {
-          router.push("/");
-        }, 1200);
-      } else {
-        setResult({
-          type: "error",
-          message: data.error || "Erro desconhecido",
-        });
-      }
-    } catch {
-      setResult({ type: "error", message: "Erro de rede ao enviar ISBN" });
-    } finally {
-      setLoading(false);
-      setTimeout(() => {
-        processingRef.current = false;
-      }, 3000);
-    }
-  }, []);
-
-  const onBarcodeRead = useCallback(
-    (raw: string) => {
-      const buffer = lastReadingsRef.current;
-      buffer.push(raw);
-      if (buffer.length > 3) buffer.shift();
-
-      // Require 3 consecutive identical readings before accepting
-      if (buffer.length === 3 && buffer.every((r) => r === raw)) {
-        handleScan(raw);
+          processingRef.current = false;
+        }, 1500);
+      } finally {
+        setLoading(false);
       }
     },
-    [handleScan]
+    [router]
   );
 
   const stopScanner = useCallback(() => {
-    if (intervalRef.current) {
-      window.clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (scannerRef.current?.isScanning) {
+      scannerRef.current
+        .stop()
+        .catch((err) => console.error("Erro ao parar scanner:", err));
     }
-
-    if (zxingControlsRef.current) {
-      zxingControlsRef.current.stop();
-      zxingControlsRef.current = null;
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
+    scannerRef.current = null;
     setScanning(false);
   }, []);
 
@@ -127,57 +96,44 @@ export default function Scanner() {
 
       setResult({ type: "info", message: "Solicitando permissão da câmera..." });
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+      const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
+        verbose: false,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+        ],
       });
 
-      streamRef.current = stream;
+      scannerRef.current = qrScanner;
 
-      const video = videoRef.current;
-      if (!video) {
-        setResult({ type: "error", message: "Elemento de vídeo não encontrado." });
-        return;
-      }
-
-      video.srcObject = stream;
-      await video.play();
+      await qrScanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 280, height: 160 },
+          aspectRatio: 1.777778,
+          disableFlip: false,
+          videoConstraints: {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        },
+        (decodedText) => {
+          if (!processingRef.current) {
+            handleScan(decodedText);
+          }
+        },
+        () => {
+          // Ignore per-frame errors
+        }
+      );
 
       setScanning(true);
       setResult({ type: "info", message: "Aponte para o código de barras..." });
-
-      const BarcodeDetectorCtor = (
-        window as unknown as { BarcodeDetector?: BarcodeDetectorConstructor }
-      ).BarcodeDetector;
-
-      if (BarcodeDetectorCtor) {
-        // Native BarcodeDetector (Chrome, Edge, Safari 15.4+)
-        const detector = new BarcodeDetectorCtor({
-          formats: ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"],
-        });
-
-        intervalRef.current = window.setInterval(async () => {
-          if (processingRef.current) return;
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0) {
-              onBarcodeRead(barcodes[0].rawValue);
-            }
-          } catch {
-            // Ignore per-frame detection errors
-          }
-        }, 250);
-      } else {
-        // Fallback: ZXing
-        const reader = new BrowserMultiFormatReader();
-        zxingControlsRef.current = await reader.decodeFromVideoElement(
-          video,
-          (res) => {
-            if (res) {
-              onBarcodeRead(res.getText());
-            }
-          }
-        );
-      }
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
       const message = err instanceof Error ? err.message : String(err);
@@ -208,7 +164,7 @@ export default function Scanner() {
 
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold text-foreground">
+      <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold text-foreground">
         <ScanLine className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
         Scanner de Código de Barras
       </h1>
@@ -246,29 +202,23 @@ export default function Scanner() {
         className="relative w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
         style={{ minHeight: scanning ? 320 : 200 }}
       >
-        <video
-          ref={videoRef}
-          className={`h-auto w-full rounded-xl ${scanning ? "block" : "hidden"}`}
-          playsInline
-          muted
+        <div
+          id={SCANNER_ELEMENT_ID}
+          className={`h-full w-full ${scanning ? "block" : "hidden"}`}
         />
 
         {scanning && (
           <>
-            {/* Scan frame overlay */}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="relative h-32 w-4/5 max-w-sm">
-                {/* Corner brackets */}
                 <span className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-indigo-500" />
                 <span className="absolute right-0 top-0 h-6 w-6 border-r-4 border-t-4 border-indigo-500" />
                 <span className="absolute bottom-0 left-0 h-6 w-6 border-b-4 border-l-4 border-indigo-500" />
                 <span className="absolute bottom-0 right-0 h-6 w-6 border-b-4 border-r-4 border-indigo-500" />
-                {/* Animated scan line */}
                 <span className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 animate-pulse bg-indigo-500/80" />
               </div>
             </div>
 
-            {/* Status badge */}
             <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
               <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-green-400 align-middle" />
               Escaneando...
@@ -339,7 +289,6 @@ export default function Scanner() {
         </div>
       )}
 
-      {/* Manual ISBN Input Modal */}
       {showManualInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
