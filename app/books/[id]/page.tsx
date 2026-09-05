@@ -90,7 +90,10 @@ export default async function BookDetailPage({
                   >
                     <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                   </svg>
-                  <span className="mt-2 text-sm">Sem capa</span>
+                  <span className="mt-2 text-sm">Sem capa disponível</span>
+                  <p className="mt-1 max-w-[180px] text-center text-xs text-zinc-400 dark:text-zinc-500">
+                    Nenhuma capa encontrada. Edite o livro para adicionar uma capa manualmente.
+                  </p>
                 </div>
               )}
             </div>

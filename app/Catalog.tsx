@@ -175,7 +175,10 @@ export default function Catalog({ books }: { books: Book[] }) {
           setMessage(saveData.error || "Erro ao salvar capa");
         }
       } else {
-        setMessage(data.error || "Nenhuma capa encontrada");
+        setMessage(
+          data.error ||
+            "Nenhuma capa encontrada automaticamente. Você pode adicionar uma capa manualmente no botão Editar."
+        );
       }
     } catch {
       setMessage("Erro ao buscar capa");
@@ -322,7 +325,10 @@ export default function Catalog({ books }: { books: Book[] }) {
                       >
                         <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                       </svg>
-                      <span className="mt-1 text-xs">Sem capa</span>
+                      <span className="mt-1 text-xs">Sem capa disponível</span>
+                      <p className="mt-1 max-w-[180px] text-center text-[10px] text-zinc-400 dark:text-zinc-500">
+                        Nenhuma capa encontrada na internet. Clique em Editar para adicionar manualmente.
+                      </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
