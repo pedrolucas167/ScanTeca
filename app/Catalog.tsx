@@ -17,6 +17,7 @@ import {
   Share2,
   Sparkles,
   Star,
+  Wand2,
 } from "lucide-react";
 
 interface Book {
@@ -106,9 +107,12 @@ export default function Catalog({
   const [shareEnabled, setShareEnabled] = useState(initialShareEnabled);
   const [shareId, setShareId] = useState<string | null>(initialShareId);
   const [copied, setCopied] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  // Captured once on mount — Date.now() during render is impure (react-hooks/purity)
+  const [now] = useState(() => Date.now());
 
   const quote = literaryQuotes[
-    Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % literaryQuotes.length
+    Math.floor(now / (1000 * 60 * 60 * 24)) % literaryQuotes.length
   ];
 
   const collections = useMemo(
@@ -180,7 +184,7 @@ export default function Catalog({
       readDates.length > 1
         ? Math.max(
             1,
-            (Date.now() - readDates[0]) / (1000 * 60 * 60 * 24 * 30)
+            (now - readDates[0]) / (1000 * 60 * 60 * 24 * 30)
           )
         : 1;
     const pace = Math.round((read.length / monthsSpan) * 10) / 10;
@@ -199,7 +203,7 @@ export default function Catalog({
       oldest,
       pace,
     };
-  }, [bookList]);
+  }, [bookList, now]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -557,6 +561,93 @@ export default function Catalog({
     }
   };
 
+  const handleEnrichAll = async () => {
+    if (
+      !window.confirm(
+        "Buscar e preencher automaticamente sinopse, gênero e páginas dos livros que estão sem esses dados? Campos já preenchidos não serão alterados."
+      )
+    ) {
+      return;
+    }
+
+    setEnriching(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/books/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage(
+          data.enriched > 0
+            ? `${data.enriched} de ${data.total} livro(s) atualizados. Recarregando...`
+            : "Nenhum dado novo encontrado para os livros pendentes."
+        );
+        if (data.enriched > 0) {
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          setTimeout(() => setMessage(null), 5000);
+        }
+      } else {
+        setMessage(data.error || "Erro ao enriquecer acervo");
+      }
+    } catch {
+      setMessage("Erro de rede ao enriquecer acervo");
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  const handleEnrichBook = async () => {
+    if (!editingBook) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/books/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookId: editingBook.id }),
+      });
+
+      const data = await res.json();
+      const values = data?.results?.[0]?.values as
+        | { synopsis?: string; genre?: string; pages?: number }
+        | undefined;
+
+      if (res.ok && values && Object.keys(values).length > 0) {
+        setEditingBook({
+          ...editingBook,
+          synopsis: values.synopsis ?? editingBook.synopsis,
+          genre: values.genre ?? editingBook.genre,
+          pages: values.pages ?? editingBook.pages,
+        });
+        const fields = Object.keys(values)
+          .map((f) =>
+            f === "synopsis" ? "sinopse" : f === "genre" ? "gênero" : "páginas"
+          )
+          .join(", ");
+        setMessage(`Dados preenchidos: ${fields}. Revise antes de salvar.`);
+        setTimeout(() => setMessage(null), 5000);
+      } else if (res.ok) {
+        setMessage("Nenhum dado novo encontrado para este livro");
+        setTimeout(() => setMessage(null), 4000);
+      } else {
+        setMessage(data.error || "Erro ao completar dados");
+      }
+    } catch {
+      setMessage("Erro de rede ao completar dados");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = [
       "Título",
@@ -850,6 +941,16 @@ export default function Catalog({
                 <Sparkles className="h-3.5 w-3.5" />
                 Oráculo
               </Link>
+              <button
+                type="button"
+                onClick={handleEnrichAll}
+                disabled={enriching}
+                title="Preenche sinopse, gênero e páginas dos livros que estão sem esses dados"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                {enriching ? "Enriquecendo..." : "Completar dados"}
+              </button>
             </div>
 
             <div className="flex items-center gap-1 rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600 dark:bg-zinc-800">
@@ -1519,6 +1620,21 @@ export default function Catalog({
                   <span className="flex items-center justify-center gap-2">
                     <Sparkles className="h-4 w-4" />
                     Gerar sinopse automaticamente
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleEnrichBook}
+                disabled={loading}
+                className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+              >
+                {loading ? (
+                  "Buscando..."
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Wand2 className="h-4 w-4" />
+                    Completar dados vazios (sinopse, gênero, páginas)
                   </span>
                 )}
               </button>
