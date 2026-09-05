@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Check, PlusCircle } from "lucide-react";
+import { BookOpen, Check, PlusCircle, Search } from "lucide-react";
 
 export default function ManualAddPage() {
   const router = useRouter();
@@ -22,6 +22,45 @@ export default function ManualAddPage() {
     notes: "",
     rating: "" as string,
   });
+
+  const handleSearchCoverByTitle = async () => {
+    if (!form.title.trim()) {
+      setMessage("Preencha o título para buscar a capa");
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/search-cover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          author: form.author,
+          isbn: form.isbn,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.coverUrl) {
+        setForm((f) => ({ ...f, coverUrl: data.coverUrl }));
+        setPreview(data.coverUrl);
+        setMessage(`Capa encontrada para "${form.title}"`);
+      } else {
+        setMessage(
+          data.error ||
+            "Nenhuma capa encontrada. Você pode adicionar uma URL manualmente ou tirar uma foto."
+        );
+      }
+    } catch {
+      setMessage("Erro ao buscar capa. Tente usar uma URL ou foto.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -219,26 +258,76 @@ export default function ManualAddPage() {
           />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Foto da capa
+            Capa do livro
           </label>
+          <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Você pode buscar automaticamente, colar uma URL, ou enviar uma foto.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleSearchCoverByTitle}
+            disabled={loading}
+            className="mb-3 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+          >
+            {loading ? (
+              "Buscando..."
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <Search className="h-4 w-4" />
+                Buscar capa pelo título
+              </span>
+            )}
+          </button>
+
+          <div className="mb-3 flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
+            <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-600" />
+            ou
+            <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-600" />
+          </div>
+
+          <input
+            type="text"
+            value={form.coverUrl}
+            onChange={(e) => {
+              const url = e.target.value;
+              setForm({ ...form, coverUrl: url });
+              setPreview(url);
+            }}
+            placeholder="URL da imagem da capa"
+            className="mb-3 w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
+          />
+
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="mb-2 w-full text-sm text-zinc-600 file:mr-4 file:rounded-full file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
+            className="w-full text-sm text-zinc-600 file:mr-4 file:rounded-full file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
           />
+
           {preview && (
-            <div className="mt-3 flex justify-center">
+            <div className="mt-3 flex flex-col items-center gap-2 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Pré-visualização
+              </p>
               <img
                 src={preview}
                 alt="Pré-visualização da capa"
                 className="h-48 rounded-lg object-contain shadow-sm"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
               />
             </div>
           )}
+
+          <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+            Não encontrou a capa? Você pode deixar em branco e adicionar depois,
+            ou usar uma URL de outra fonte.
+          </p>
         </div>
 
         <div className="flex gap-3">
