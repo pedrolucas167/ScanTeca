@@ -28,9 +28,25 @@ model Book {
   userId        String
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  reviews       Review[]
 
   @@unique([isbn, userId])
   @@index([userId])
   @@index([status])
   @@index([collection])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  content   String
+  rating    Int?
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  userId    String
+  userName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookId])
+  @@index([userId])
 }

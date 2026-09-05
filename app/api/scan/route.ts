@@ -24,10 +24,17 @@ interface OpenLibraryBook {
   authors?: { name: string }[];
   publish_date?: string;
   cover?: { medium?: string; small?: string };
+  works?: { key: string }[];
 }
 
 interface OpenLibraryResponse {
   [key: string]: OpenLibraryBook;
+}
+
+interface OpenLibraryWork {
+  description?:
+    | string
+    | { type: string; value: string };
 }
 
 export async function POST(request: NextRequest) {
@@ -100,11 +107,33 @@ export async function POST(request: NextRequest) {
         const key = `ISBN:${cleaned}`;
         const olBook = olData[key];
         if (olBook) {
+          let synopsis: string | null = null;
+
+          // Try to fetch work description for better synopsis
+          const workKey = olBook.works?.[0]?.key;
+          if (workKey) {
+            try {
+              const workRes = await fetch(
+                `https://openlibrary.org${workKey}.json`
+              );
+              if (workRes.ok) {
+                const work = (await workRes.json()) as OpenLibraryWork;
+                const raw = work.description;
+                synopsis =
+                  typeof raw === "string"
+                    ? raw
+                    : (raw?.value ?? null);
+              }
+            } catch (err) {
+              console.error("Open Library Work API error:", err);
+            }
+          }
+
           bookData = {
             title: olBook.title ?? "Título desconhecido",
             author: olBook.authors?.map((a) => a.name).join(", ") ?? "Autor desconhecido",
             publishedDate: olBook.publish_date ?? null,
-            synopsis: null,
+            synopsis,
             coverUrl: olBook.cover?.medium ?? olBook.cover?.small ?? null,
           };
         }

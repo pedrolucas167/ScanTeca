@@ -148,3 +148,49 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID do livro é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.book.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Livro não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    await prisma.book.delete({
+      where: { id },
+    });
+
+    return NextResponse.json(
+      { message: "Livro removido com sucesso" },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Erro em DELETE /api/books:", error);
+    return NextResponse.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 }
+    );
+  }
+}

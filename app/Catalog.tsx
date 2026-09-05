@@ -66,6 +66,33 @@ export default function Catalog({ books }: { books: Book[] }) {
     setEditingBook({ ...book });
   };
 
+  const handleDelete = async (book: Book) => {
+    if (!confirm(`Tem certeza que deseja remover "${book.title}"?`)) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/books?id=${book.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setBookList((prev) => prev.filter((b) => b.id !== book.id));
+        setMessage(`✓ ${book.title} removido`);
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setMessage(data.error || "Erro ao remover");
+      }
+    } catch {
+      setMessage("Erro de rede ao remover");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!editingBook) return;
     setLoading(true);
@@ -170,7 +197,7 @@ export default function Catalog({ books }: { books: Book[] }) {
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          📚 Minha Biblioteca
+          📚 Scanteca
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
           Organize seus livros: lidos, a ler e lista de desejos.
@@ -268,7 +295,8 @@ export default function Catalog({ books }: { books: Book[] }) {
             {filtered.map((book) => (
               <article
                 key={book.id}
-                className="group relative flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+                onClick={() => (window.location.href = `/books/${book.id}`)}
+                className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <div className="relative flex h-56 items-center justify-center bg-zinc-100 dark:bg-zinc-800">
                   {book.coverUrl ? (
@@ -296,7 +324,10 @@ export default function Catalog({ books }: { books: Book[] }) {
                       </svg>
                       <span className="mt-1 text-xs">Sem capa</span>
                       <button
-                        onClick={() => searchAndSaveCover(book)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          searchAndSaveCover(book);
+                        }}
                         disabled={loading}
                         className="mt-2 rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
                       >
@@ -346,12 +377,26 @@ export default function Catalog({ books }: { books: Book[] }) {
                     <span className="inline-block rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                       {book.collection}
                     </span>
-                    <button
-                      onClick={() => handleEdit(book)}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                    >
-                      Editar
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(book);
+                        }}
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(book);
+                        }}
+                        className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400"
+                      >
+                        Remover
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>

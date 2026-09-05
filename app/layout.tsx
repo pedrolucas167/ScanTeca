@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Catálogo de Livros",
-  description: "Catálogo de livros com scanner de código de barras ISBN",
+  title: "Scanteca",
+  description: "Scanteca - biblioteca pessoal com scanner de códigos ISBN",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -53,7 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 href="/"
                 className="text-lg font-bold tracking-tight text-foreground"
               >
-                📚 Livros
+                📚 Scanteca
               </Link>
               <div className="flex items-center gap-2 sm:gap-4">
                 <Link
