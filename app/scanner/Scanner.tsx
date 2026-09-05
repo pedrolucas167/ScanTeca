@@ -177,10 +177,10 @@ export default function Scanner() {
       <div className="mb-6 max-w-md rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
         <p className="font-semibold">Atenção:</p>
         <p>
-          Algumas obras podem não ser encontradas automaticamente (especialmente
+          Algumas obras podem não ser encontradas pelo ISBN (especialmente
           livros nacionais, independentes ou sem ISBN registrado). Se isso
-          acontecer, você poderá adicionar o livro manualmente em
-          &ldquo;Adicionar Manual&rdquo;.
+          acontecer, tente a aba &ldquo;Buscar livro&rdquo; para pesquisar por
+          título ou autor — ou adicione manualmente pelo catálogo.
         </p>
       </div>
 
