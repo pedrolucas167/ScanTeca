@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Catalog from "./Catalog";
+import LandingPage from "./LandingPage";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export default async function Home() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect("/sign-in");
+    return <LandingPage />;
   }
 
   const [books, setting] = await Promise.all([
