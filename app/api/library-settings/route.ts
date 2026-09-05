@@ -42,21 +42,49 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name } = body as { name?: string };
+    const { name, shareEnabled } = body as {
+      name?: string;
+      shareEnabled?: boolean;
+    };
 
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Nome da biblioteca é obrigatório" },
-        { status: 400 }
-      );
+    const updateData: Record<string, unknown> = {};
+    const createData: Record<string, unknown> = { userId };
+
+    if (name !== undefined) {
+      if (typeof name !== "string" || name.trim().length === 0) {
+        return NextResponse.json(
+          { error: "Nome da biblioteca é obrigatório" },
+          { status: 400 }
+        );
+      }
+      updateData.name = name.trim();
+      createData.name = name.trim();
+    }
+
+    if (shareEnabled !== undefined) {
+      updateData.shareEnabled = shareEnabled;
+      createData.shareEnabled = shareEnabled;
+      if (shareEnabled) {
+        // Generate shareId if enabling and none exists
+        const existing = await prisma.librarySetting.findUnique({
+          where: { userId },
+        });
+        if (!existing?.shareId) {
+          const shareId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+          updateData.shareId = shareId;
+          createData.shareId = shareId;
+        }
+      }
     }
 
     const setting = await prisma.librarySetting.upsert({
       where: { userId },
-      update: { name: name.trim() },
+      update: updateData,
       create: {
         userId,
-        name: name.trim(),
+        name: (createData.name as string) || "Minha Biblioteca",
+        shareEnabled: (createData.shareEnabled as boolean) || false,
+        shareId: (createData.shareId as string) || null,
       },
     });
 

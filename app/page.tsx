@@ -27,5 +27,12 @@ export default async function Home() {
     }),
   ]);
 
-  return <Catalog books={books} libraryName={setting.name} />;
+  return (
+    <Catalog
+      books={books}
+      libraryName={setting.name}
+      shareEnabled={setting.shareEnabled}
+      shareId={setting.shareId}
+    />
+  );
 }

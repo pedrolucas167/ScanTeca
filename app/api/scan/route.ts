@@ -11,6 +11,8 @@ interface GoogleBooksVolume {
       authors?: string[];
       publishedDate?: string;
       description?: string;
+      pageCount?: number;
+      categories?: string[];
       imageLinks?: {
         thumbnail?: string;
         smallThumbnail?: string;
@@ -23,6 +25,8 @@ interface OpenLibraryBook {
   title?: string;
   authors?: { name: string }[];
   publish_date?: string;
+  number_of_pages?: number;
+  subjects?: { name: string }[];
   cover?: { medium?: string; small?: string };
   works?: { key: string }[];
 }
@@ -95,6 +99,8 @@ export async function POST(request: NextRequest) {
       publishedDate: string | null;
       synopsis: string | null;
       coverUrl: string | null;
+      genre: string | null;
+      pages: number | null;
     } | null = null;
 
     // Try Open Library first (more reliable for ISBN lookups)
@@ -135,6 +141,8 @@ export async function POST(request: NextRequest) {
             publishedDate: olBook.publish_date ?? null,
             synopsis,
             coverUrl: olBook.cover?.medium ?? olBook.cover?.small ?? null,
+            genre: olBook.subjects?.[0]?.name ?? null,
+            pages: olBook.number_of_pages ?? null,
           };
         }
       }
@@ -200,6 +208,8 @@ export async function POST(request: NextRequest) {
               publishedDate: info.publishedDate ?? null,
               synopsis: info.description ?? null,
               coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
+              genre: info.categories?.[0] ?? null,
+              pages: info.pageCount ?? null,
             };
           }
         } else {
@@ -215,6 +225,27 @@ export async function POST(request: NextRequest) {
         { error: "Nenhum livro encontrado para este ISBN" },
         { status: 404 }
       );
+    }
+
+    // Enrich with Google Books data (genre/pages) if missing
+    if (!bookData.genre || !bookData.pages) {
+      try {
+        const res = await fetch(googleUrl);
+        if (res.ok) {
+          const data = (await res.json()) as GoogleBooksVolume;
+          if (data.items && data.totalItems > 0) {
+            const info = data.items[0].volumeInfo;
+            if (!bookData.genre && info.categories?.[0]) {
+              bookData.genre = info.categories[0];
+            }
+            if (!bookData.pages && info.pageCount) {
+              bookData.pages = info.pageCount;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Google Books enrichment error:", err);
+      }
     }
 
     // Try to find a cover if missing
@@ -235,6 +266,8 @@ export async function POST(request: NextRequest) {
         publishedDate: bookData.publishedDate,
         synopsis: bookData.synopsis,
         coverUrl: bookData.coverUrl,
+        genre: bookData.genre,
+        pages: bookData.pages,
         userId,
       },
     });

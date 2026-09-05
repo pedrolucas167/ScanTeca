@@ -56,7 +56,9 @@ model Review {
 }
 
 model LibrarySetting {
-  id     String @id @default(cuid())
-  userId String @unique
-  name   String @default("Minha Biblioteca")
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  name         String  @default("Minha Biblioteca")
+  shareId      String? @unique
+  shareEnabled Boolean @default(false)
 }

@@ -14,6 +14,7 @@ import {
   List,
   PlusCircle,
   Search,
+  Share2,
   Star,
 } from "lucide-react";
 
@@ -52,9 +53,13 @@ const statusClasses: Record<string, string> = {
 export default function Catalog({
   books,
   libraryName: initialLibraryName,
+  shareEnabled: initialShareEnabled,
+  shareId: initialShareId,
 }: {
   books: Book[];
   libraryName: string;
+  shareEnabled: boolean;
+  shareId: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -76,6 +81,8 @@ export default function Catalog({
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [shareEnabled, setShareEnabled] = useState(initialShareEnabled);
+  const [shareId, setShareId] = useState<string | null>(initialShareId);
 
   const collections = useMemo(
     () => Array.from(new Set(bookList.map((b) => b.collection))).sort(),
@@ -526,6 +533,37 @@ export default function Catalog({
     }
   };
 
+  const handleToggleShare = async () => {
+    const newValue = !shareEnabled;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/library-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareEnabled: newValue }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShareEnabled(data.setting.shareEnabled);
+        setShareId(data.setting.shareId);
+        if (data.setting.shareEnabled && data.setting.shareId) {
+          const url = `${window.location.origin}/shared/${data.setting.shareId}`;
+          await navigator.clipboard.writeText(url).catch(() => {});
+          setMessage(`Link público ativado e copiado: ${url}`);
+        } else {
+          setMessage("Link público desativado");
+        }
+        setTimeout(() => setMessage(null), 6000);
+      } else {
+        setMessage(data.error || "Erro ao atualizar compartilhamento");
+      }
+    } catch {
+      setMessage("Erro de rede");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
@@ -581,7 +619,7 @@ export default function Catalog({
         <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
           Organize seus livros: lidos, a ler e lista de desejos.
         </p>
-        <div className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
+        <div className="mx-auto mt-6 flex max-w-2xl flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/scanner"
             className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-indigo-700"
@@ -603,7 +641,14 @@ export default function Catalog({
               <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
               <line x1="7" y1="12" x2="17" y2="12" />
             </svg>
-            Escanear Livro
+            Escanear
+          </Link>
+          <Link
+            href="/search-add"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-indigo-300 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+          >
+            <Search className="h-4 w-4" />
+            Buscar Livro
           </Link>
           <Link
             href="/manual-add"
@@ -639,6 +684,19 @@ export default function Catalog({
               >
                 <Download className="h-3.5 w-3.5" />
                 Exportar CSV
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleShare}
+                disabled={loading}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                  shareEnabled
+                    ? "border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
+                    : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                }`}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {shareEnabled ? "Link ativo" : "Compartilhar"}
               </button>
             </div>
 
