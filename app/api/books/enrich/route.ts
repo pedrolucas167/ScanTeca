@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { findSynopsis, cleanSynopsis } from "@/lib/synopsis";
+import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { isTitleSimilar, isAuthorSimilar } from "@/lib/book-cover";
 
@@ -20,6 +21,7 @@ interface BookRow {
   isbn: string | null;
   title: string;
   author: string;
+  publishedDate: string | null;
   synopsis: string | null;
   genre: string | null;
   pages: number | null;
@@ -29,7 +31,12 @@ interface EnrichResult {
   id: string;
   title: string;
   updated: string[];
-  values: { synopsis?: string; genre?: string; pages?: number };
+  values: {
+    synopsis?: string;
+    genre?: string;
+    pages?: number;
+    publishedDate?: string;
+  };
 }
 
 function sleep(ms: number) {
@@ -119,12 +126,12 @@ export async function POST(request: NextRequest) {
 
     const books = bookId
       ? await prisma.$queryRaw<BookRow[]>`
-          SELECT id, isbn, title, author, synopsis, genre, pages
+          SELECT id, isbn, title, author, "publishedDate", synopsis, genre, pages
           FROM "Book"
           WHERE id = ${bookId} AND "userId" = ${userId}
         `
       : await prisma.$queryRaw<BookRow[]>`
-          SELECT id, isbn, title, author, synopsis, genre, pages
+          SELECT id, isbn, title, author, "publishedDate", synopsis, genre, pages
           FROM "Book"
           WHERE "userId" = ${userId}
             AND (
@@ -144,7 +151,12 @@ export async function POST(request: NextRequest) {
     const results: EnrichResult[] = [];
 
     for (const book of books) {
-      const updates: { synopsis?: string; genre?: string; pages?: number } = {};
+      const updates: {
+        synopsis?: string;
+        genre?: string;
+        pages?: number;
+        publishedDate?: string;
+      } = {};
       const needsSynopsis = !book.synopsis?.trim();
       const needsGenre = !book.genre;
       const needsPages = !book.pages;
@@ -164,6 +176,19 @@ export async function POST(request: NextRequest) {
           isbn: book.isbn ?? undefined,
         });
         if (syn) updates.synopsis = syn;
+      }
+
+      // Corrige data de reimpressão → primeira publicação da obra
+      const originalYear = await findOriginalPublishYear({
+        title: book.title,
+        author: book.author,
+        isbn: book.isbn ?? undefined,
+      });
+      if (originalYear) {
+        const currentYear = extractYear(book.publishedDate);
+        if (!currentYear || originalYear < currentYear) {
+          updates.publishedDate = String(originalYear);
+        }
       }
 
       const updatedFields = Object.keys(updates);

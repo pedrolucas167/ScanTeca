@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { findBookCover } from "@/lib/book-cover";
 import { findSynopsis } from "@/lib/synopsis";
+import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 
 interface GoogleBooksVolume {
@@ -262,6 +263,19 @@ export async function POST(request: NextRequest) {
         isbn: cleaned,
       });
       if (extraSynopsis) bookData.synopsis = extraSynopsis;
+    }
+
+    // Prefere a data da primeira publicação da obra, não da edição/reimpressão
+    const originalYear = await findOriginalPublishYear({
+      title: bookData.title,
+      author: bookData.author,
+      isbn: cleaned,
+    });
+    if (originalYear) {
+      const currentYear = extractYear(bookData.publishedDate);
+      if (!currentYear || originalYear < currentYear) {
+        bookData.publishedDate = String(originalYear);
+      }
     }
 
     const book = await prisma.book.create({

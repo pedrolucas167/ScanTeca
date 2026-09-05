@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { BookStatus } from "@prisma/client";
 import { findBookCover } from "@/lib/book-cover";
 import { findSynopsis } from "@/lib/synopsis";
+import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 
 export async function POST(request: NextRequest) {
@@ -61,12 +62,26 @@ export async function POST(request: NextRequest) {
         isbn: cleanedIsbn || undefined,
       }));
 
+    // Prefere a data da primeira publicação da obra, não da edição/reimpressão
+    let effectivePublishedDate: string | null = publishedDate || null;
+    const originalYear = await findOriginalPublishYear({
+      title,
+      author,
+      isbn: cleanedIsbn || undefined,
+    });
+    if (originalYear) {
+      const currentYear = extractYear(effectivePublishedDate);
+      if (!currentYear || originalYear < currentYear) {
+        effectivePublishedDate = String(originalYear);
+      }
+    }
+
     const book = await prisma.book.create({
       data: {
         isbn: cleanedIsbn || "MANUAL",
         title,
         author: author || "Autor desconhecido",
-        publishedDate: publishedDate || null,
+        publishedDate: effectivePublishedDate,
         synopsis: effectiveSynopsis,
         coverUrl: effectiveCoverUrl || null,
         status: (status as BookStatus) || BookStatus.TO_READ,
