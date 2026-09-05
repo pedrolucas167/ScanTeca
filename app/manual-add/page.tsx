@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Check, PlusCircle, Search } from "lucide-react";
+import { BookOpen, Check, PlusCircle, Search, Sparkles } from "lucide-react";
 
 export default function ManualAddPage() {
   const router = useRouter();
@@ -59,6 +59,46 @@ export default function ManualAddPage() {
       }
     } catch {
       setMessage("Erro ao buscar capa. Tente usar uma URL ou foto.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateSynopsis = async () => {
+    if (!form.title.trim()) {
+      setMessage("Preencha o título para gerar a sinopse");
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/generate-synopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          author: form.author,
+          isbn: form.isbn,
+          currentSynopsis: form.synopsis,
+          force: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.synopsis) {
+        setForm((f) => ({ ...f, synopsis: data.synopsis }));
+        setMessage("Sinopse gerada! Você pode editá-la antes de salvar.");
+        setTimeout(() => setMessage(null), 4000);
+      } else if (res.ok) {
+        setMessage(data.error || "Não foi possível encontrar uma sinopse");
+      } else {
+        setMessage(data.error || "Erro ao gerar sinopse");
+      }
+    } catch {
+      setMessage("Erro de rede ao gerar sinopse");
     } finally {
       setLoading(false);
     }
@@ -219,9 +259,24 @@ export default function ManualAddPage() {
             value={form.synopsis}
             onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
             placeholder="Resumo do livro..."
-            rows={3}
+            rows={5}
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
+          <button
+            type="button"
+            onClick={handleGenerateSynopsis}
+            disabled={loading}
+            className="mt-2 w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+          >
+            {loading ? (
+              "Gerando..."
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                Gerar sinopse automaticamente
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="mb-4">

@@ -505,6 +505,58 @@ export default function Catalog({
     }
   };
 
+  const handleGenerateSynopsis = async () => {
+    if (!editingBook) return;
+
+    if (!editingBook.title.trim()) {
+      setMessage("Preencha o título para gerar a sinopse");
+      return;
+    }
+
+    const hasSynopsis =
+      editingBook.synopsis && editingBook.synopsis.trim().length > 0;
+    if (
+      hasSynopsis &&
+      !window.confirm(
+        "Já existe uma sinopse. Deseja substituí-la por uma nova?"
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/generate-synopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editingBook.title,
+          author: editingBook.author,
+          isbn: editingBook.isbn,
+          force: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.synopsis) {
+        setEditingBook({ ...editingBook, synopsis: data.synopsis });
+        setMessage("Sinopse gerada! Você pode editá-la antes de salvar.");
+        setTimeout(() => setMessage(null), 4000);
+      } else if (res.ok) {
+        setMessage(data.error || "Não foi possível encontrar uma sinopse");
+      } else {
+        setMessage(data.error || "Erro ao gerar sinopse");
+      }
+    } catch {
+      setMessage("Erro de rede ao gerar sinopse");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = [
       "Título",
@@ -1452,9 +1504,24 @@ export default function Catalog({
                     synopsis: e.target.value || null,
                   })
                 }
-                rows={3}
+                rows={5}
                 className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
               />
+              <button
+                type="button"
+                onClick={handleGenerateSynopsis}
+                disabled={loading}
+                className="mt-2 w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+              >
+                {loading ? (
+                  "Gerando..."
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Gerar sinopse automaticamente
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="mb-4">
