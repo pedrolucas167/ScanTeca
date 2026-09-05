@@ -10,29 +10,32 @@ export default function LandingPage() {
             <BookOpen className="h-10 w-10 text-indigo-600 dark:text-indigo-400" />
           </div>
 
-          <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+          <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-400 dark:text-zinc-500">
+            Bibliotheca Personalis
+          </p>
+          <h1 className="mt-3 font-serif text-5xl font-semibold tracking-tight text-foreground sm:text-6xl">
             Scanteca
           </h1>
-          <p className="mx-auto mt-4 max-w-lg text-lg text-zinc-600 dark:text-zinc-400">
+          <p className="mx-auto mt-4 max-w-lg font-serif text-lg italic text-zinc-600 dark:text-zinc-400">
             Organize, descubra e celebre a sua biblioteca pessoal.
           </p>
 
           <div className="mx-auto mt-10 max-w-2xl rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
             <Quote className="mx-auto mb-4 h-6 w-6 text-indigo-400" />
-            <blockquote className="text-lg font-medium leading-relaxed text-foreground sm:text-xl">
+            <blockquote className="font-serif text-lg italic leading-relaxed text-foreground sm:text-xl">
               "Comecei minha vida como hei de acabá-la, sem dúvida: no meio dos
               livros. [...] Mas os livros foram meus passarinhos e meus ninhos,
               meus animais domésticos, meu estábulo e minha biblioteca; a
               biblioteca, num recanto, realizava o mundo em espessura e em
               fito, o feitiço enciclopédico."
             </blockquote>
-            <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-4 font-serif text-sm not-italic text-zinc-500 dark:text-zinc-400">
               — Jean-Paul Sartre,{" "}
               <em className="text-indigo-600 dark:text-indigo-400">As Palavras</em>
             </p>
           </div>
 
-          <p className="mx-auto mt-8 max-w-lg text-zinc-600 dark:text-zinc-400">
+          <p className="mx-auto mt-8 max-w-lg font-serif text-base italic text-zinc-600 dark:text-zinc-400">
             Os livros eram meus móveis e meus encargos.
           </p>
 

@@ -42,15 +42,24 @@ export default async function SharedCatalogPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
-        <h1 className="flex items-center justify-center gap-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+      <section className="border-b border-zinc-200 bg-gradient-to-br from-amber-50/60 via-white to-indigo-50/40 px-4 py-14 text-center dark:border-zinc-800 dark:from-amber-950/10 dark:via-zinc-950 dark:to-indigo-950/20">
+        <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-400 dark:text-zinc-500">
+          Ex Libris
+        </p>
+        <h1 className="mt-2 flex items-center justify-center gap-3 font-serif text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           <BookOpen className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
           {setting.name}
         </h1>
-        <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
-          Catálogo público · {books.length}{" "}
-          {books.length === 1 ? "livro" : "livros"} · {readCount}{" "}
-          {readCount === 1 ? "lido" : "lidos"}
+        <div className="mx-auto mt-5 flex max-w-xs items-center gap-3">
+          <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
+          <span className="font-serif text-sm italic text-zinc-400 dark:text-zinc-500">
+            ❧
+          </span>
+          <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
+        </div>
+        <p className="mx-auto mt-4 max-w-lg font-serif text-base italic text-zinc-600 dark:text-zinc-400">
+          {books.length} {books.length === 1 ? "volume" : "volumes"} ·{" "}
+          {readCount} {readCount === 1 ? "lido" : "lidos"}
         </p>
         <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
           Compartilhado via Scanteca

@@ -50,6 +50,17 @@ const statusClasses: Record<string, string> = {
   WISHLIST: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
+const literaryQuotes = [
+  { text: "Sempre imaginei que o paraíso fosse uma espécie de biblioteca.", author: "Jorge Luis Borges" },
+  { text: "Um quarto sem livros é como um corpo sem alma.", author: "Cícero" },
+  { text: "A leitura de todos os bons livros é uma conversação com as mais honestas pessoas dos séculos passados.", author: "Descartes" },
+  { text: "Há livros escritos para evitar espaços vazios na estante.", author: "Carlos Drummond de Andrade" },
+  { text: "Um leitor vive mil vidas antes de morrer. O homem que nunca lê vive apenas uma.", author: "George R. R. Martin" },
+  { text: "A vida é a arte do encontro, embora haja tanto desencontro pela vida.", author: "Vinicius de Moraes" },
+  { text: "Ler é sonhar acordado.", author: "Anônimo" },
+  { text: "Os livros são os mais quietos e constantes dos amigos.", author: "Charles W. Eliot" },
+];
+
 export default function Catalog({
   books,
   libraryName: initialLibraryName,
@@ -83,6 +94,11 @@ export default function Catalog({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [shareEnabled, setShareEnabled] = useState(initialShareEnabled);
   const [shareId, setShareId] = useState<string | null>(initialShareId);
+
+  // Citação literária rotativa (muda a cada dia)
+  const quote = literaryQuotes[
+    Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % literaryQuotes.length
+  ];
 
   const collections = useMemo(
     () => Array.from(new Set(bookList.map((b) => b.collection))).sort(),
@@ -120,6 +136,47 @@ export default function Catalog({
       rated.length > 0
         ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length
         : 0;
+
+    // Pilha imaginária: ~0.08mm por página
+    const stackMeters = Math.round(totalPages * 0.08) / 1000;
+
+    // Horas de leitura: ~40 páginas/hora
+    const readingHours = Math.round(totalPages / 40);
+
+    // Autor mais presente
+    const authorCount = new Map<string, number>();
+    for (const b of bookList) {
+      if (b.author && b.author !== "Autor desconhecido") {
+        authorCount.set(b.author, (authorCount.get(b.author) ?? 0) + 1);
+      }
+    }
+    const topAuthor =
+      authorCount.size > 0
+        ? [...authorCount.entries()].sort((a, b) => b[1] - a[1])[0]
+        : null;
+
+    // Obra mais antiga
+    const oldest = bookList
+      .map((b) => {
+        const m = b.publishedDate?.match(/\d{4}/);
+        return m ? { title: b.title, year: Number(m[0]) } : null;
+      })
+      .filter((x): x is { title: string; year: number } => !!x)
+      .sort((a, b) => a.year - b.year)[0] ?? null;
+
+    // Ritmo: livros lidos por mês desde o primeiro
+    const readDates = read
+      .map((b) => new Date(b.createdAt).getTime())
+      .sort((a, b) => a - b);
+    const monthsSpan =
+      readDates.length > 1
+        ? Math.max(
+            1,
+            (Date.now() - readDates[0]) / (1000 * 60 * 60 * 24 * 30)
+          )
+        : 1;
+    const pace = Math.round((read.length / monthsSpan) * 10) / 10;
+
     return {
       total: bookList.length,
       read: read.length,
@@ -128,6 +185,11 @@ export default function Catalog({
       totalPages,
       avgRating: Math.round(avgRating * 10) / 10,
       noCover: bookList.filter((b) => !b.coverUrl).length,
+      stackMeters,
+      readingHours,
+      topAuthor,
+      oldest,
+      pace,
     };
   }, [bookList]);
 
@@ -566,13 +628,16 @@ export default function Catalog({
 
   return (
     <div className="flex flex-1 flex-col">
-      <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
-        <h1 className="flex items-center justify-center gap-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+      <section className="border-b border-zinc-200 bg-gradient-to-br from-amber-50/60 via-white to-indigo-50/40 px-4 py-14 text-center dark:border-zinc-800 dark:from-amber-950/10 dark:via-zinc-950 dark:to-indigo-950/20">
+        <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-400 dark:text-zinc-500">
+          Bibliotheca Personalis
+        </p>
+        <h1 className="mt-2 flex items-center justify-center gap-3 font-serif text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           <BookOpen className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
           Scanteca
         </h1>
 
-        <div className="mx-auto mt-4 flex max-w-lg flex-col items-center justify-center gap-2 sm:flex-row">
+        <div className="mx-auto mt-5 flex max-w-lg flex-col items-center justify-center gap-2 sm:flex-row">
           {isEditingName ? (
             <div className="flex w-full items-center justify-center gap-2 sm:w-auto">
               <input
@@ -586,7 +651,7 @@ export default function Catalog({
                     setNameInput(libraryName);
                   }
                 }}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-center text-lg font-semibold text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:w-64 dark:border-zinc-600 dark:bg-zinc-800"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-center font-serif text-lg text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:w-64 dark:border-zinc-600 dark:bg-zinc-800"
                 autoFocus
               />
               <button
@@ -600,10 +665,10 @@ export default function Catalog({
           ) : (
             <button
               onClick={() => setIsEditingName(true)}
-              className="group flex items-center gap-2 rounded-lg border border-transparent px-3 py-1 text-lg font-semibold text-foreground hover:border-zinc-200 hover:bg-white/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/50"
+              className="group flex items-center gap-2 rounded-lg border border-transparent px-3 py-1 font-serif text-2xl italic text-foreground hover:border-zinc-200 hover:bg-white/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/50"
             >
               {libraryName}
-              <span className="text-xs font-normal text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-zinc-500">
+              <span className="font-sans text-xs font-normal not-italic text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-zinc-500">
                 (editar)
               </span>
             </button>
@@ -612,13 +677,27 @@ export default function Catalog({
             ·
           </span>
           <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-            {bookList.length} {bookList.length === 1 ? "livro" : "livros"}
+            {bookList.length} {bookList.length === 1 ? "volume" : "volumes"}
           </p>
         </div>
 
-        <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
-          Organize seus livros: lidos, a ler e lista de desejos.
-        </p>
+        {/* Ornamento tipográfico */}
+        <div className="mx-auto mt-5 flex max-w-xs items-center gap-3">
+          <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
+          <span className="font-serif text-sm italic text-zinc-400 dark:text-zinc-500">
+            ❧
+          </span>
+          <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
+        </div>
+
+        <blockquote className="mx-auto mt-4 max-w-xl">
+          <p className="font-serif text-base italic leading-relaxed text-zinc-600 dark:text-zinc-400">
+            &ldquo;{quote.text}&rdquo;
+          </p>
+          <cite className="mt-1 block font-serif text-xs not-italic text-zinc-400 dark:text-zinc-500">
+            — {quote.author}
+          </cite>
+        </blockquote>
         <div className="mx-auto mt-6 flex max-w-2xl flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/scanner"
@@ -742,47 +821,92 @@ export default function Catalog({
 
           {/* Stats panel */}
           {showStats && (
-            <div className="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-6 dark:border-zinc-700 dark:bg-zinc-900">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                  {stats.total}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Total</p>
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+              <p className="mb-4 text-center font-serif text-sm italic text-zinc-500 dark:text-zinc-400">
+                — Ficha da coleção —
+              </p>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="text-center">
+                  <p className="font-serif text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
+                    {stats.total}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {stats.total === 1 ? "Volume" : "Volumes"}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="font-serif text-3xl font-semibold text-green-600 dark:text-green-400">
+                    {stats.read}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Lidos</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-serif text-3xl font-semibold text-amber-600 dark:text-amber-400">
+                    {stats.totalPages.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Páginas lidas
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="font-serif text-3xl font-semibold text-amber-700 dark:text-amber-500">
+                    {stats.stackMeters}m
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Pilha de livros
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="font-serif text-3xl font-semibold text-teal-600 dark:text-teal-400">
+                    {stats.readingHours}h
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Horas de leitura
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="flex items-center justify-center gap-1 font-serif text-3xl font-semibold text-yellow-500">
+                    {stats.avgRating}
+                    <Star className="h-4 w-4 fill-current" />
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Média de avaliação
+                  </p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {stats.read}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Lidos</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {stats.toRead}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">A ler</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {stats.wishlist}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Desejos</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  {stats.totalPages.toLocaleString("pt-BR")}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Páginas lidas
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="flex items-center justify-center gap-1 text-2xl font-bold text-yellow-500">
-                  {stats.avgRating}
-                  <Star className="h-4 w-4 fill-current" />
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Média de avaliação
-                </p>
+
+              {/* Detalhes de curador */}
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 sm:grid-cols-3 dark:border-zinc-800">
+                {stats.topAuthor && (
+                  <div className="text-center">
+                    <p className="font-serif text-sm italic text-foreground">
+                      {stats.topAuthor[0]}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                      Autor mais presente · {stats.topAuthor[1]}{" "}
+                      {stats.topAuthor[1] === 1 ? "obra" : "obras"}
+                    </p>
+                  </div>
+                )}
+                {stats.oldest && (
+                  <div className="text-center">
+                    <p className="font-serif text-sm italic text-foreground">
+                      {stats.oldest.title} ({stats.oldest.year})
+                    </p>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                      Obra mais antiga
+                    </p>
+                  </div>
+                )}
+                <div className="text-center">
+                  <p className="font-serif text-sm italic text-foreground">
+                    {stats.pace}{" "}
+                    {stats.pace === 1 ? "livro" : "livros"}/mês
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                    Ritmo de leitura
+                  </p>
+                </div>
               </div>
             </div>
           )}
