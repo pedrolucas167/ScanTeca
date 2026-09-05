@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+import { Camera, Check, ScanLine } from "lucide-react";
 import { playBeep } from "@/lib/beep";
 
 interface ScanResult {
@@ -55,7 +56,7 @@ export default function Scanner() {
       if (res.ok) {
         setResult({
           type: "success",
-          message: `✓ ${data.book.title} — redirecionando para o catálogo...`,
+          message: `${data.book.title} — redirecionando para o catálogo...`,
         });
         stopScanner();
         setTimeout(() => {
@@ -208,7 +209,8 @@ export default function Scanner() {
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold text-foreground">
-        📷 Scanner de Código de Barras
+        <ScanLine className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+        Scanner de Código de Barras
       </h1>
 
       <p className="mb-6 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">

@@ -3,6 +3,13 @@
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import {
+  BookOpen,
+  Check,
+  PlusCircle,
+  Search,
+  Star,
+} from "lucide-react";
 
 interface Book {
   id: string;
@@ -81,7 +88,7 @@ export default function Catalog({ books }: { books: Book[] }) {
 
       if (res.ok) {
         setBookList((prev) => prev.filter((b) => b.id !== book.id));
-        setMessage(`✓ ${book.title} removido`);
+        setMessage(`${book.title} removido`);
         setTimeout(() => setMessage(null), 3000);
       } else {
         setMessage(data.error || "Erro ao remover");
@@ -123,7 +130,7 @@ export default function Catalog({ books }: { books: Book[] }) {
           prev.map((b) => (b.id === data.book.id ? data.book : b))
         );
         setEditingBook(null);
-        setMessage(`✓ ${data.book.title} atualizado`);
+        setMessage(`${data.book.title} atualizado`);
         setTimeout(() => setMessage(null), 3000);
       } else {
         setMessage(data.error || "Erro ao atualizar");
@@ -168,7 +175,7 @@ export default function Catalog({ books }: { books: Book[] }) {
           setBookList((prev) =>
             prev.map((b) => (b.id === book.id ? { ...b, coverUrl: data.coverUrl } : b))
           );
-          setMessage(`✓ Capa encontrada para ${book.title}`);
+          setMessage(`Capa encontrada para ${book.title}`);
           setTimeout(() => setMessage(null), 3000);
           return data.coverUrl;
         } else {
@@ -199,8 +206,9 @@ export default function Catalog({ books }: { books: Book[] }) {
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50 to-white px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:to-zinc-950">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          📚 Scanteca
+        <h1 className="flex items-center justify-center gap-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <BookOpen className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+          Scanteca
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-zinc-600 dark:text-zinc-400">
           Organize seus livros: lidos, a ler e lista de desejos.
@@ -233,7 +241,8 @@ export default function Catalog({ books }: { books: Book[] }) {
             href="/manual-add"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
-            ➕ Adicionar Manual
+            <PlusCircle className="h-4 w-4" />
+            Adicionar Manual
           </Link>
         </div>
       </section>
@@ -281,7 +290,7 @@ export default function Catalog({ books }: { books: Book[] }) {
 
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="mb-4 text-6xl">📖</div>
+            <BookOpen className="mb-4 h-16 w-16 text-zinc-300 dark:text-zinc-700" />
             <h2 className="text-xl font-semibold text-foreground">
               {query || statusFilter || collectionFilter
                 ? "Nenhum livro encontrado"
@@ -337,7 +346,7 @@ export default function Catalog({ books }: { books: Book[] }) {
                         disabled={loading}
                         className="mt-2 rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {loading ? "Buscando..." : "🔍 Buscar capa"}
+                        {loading ? "Buscando..." : <span className="flex items-center gap-1"><Search className="h-3 w-3" /> Buscar capa</span>}
                       </button>
                     </div>
                   )}
@@ -351,8 +360,10 @@ export default function Catalog({ books }: { books: Book[] }) {
                       {statusLabels[book.status]}
                     </span>
                     {book.rating ? (
-                      <span className="text-xs text-yellow-500">
-                        {"★".repeat(book.rating)}
+                      <span className="flex items-center gap-0.5 text-xs text-yellow-500">
+                        {Array.from({ length: book.rating }).map((_, i) => (
+                          <Star key={i} className="h-3 w-3 fill-current" />
+                        ))}
                       </span>
                     ) : null}
                   </div>
@@ -502,7 +513,7 @@ export default function Catalog({ books }: { books: Book[] }) {
                 disabled={loading}
                 className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
               >
-                {loading ? "Buscando..." : "🔍 Buscar capa automaticamente"}
+                {loading ? "Buscando..." : <span className="flex items-center justify-center gap-2"><Search className="h-4 w-4" /> Buscar capa automaticamente</span>}
               </button>
             </div>
 

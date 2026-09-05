@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Star } from "lucide-react";
 
 interface Review {
   id: string;
@@ -107,8 +108,10 @@ export function BookReviews({
                   {review.userName || "Leitor anônimo"}
                 </span>
                 {review.rating ? (
-                  <span className="text-xs text-yellow-500">
-                    {"★".repeat(review.rating)}
+                  <span className="flex items-center gap-0.5 text-xs text-yellow-500">
+                    {Array.from({ length: review.rating }).map((_, i) => (
+                      <Star key={i} className="h-3 w-3 fill-current" />
+                    ))}
                   </span>
                 ) : null}
                 <span className="text-xs text-zinc-400">

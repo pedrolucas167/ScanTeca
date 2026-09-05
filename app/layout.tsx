@@ -8,6 +8,7 @@ import {
   Show,
   UserButton,
 } from "@clerk/nextjs";
+import { BookOpen, Heart } from "lucide-react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -51,9 +52,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
               <Link
                 href="/"
-                className="text-lg font-bold tracking-tight text-foreground"
+                className="flex items-center gap-1.5 text-lg font-bold tracking-tight text-foreground"
               >
-                📚 Scanteca
+                <BookOpen className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                Scanteca
               </Link>
               <div className="flex items-center gap-2 sm:gap-4">
                 <Link
@@ -105,8 +107,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </header>
           {children}
           <footer className="border-t border-zinc-200 bg-white py-6 text-center dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Feito com 💜 por{" "}
+            <p className="flex items-center justify-center gap-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Feito com
+              <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" /> por{" "}
               <a
                 href="https://portfoliomarques.vercel.app/"
                 target="_blank"

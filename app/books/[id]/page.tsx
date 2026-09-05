@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeft, Star } from "lucide-react";
 import { BookReviews } from "./BookReviews";
 
 export const dynamic = "force-dynamic";
@@ -59,9 +60,10 @@ export default async function BookDetailPage({
       <div className="mx-auto w-full max-w-4xl">
         <Link
           href="/"
-          className="mb-6 inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
         >
-          ← Voltar ao catálogo
+          <ArrowLeft className="h-4 w-4" />
+          Voltar ao catálogo
         </Link>
 
         <div className="mb-8 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -125,7 +127,11 @@ export default async function BookDetailPage({
 
               {book.rating ? (
                 <div className="mt-2 flex items-center gap-1">
-                  <span className="text-yellow-500">{"★".repeat(book.rating)}</span>
+                  <span className="flex items-center gap-0.5 text-yellow-500">
+                    {Array.from({ length: book.rating }).map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-current" />
+                    ))}
+                  </span>
                   <span className="text-sm text-zinc-500 dark:text-zinc-400">
                     Sua avaliação
                   </span>
@@ -133,13 +139,15 @@ export default async function BookDetailPage({
               ) : null}
 
               {avgRating && (
-                <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  Média das reviews: {" "}
-                  <span className="font-medium text-yellow-500">
-                    {"★".repeat(Math.round(Number(avgRating)))}
-                  </span>{" "}
-                  ({avgRating}) · {book.reviews.length} review
-                  {book.reviews.length === 1 ? "" : "s"}
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                  <span>Média das reviews:</span>
+                  <span className="flex items-center gap-0.5 font-medium text-yellow-500">
+                    {Array.from({ length: Math.round(Number(avgRating)) }).map((_, i) => (
+                      <Star key={i} className="h-3.5 w-3.5 fill-current" />
+                    ))}
+                  </span>
+                  <span>({avgRating}) · {book.reviews.length} review
+                  {book.reviews.length === 1 ? "" : "s"}</span>
                 </div>
               )}
 

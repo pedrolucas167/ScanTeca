@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { BookOpen, Check, PlusCircle } from "lucide-react";
 
 export default function ManualAddPage() {
   const router = useRouter();
@@ -60,7 +61,7 @@ export default function ManualAddPage() {
       const data = await res.json();
 
       if (res.ok) {
-        setMessage(`✓ ${data.book.title} adicionado! Redirecionando...`);
+        setMessage(`${data.book.title} adicionado! Redirecionando...`);
         setTimeout(() => {
           router.push("/");
         }, 1200);
@@ -76,8 +77,9 @@ export default function ManualAddPage() {
 
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-8">
-      <h1 className="mb-2 text-2xl font-bold text-foreground">
-        ➕ Adicionar Livro Manualmente
+      <h1 className="mb-2 flex items-center justify-center gap-2 text-2xl font-bold text-foreground">
+        <PlusCircle className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+        Adicionar Livro Manualmente
       </h1>
       <p className="mb-6 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
         Preencha os dados do livro. Útil para livros sem ISBN ou sem capa na base.
@@ -260,7 +262,7 @@ export default function ManualAddPage() {
       {message && (
         <div
           className={`mt-6 w-full max-w-md rounded-lg p-4 text-sm font-medium ${
-            message.startsWith("✓")
+            message.includes("adicionado")
               ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
               : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
           }`}
