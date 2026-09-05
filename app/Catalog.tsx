@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Search,
   Share2,
+  SlidersHorizontal,
   Sparkles,
   Star,
   Wand2,
@@ -108,12 +109,17 @@ export default function Catalog({
   const [shareId, setShareId] = useState<string | null>(initialShareId);
   const [copied, setCopied] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   // Captured once on mount — Date.now() during render is impure (react-hooks/purity)
   const [now] = useState(() => Date.now());
 
   const quote = literaryQuotes[
     Math.floor(now / (1000 * 60 * 60 * 24)) % literaryQuotes.length
   ];
+
+  const activeFiltersCount =
+    [statusFilter, collectionFilter, genreFilter, yearFilter, ratingFilter].filter(Boolean).length +
+    (noCoverOnly ? 1 : 0);
 
   const collections = useMemo(
     () => Array.from(new Set(bookList.map((b) => b.collection))).sort(),
@@ -881,6 +887,7 @@ export default function Catalog({
               <button
                 type="button"
                 onClick={() => setShowStats((s) => !s)}
+                title="Estatísticas"
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                   showStats
                     ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
@@ -888,20 +895,22 @@ export default function Catalog({
                 }`}
               >
                 <BarChart3 className="h-3.5 w-3.5" />
-                Estatísticas
+                <span className="hidden sm:inline">Estatísticas</span>
               </button>
               <button
                 type="button"
                 onClick={handleExportCSV}
+                title="Exportar CSV"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
               >
                 <Download className="h-3.5 w-3.5" />
-                Exportar CSV
+                <span className="hidden sm:inline">Exportar CSV</span>
               </button>
               <button
                 type="button"
                 onClick={handleToggleShare}
                 disabled={loading}
+                title={shareEnabled ? "Desativar link público" : "Compartilhar catálogo"}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                   shareEnabled
                     ? "border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
@@ -909,14 +918,17 @@ export default function Catalog({
                 }`}
               >
                 <Share2 className="h-3.5 w-3.5" />
-                {shareEnabled ? "Desativar link" : "Compartilhar"}
+                <span className="hidden sm:inline">
+                  {shareEnabled ? "Desativar link" : "Compartilhar"}
+                </span>
               </button>
               <Link
                 href="/oracle"
+                title="Oráculo — pergunte sobre seu acervo"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                Oráculo
+                <span className="hidden sm:inline">Oráculo</span>
               </Link>
               <button
                 type="button"
@@ -926,7 +938,9 @@ export default function Catalog({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
               >
                 <Wand2 className="h-3.5 w-3.5" />
-                {enriching ? "Enriquecendo..." : "Completar dados"}
+                <span className="hidden sm:inline">
+                  {enriching ? "Enriquecendo..." : "Completar dados"}
+                </span>
               </button>
             </div>
 
@@ -1086,7 +1100,33 @@ export default function Catalog({
             className="w-full rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {/* Mobile: botão Filtros + contador — o painel abre sob demanda */}
+          <div className="flex items-center justify-between lg:hidden">
+            <button
+              type="button"
+              onClick={() => setShowFilters((s) => !s)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                showFilters || activeFiltersCount > 0
+                  ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+                  : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros
+              {activeFiltersCount > 0 && (
+                <span className="ml-0.5 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {filtered.length} {filtered.length === 1 ? "livro" : "livros"}
+            </p>
+          </div>
+
+          <div
+            className={`${showFilters ? "grid" : "hidden"} grid-cols-2 gap-3 sm:grid-cols-3 lg:grid lg:grid-cols-5`}
+          >
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -1147,7 +1187,9 @@ export default function Catalog({
             </select>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className={`${showFilters ? "flex" : "hidden"} flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:flex`}
+          >
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
@@ -1183,7 +1225,7 @@ export default function Catalog({
                 </span>
               )}
             </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="hidden text-xs text-zinc-500 lg:block dark:text-zinc-400">
               {filtered.length} {filtered.length === 1 ? "livro" : "livros"}
             </p>
           </div>
