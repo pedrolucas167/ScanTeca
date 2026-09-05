@@ -28,6 +28,8 @@ export default function Scanner() {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [manualIsbn, setManualIsbn] = useState("");
+  const [showManualInput, setShowManualInput] = useState(false);
   const processingRef = useRef(false);
 
   const handleScan = useCallback(async (isbn: string) => {
@@ -165,6 +167,17 @@ export default function Scanner() {
     }
   }, [handleScan, stopScanner]);
 
+  const handleManualSubmit = useCallback(() => {
+    const isbn = manualIsbn.trim();
+    if (!isbn) {
+      setResult({ type: "error", message: "Digite um ISBN válido" });
+      return;
+    }
+    setShowManualInput(false);
+    setManualIsbn("");
+    handleScan(isbn);
+  }, [manualIsbn, handleScan]);
+
   useEffect(() => {
     return () => {
       stopScanner();
@@ -182,7 +195,7 @@ export default function Scanner() {
         automaticamente cadastrado no catálogo.
       </p>
 
-      <div className="mb-6 flex gap-3">
+      <div className="mb-6 flex flex-wrap justify-center gap-3">
         {!scanning ? (
           <button
             onClick={startScanner}
@@ -198,6 +211,12 @@ export default function Scanner() {
             Parar Scanner
           </button>
         )}
+        <button
+          onClick={() => setShowManualInput(true)}
+          className="rounded-full border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        >
+          Digitar ISBN
+        </button>
       </div>
 
       <div
@@ -294,6 +313,47 @@ export default function Scanner() {
           }`}
         >
           {result.message}
+        </div>
+      )}
+
+      {/* Manual ISBN Input Modal */}
+      {showManualInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">
+              Digitar ISBN
+            </h2>
+            <input
+              type="text"
+              value={manualIsbn}
+              onChange={(e) => setManualIsbn(e.target.value)}
+              placeholder="Ex: 9788535902778"
+              className="mb-4 w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleManualSubmit();
+                }
+              }}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowManualInput(false);
+                  setManualIsbn("");
+                }}
+                className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleManualSubmit}
+                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+              >
+                Buscar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

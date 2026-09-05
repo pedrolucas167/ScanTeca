@@ -55,16 +55,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 📚 Livros
               </Link>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <Link
                   href="/"
-                  className="text-sm font-medium text-zinc-600 transition-colors hover:text-foreground dark:text-zinc-400"
+                  className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-foreground sm:inline dark:text-zinc-400"
                 >
                   Catálogo
                 </Link>
                 <Link
                   href="/scanner"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 sm:px-4 sm:text-sm"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -83,16 +83,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
                     <line x1="7" y1="12" x2="17" y2="12" />
                   </svg>
-                  Scanner
+                  <span className="hidden sm:inline">Scanner</span>
                 </Link>
                 <Show when="signed-out">
                   <SignInButton mode="modal">
-                    <button className="text-sm font-medium text-zinc-600 transition-colors hover:text-foreground dark:text-zinc-400">
+                    <button className="text-xs font-medium text-zinc-600 transition-colors hover:text-foreground sm:text-sm dark:text-zinc-400">
                       Entrar
                     </button>
                   </SignInButton>
                   <SignUpButton mode="modal">
-                    <button className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
+                    <button className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 sm:px-4 sm:text-sm dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
                       Cadastrar
                     </button>
                   </SignUpButton>
