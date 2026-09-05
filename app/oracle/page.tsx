@@ -131,14 +131,46 @@ export default function OraclePage() {
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center py-16 text-center">
+            <div className="flex flex-col items-center py-10 text-center sm:py-16">
               <div className="mb-4 rounded-2xl bg-indigo-100 p-4 dark:bg-indigo-900/30">
                 <Sparkles className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
               </div>
               <h2 className="font-serif text-2xl font-semibold text-foreground">
                 Consulte o Oráculo
               </h2>
-              <p className="mx-auto mt-2 max-w-md font-serif text-sm italic text-zinc-500 dark:text-zinc-400">
+              <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                O Oráculo conhece a ficha de cada livro do seu catálogo —
+                título, autor, sinopse e gênero. Pergunte em linguagem natural
+                e ele responde com base no <strong>seu</strong> acervo,
+                indicando quais livros usou como referência.
+              </p>
+              <div className="mx-auto mt-5 grid max-w-lg grid-cols-1 gap-2 text-left sm:grid-cols-3">
+                <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                  <p className="text-xs font-semibold text-foreground">
+                    Encontra por tema
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    &ldquo;O que eu tenho sobre filosofia?&rdquo;
+                  </p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                  <p className="text-xs font-semibold text-foreground">
+                    Recomenda leituras
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    &ldquo;O que ler depois de Duna?&rdquo;
+                  </p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                  <p className="text-xs font-semibold text-foreground">
+                    Conversa sobre o acervo
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    &ldquo;Qual meu livro mais denso?&rdquo;
+                  </p>
+                </div>
+              </div>
+              <p className="mx-auto mt-5 max-w-md font-serif text-sm italic text-zinc-500 dark:text-zinc-400">
                 &ldquo;Sempre imaginei que o paraíso fosse uma espécie de
                 biblioteca.&rdquo;
               </p>
