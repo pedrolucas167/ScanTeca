@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import type { IScannerControls } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { ScanLine } from "lucide-react";
 import { playBeep } from "@/lib/beep";
 
@@ -11,11 +13,10 @@ interface ScanResult {
   message: string;
 }
 
-const SCANNER_ELEMENT_ID = "html5qr-code-scanner";
-
 export default function Scanner() {
   const router = useRouter();
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,12 +25,12 @@ export default function Scanner() {
   const processingRef = useRef(false);
 
   const stopScanner = useCallback(() => {
-    if (scannerRef.current?.isScanning) {
-      scannerRef.current
-        .stop()
-        .catch((err) => console.error("Erro ao parar scanner:", err));
+    try {
+      controlsRef.current?.stop();
+    } catch (err) {
+      console.error("Erro ao parar scanner:", err);
     }
-    scannerRef.current = null;
+    controlsRef.current = null;
     setScanning(false);
   }, []);
 
@@ -96,51 +97,48 @@ export default function Scanner() {
 
       setResult({ type: "info", message: "Solicitando permissão da câmera..." });
 
-      // Show the scanner element BEFORE start() — html5-qrcode measures it
-      // to size the <video>; with display:none it renders 0x0 (black screen).
+      // Show the video element BEFORE starting so it has real dimensions.
       setScanning(true);
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))
       );
 
-      const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
-        verbose: false,
-        // ISBN-13 only — every ISBN-10 is also encoded as EAN-13 (978 prefix)
-        formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
+      if (!videoRef.current) {
+        throw new Error("Elemento de vídeo não disponível");
+      }
+
+      // ISBN-13 only — every ISBN-10 is also encoded as EAN-13 (978 prefix).
+      // TRY_HARDER improves detection of low-contrast/small barcodes.
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+
+      const reader = new BrowserMultiFormatReader(hints, {
+        delayBetweenScanAttempts: 100,
       });
 
-      scannerRef.current = qrScanner;
-
-      await qrScanner.start(
-        { facingMode: "environment" },
+      const controls = await reader.decodeFromConstraints(
         {
-          fps: 20,
-          // Narrow rectangle forces horizontal barcode alignment
-          qrbox: { width: 250, height: 100 },
-          aspectRatio: 1.777778,
-          disableFlip: false,
-          // videoConstraints replaces the facingMode param entirely in
-          // html5-qrcode, so facingMode must live inside it.
-          videoConstraints: {
+          audio: false,
+          video: {
             facingMode: { ideal: "environment" },
             width: { ideal: 1280 },
             height: { ideal: 720 },
             // Continuous autofocus where supported (Chrome/Android);
             // ignored gracefully on iOS/Safari. focusMode is non-standard
-            // in TS's DOM types, hence the double cast.
+            // in TS's DOM types, hence the cast.
             advanced: [{ focusMode: "continuous" }],
           } as unknown as MediaTrackConstraints,
         },
-        (decodedText) => {
-          if (!processingRef.current) {
-            handleScan(decodedText);
+        videoRef.current,
+        (scanResult) => {
+          if (scanResult && !processingRef.current) {
+            handleScan(scanResult.getText());
           }
-        },
-        () => {
-          // Ignore per-frame errors
         }
       );
 
+      controlsRef.current = controls;
       setResult({ type: "info", message: "Aponte para o código de barras..." });
     } catch (err) {
       console.error("Erro ao iniciar scanner:", err);
@@ -220,9 +218,12 @@ export default function Scanner() {
         className="relative w-full max-w-md overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 sm:max-w-lg lg:max-w-2xl dark:border-zinc-700 dark:bg-zinc-900"
         style={{ minHeight: scanning ? 320 : 200 }}
       >
-        <div
-          id={SCANNER_ELEMENT_ID}
-          className={`h-full w-full ${scanning ? "block" : "hidden"}`}
+        <video
+          ref={videoRef}
+          className={`h-full w-full object-cover ${scanning ? "block" : "hidden"}`}
+          muted
+          playsInline
+          autoPlay
         />
 
         {scanning && (
