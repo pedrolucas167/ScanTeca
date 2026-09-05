@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { BookStatus } from "@prisma/client";
 import { findBookCover } from "@/lib/book-cover";
+import { findSynopsis } from "@/lib/synopsis";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 
 export async function POST(request: NextRequest) {
@@ -52,6 +53,13 @@ export async function POST(request: NextRequest) {
 
     const effectiveCoverUrl = coverUrl ||
       (await findBookCover({ title, author, isbn: cleanedIsbn || undefined }));
+    const effectiveSynopsis =
+      synopsis ||
+      (await findSynopsis({
+        title,
+        author,
+        isbn: cleanedIsbn || undefined,
+      }));
 
     const book = await prisma.book.create({
       data: {
@@ -59,7 +67,7 @@ export async function POST(request: NextRequest) {
         title,
         author: author || "Autor desconhecido",
         publishedDate: publishedDate || null,
-        synopsis: synopsis || null,
+        synopsis: effectiveSynopsis,
         coverUrl: effectiveCoverUrl || null,
         status: (status as BookStatus) || BookStatus.TO_READ,
         collection: collection || "Minha Biblioteca",

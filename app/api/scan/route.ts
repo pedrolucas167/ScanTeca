@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { findBookCover } from "@/lib/book-cover";
+import { findSynopsis } from "@/lib/synopsis";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 
 interface GoogleBooksVolume {
@@ -252,6 +253,15 @@ export async function POST(request: NextRequest) {
         isbn: cleaned,
       });
       if (extraCover) bookData.coverUrl = extraCover;
+    }
+
+    if (!bookData.synopsis) {
+      const extraSynopsis = await findSynopsis({
+        title: bookData.title,
+        author: bookData.author,
+        isbn: cleaned,
+      });
+      if (extraSynopsis) bookData.synopsis = extraSynopsis;
     }
 
     const book = await prisma.book.create({

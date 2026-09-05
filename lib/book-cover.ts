@@ -290,7 +290,7 @@ function encodeParams(title: string, author: string) {
   return parts.join("+");
 }
 
-function normalize(text: string): string[] {
+export function normalize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9áàâãéêíóôõúç\s]/g, "")
@@ -298,7 +298,7 @@ function normalize(text: string): string[] {
     .filter((w) => w.length > 2);
 }
 
-function isTitleSimilar(query: string, found: string): boolean {
+export function isTitleSimilar(query: string, found: string): boolean {
   const queryWords = normalize(query);
   const foundWords = normalize(found);
   if (queryWords.length === 0 || foundWords.length === 0) return false;
@@ -311,7 +311,7 @@ function isTitleSimilar(query: string, found: string): boolean {
   return common.length >= Math.max(1, Math.ceil(queryWords.length * 0.5));
 }
 
-function isAuthorSimilar(query: string, found: string): boolean {
+export function isAuthorSimilar(query: string, found: string): boolean {
   const queryWords = normalize(query);
   const foundWords = normalize(found);
   if (queryWords.length === 0 || foundWords.length === 0) return true;
