@@ -185,8 +185,8 @@ export default function Catalog({
           setBookList((prev) =>
             prev.map((b) => (b.id === book.id ? { ...b, coverUrl: data.coverUrl } : b))
           );
-          setMessage(`Capa encontrada para ${book.title}`);
-          setTimeout(() => setMessage(null), 3000);
+          setMessage(`Capa encontrada para "${book.title}". Confira a pré-visualização no modal de edição.`);
+          setTimeout(() => setMessage(null), 5000);
           return data.coverUrl;
         } else {
           setMessage(saveData.error || "Erro ao salvar capa");
@@ -701,6 +701,23 @@ export default function Catalog({
               >
                 {loading ? "Buscando..." : <span className="flex items-center justify-center gap-2"><Globe className="h-4 w-4" /> Buscar capa na Wikipédia</span>}
               </button>
+
+              {editingBook.coverUrl && (
+                <div className="mt-3 flex flex-col items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+                  <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                    Pré-visualização da capa
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={editingBook.coverUrl}
+                    alt={`Capa de ${editingBook.title}`}
+                    className="h-48 w-auto rounded-md object-contain shadow-sm"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="mb-4">
