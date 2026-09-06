@@ -39,7 +39,7 @@ export default async function JornadaPage() {
     prisma.librarySetting.findUnique({ where: { userId } }),
     prisma.readingLog.findMany({
       where: { userId },
-      select: { date: true },
+      select: { date: true, pages: true },
     }),
   ]);
 
@@ -95,6 +95,19 @@ export default async function JornadaPage() {
     streak++;
     cursor.setDate(cursor.getDate() - 1);
   }
+
+  // Heatmap: páginas por dia nas últimas 15 semanas (estilo GitHub)
+  const HEAT_WEEKS = 15;
+  const pagesByDay = new Map<string, number>();
+  for (const l of logs) {
+    const key = l.date.toISOString().slice(0, 10);
+    pagesByDay.set(key, (pagesByDay.get(key) ?? 0) + l.pages);
+  }
+  const heatEnd = new Date();
+  heatEnd.setHours(0, 0, 0, 0);
+  heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay())); // sábado desta semana
+  const heatStart = new Date(heatEnd);
+  heatStart.setDate(heatStart.getDate() - (HEAT_WEEKS * 7 - 1));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -168,6 +181,41 @@ export default async function JornadaPage() {
             readCount={readThisYear.length}
             year={year}
           />
+        </div>
+
+        {/* Heatmap de leitura */}
+        <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+          <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
+            Mapa de leitura
+          </h2>
+          <div className="overflow-x-auto">
+            <div className="grid w-max grid-flow-col grid-rows-7 gap-[3px]">
+              {Array.from({ length: HEAT_WEEKS * 7 }).map((_, i) => {
+                const d = new Date(heatStart);
+                d.setDate(d.getDate() + i);
+                const key = d.toISOString().slice(0, 10);
+                const p = pagesByDay.get(key) ?? 0;
+                const cls =
+                  p === 0
+                    ? "bg-zinc-100 dark:bg-zinc-800"
+                    : p < 15
+                      ? "bg-emerald-200 dark:bg-emerald-900"
+                      : p < 30
+                        ? "bg-emerald-400 dark:bg-emerald-700"
+                        : "bg-emerald-600 dark:bg-emerald-500";
+                return (
+                  <div
+                    key={key}
+                    title={`${d.toLocaleDateString("pt-BR")}: ${p} ${p === 1 ? "página" : "páginas"}`}
+                    className={`h-3 w-3 rounded-sm ${cls}`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] text-zinc-400 dark:text-zinc-500">
+            Últimas {HEAT_WEEKS} semanas · tons mais fortes = mais páginas no dia
+          </p>
         </div>
 
         {/* Lendo agora */}
