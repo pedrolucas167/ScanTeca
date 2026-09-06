@@ -155,6 +155,14 @@ export default async function JornadaPage() {
           Ler mais e melhor: acompanhe o ritmo, termine o que começou e mantenha
           a fila andando.
         </p>
+        {setting?.shareEnabled && setting.shareId && (
+          <Link
+            href={`/shared/${setting.shareId}/jornada`}
+            className="mt-2 inline-block text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          >
+            Ver página pública da sua jornada →
+          </Link>
+        )}
       </section>
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
