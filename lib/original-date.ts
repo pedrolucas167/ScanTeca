@@ -26,7 +26,9 @@ export async function findOriginalPublishYear({
   const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : "";
 
   // ISBN → edição exata → work → ano da primeira publicação
-  if (cleanedIsbn) {
+  // (guarda de tamanho: placeholders tipo "MANUAL-<uuid>" viram dígitos
+  // soltos após o replace e não são ISBNs válidos)
+  if (cleanedIsbn.length === 10 || cleanedIsbn.length === 13) {
     try {
       const res = await fetch(
         `https://openlibrary.org/search.json?isbn=${encodeURIComponent(

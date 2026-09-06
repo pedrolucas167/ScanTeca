@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     const book = await prisma.book.create({
       data: {
-        isbn: cleanedIsbn || "MANUAL",
+        isbn: cleanedIsbn || `MANUAL-${crypto.randomUUID()}`,
         title,
         author: author || "Autor desconhecido",
         publishedDate: effectivePublishedDate,
