@@ -11,6 +11,7 @@ import {
   Layers,
   ArrowRight,
 } from "lucide-react";
+import GoalCard from "./GoalCard";
 
 export const dynamic = "force-dynamic";
 
@@ -29,10 +30,13 @@ export default async function JornadaPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const books = await prisma.book.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-  });
+  const [books, setting] = await Promise.all([
+    prisma.book.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.librarySetting.findUnique({ where: { userId } }),
+  ]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -128,6 +132,15 @@ export default async function JornadaPage() {
               Tempo médio por livro
             </p>
           </div>
+        </div>
+
+        {/* Meta do ano */}
+        <div className="mt-6">
+          <GoalCard
+            initialGoal={setting?.yearlyGoal ?? null}
+            readCount={readThisYear.length}
+            year={year}
+          />
         </div>
 
         {/* Lendo agora */}

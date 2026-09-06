@@ -69,6 +69,7 @@ model LibrarySetting {
   shareId       String? @unique
   shareEnabled  Boolean @default(false)
   oracleProfile String?
+  yearlyGoal    Int?
 }
 
 model OracleMessage {
