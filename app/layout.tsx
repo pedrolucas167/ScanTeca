@@ -78,7 +78,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');var el=document.documentElement;if(!el.dataset.accent){var a=localStorage.getItem('accent');if(a)el.dataset.accent=a}}catch(e){}",
+              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');var el=document.documentElement;if(el.dataset.accent){localStorage.setItem('accent',el.dataset.accent)}else{var a=localStorage.getItem('accent');if(a)el.dataset.accent=a}}catch(e){}",
           }}
         />
         <ClerkProvider>
