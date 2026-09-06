@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import GoalCard from "./GoalCard";
+import QuickLog from "./QuickLog";
 
 export const dynamic = "force-dynamic";
 
@@ -241,6 +242,17 @@ export default async function JornadaPage() {
               </p>
             </div>
           ) : (
+            <>
+              <div className="mb-4">
+                <QuickLog
+                  books={reading.map((b) => ({
+                    id: b.id,
+                    title: b.title,
+                    currentPage: b.currentPage,
+                    pages: b.pages,
+                  }))}
+                />
+              </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {reading.map((b) => {
                 const pct =
@@ -307,6 +319,7 @@ export default async function JornadaPage() {
                 );
               })}
             </div>
+            </>
           )}
         </div>
 
