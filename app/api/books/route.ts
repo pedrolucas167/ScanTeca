@@ -101,6 +101,8 @@ export async function POST(request: NextRequest) {
         author: book.author,
         synopsis: book.synopsis,
         genre: book.genre,
+        notes: book.notes,
+        rating: book.rating,
       })
     );
     if (embedding) {
@@ -180,6 +182,33 @@ export async function PATCH(request: NextRequest) {
       where: { id },
       data,
     });
+
+    // Regenera embedding quando campos semânticos mudam (inclui notas do leitor)
+    if (
+      title !== undefined ||
+      author !== undefined ||
+      synopsis !== undefined ||
+      genre !== undefined ||
+      notes !== undefined ||
+      rating !== undefined
+    ) {
+      const embedding = await generateEmbedding(
+        bookToEmbeddingText({
+          title: book.title,
+          author: book.author,
+          synopsis: book.synopsis,
+          genre: book.genre,
+          notes: book.notes,
+          rating: book.rating,
+        })
+      );
+      if (embedding) {
+        const vector = `[${embedding.join(",")}]`;
+        await prisma.$executeRaw`
+          UPDATE "Book" SET embedding = ${vector}::vector WHERE id = ${book.id}
+        `;
+      }
+    }
 
     return NextResponse.json(
       { book, message: "Livro atualizado com sucesso" },

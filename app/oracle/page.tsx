@@ -48,6 +48,12 @@ export default function OraclePage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const loadingRef = useRef(false);
   const voiceOnRef = useRef(false);
+  const audioQueueRef = useRef<Promise<Blob | null>[]>([]);
+  const audioPlayingRef = useRef(false);
+  const audioDoneRef = useRef<(() => void) | null>(null);
+  const ttsBufferRef = useRef("");
+  const micBusyRef = useRef(false);
+  const streamDoneRef = useRef(true);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -85,11 +91,90 @@ export default function OraclePage() {
   }, []);
 
   const stopAudio = () => {
+    audioQueueRef.current = [];
+    ttsBufferRef.current = "";
+    audioDoneRef.current?.();
+    audioDoneRef.current = null;
     audioRef.current?.pause();
     audioRef.current = null;
   };
 
-  // Voz do Oráculo via endpoint TTS do OpenRouter
+  // Enfileira o TTS de uma frase — o fetch dispara enquanto outras tocam
+  const enqueueSpeech = (text: string) => {
+    const clean = text.replace(/[*_#`>]/g, "").trim();
+    if (!clean) return;
+    const p = fetch("/api/oracle/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: clean }),
+    })
+      .then((r) => (r.ok ? r.blob() : null))
+      .catch(() => null);
+    audioQueueRef.current.push(p);
+    void drainAudioQueue();
+  };
+
+  // Toca a fila em ordem; o prefetch já aconteceu em paralelo
+  const drainAudioQueue = async () => {
+    if (audioPlayingRef.current) return;
+    audioPlayingRef.current = true;
+    while (audioQueueRef.current.length > 0) {
+      const blob = await audioQueueRef.current.shift()!;
+      if (!blob || blob.size === 0) continue;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      await new Promise<void>((resolve) => {
+        audioDoneRef.current = resolve;
+        const done = () => {
+          URL.revokeObjectURL(url);
+          resolve();
+        };
+        audio.onended = done;
+        audio.onerror = done;
+        audio.play().catch(done);
+      });
+      audioDoneRef.current = null;
+      audioRef.current = null;
+    }
+    audioPlayingRef.current = false;
+    maybeAutoListen();
+  };
+
+  // Modo conversa: volta a ouvir quando o Oráculo termina de falar tudo
+  const maybeAutoListen = () => {
+    if (
+      voiceOnRef.current &&
+      micSupported &&
+      streamDoneRef.current &&
+      !mediaRecorderRef.current &&
+      !micBusyRef.current &&
+      !audioPlayingRef.current &&
+      audioQueueRef.current.length === 0
+    ) {
+      void handleMic();
+    }
+  };
+
+  // Acumula o stream e extrai frases completas para o TTS por frase
+  const feedTts = (chunk: string, flush = false) => {
+    ttsBufferRef.current += chunk;
+    const re = /[^.!?…\n]+[.!?…]+|[^\n]+\n/g;
+    let consumed = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(ttsBufferRef.current)) !== null) {
+      if (m[0].trim()) enqueueSpeech(m[0]);
+      consumed = re.lastIndex;
+    }
+    ttsBufferRef.current = ttsBufferRef.current.slice(consumed);
+    if (flush) {
+      const tail = ttsBufferRef.current.trim();
+      if (tail) enqueueSpeech(tail);
+      ttsBufferRef.current = "";
+    }
+  };
+
+  // Voz do Oráculo via endpoint TTS do OpenRouter (replay de uma mensagem)
   const speak = async (text: string) => {
     try {
       stopAudio();
@@ -106,8 +191,7 @@ export default function OraclePage() {
       audio.onended = () => {
         URL.revokeObjectURL(url);
         audioRef.current = null;
-        // Modo conversa: terminou de falar, volta a ouvir sozinho
-        if (voiceOnRef.current && micSupported) void handleMic();
+        maybeAutoListen();
       };
       await audio.play();
     } catch {
@@ -170,6 +254,7 @@ export default function OraclePage() {
           }
           if (json.text) {
             fullText += json.text;
+            if (voiceOnRef.current) feedTts(json.text);
             setMessages((prev) => {
               const updated = [...prev];
               updated[updated.length - 1] = {
@@ -183,12 +268,14 @@ export default function OraclePage() {
         }
       }
     }
+    if (voiceOnRef.current) feedTts("", true); // última frase sem pontuação
     return fullText;
   };
 
   const sendMessage = async (question: string) => {
     if (!question || loadingRef.current) return;
     loadingRef.current = true;
+    streamDoneRef.current = false;
 
     stopAudio();
     setInput("");
@@ -213,15 +300,16 @@ export default function OraclePage() {
         throw new Error(data?.error || "Erro ao consultar o Oráculo");
       }
 
-      const fullText = await readOracleStream(res);
-      if (voiceOnRef.current && fullText.trim()) void speak(fullText);
+      await readOracleStream(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro de rede");
       setMessages((prev) => prev.slice(0, -1)); // remove empty assistant msg
     } finally {
       loadingRef.current = false;
+      streamDoneRef.current = true;
       setLoading(false);
       inputRef.current?.focus();
+      maybeAutoListen();
     }
   };
 
@@ -229,6 +317,7 @@ export default function OraclePage() {
   const sendAudio = async (blob: Blob) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
+    streamDoneRef.current = false;
 
     stopAudio();
     setError(null);
@@ -260,14 +349,15 @@ export default function OraclePage() {
         throw new Error(data?.error || "Erro ao consultar o Oráculo");
       }
 
-      const fullText = await readOracleStream(res);
-      if (voiceOnRef.current && fullText.trim()) void speak(fullText);
+      await readOracleStream(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro de rede");
       setMessages((prev) => prev.slice(0, -2)); // remove placeholder + resposta
     } finally {
       loadingRef.current = false;
+      streamDoneRef.current = true;
       setLoading(false);
+      maybeAutoListen();
     }
   };
 
@@ -282,6 +372,8 @@ export default function OraclePage() {
       mediaRecorderRef.current?.stop();
       return;
     }
+    if (micBusyRef.current) return;
+    micBusyRef.current = true;
     try {
       stopAudio(); // barge-in: começar a falar interrompe o Oráculo
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -306,6 +398,8 @@ export default function OraclePage() {
       rec.start();
     } catch {
       setError("Não consegui acessar o microfone. Verifique a permissão.");
+    } finally {
+      micBusyRef.current = false;
     }
   };
 

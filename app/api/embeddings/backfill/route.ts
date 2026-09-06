@@ -11,9 +11,9 @@ export async function POST() {
     }
 
     const books = await prisma.$queryRaw<
-      { id: string; title: string; author: string; synopsis: string | null; genre: string | null }[]
+      { id: string; title: string; author: string; synopsis: string | null; genre: string | null; notes: string | null; rating: number | null }[]
     >`
-      SELECT id, title, author, synopsis, genre
+      SELECT id, title, author, synopsis, genre, notes, rating
       FROM "Book"
       WHERE "userId" = ${userId} AND embedding IS NULL
     `;
@@ -26,6 +26,8 @@ export async function POST() {
           author: book.author,
           synopsis: book.synopsis,
           genre: book.genre,
+          notes: book.notes,
+          rating: book.rating,
         })
       );
       if (embedding) {

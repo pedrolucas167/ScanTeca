@@ -25,6 +25,8 @@ interface BookRow {
   synopsis: string | null;
   genre: string | null;
   pages: number | null;
+  notes: string | null;
+  rating: number | null;
 }
 
 interface EnrichResult {
@@ -126,12 +128,12 @@ export async function POST(request: NextRequest) {
 
     const books = bookId
       ? await prisma.$queryRaw<BookRow[]>`
-          SELECT id, isbn, title, author, "publishedDate", synopsis, genre, pages
+          SELECT id, isbn, title, author, "publishedDate", synopsis, genre, pages, notes, rating
           FROM "Book"
           WHERE id = ${bookId} AND "userId" = ${userId}
         `
       : await prisma.$queryRaw<BookRow[]>`
-          SELECT id, isbn, title, author, "publishedDate", synopsis, genre, pages
+          SELECT id, isbn, title, author, "publishedDate", synopsis, genre, pages, notes, rating
           FROM "Book"
           WHERE "userId" = ${userId}
             AND (

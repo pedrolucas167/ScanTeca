@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embeddings";
+import { normalize } from "@/lib/book-cover";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const CHAT_MODEL =
@@ -267,9 +268,63 @@ export async function POST(request: NextRequest) {
       `→ ${relevantBooks.length} relevantes (< ${DISTANCE_THRESHOLD})`
     );
 
+    // Busca híbrida: se a pergunta cita autor/gênero do acervo, esses livros
+    // entram no contexto mesmo com distância vetorial alta
+    const qWords = new Set(normalize(retrievalQuery));
+    const qText = normalize(retrievalQuery).join(" ");
+    const meta = await prisma.$queryRaw<
+      { author: string; genre: string | null }[]
+    >`SELECT DISTINCT author, genre FROM "Book" WHERE "userId" = ${userId}`;
+
+    const hitAuthors = new Set<string>();
+    const hitGenres = new Set<string>();
+    for (const m of meta) {
+      const authorWords = normalize(m.author).filter((w) => w.length >= 4);
+      const surname = authorWords[authorWords.length - 1];
+      if (
+        (surname && qWords.has(surname)) ||
+        (authorWords.length > 1 && authorWords.every((w) => qWords.has(w)))
+      ) {
+        hitAuthors.add(m.author);
+      }
+      if (m.genre) {
+        const g = normalize(m.genre).join(" ");
+        if (g && qText.includes(g)) hitGenres.add(m.genre);
+      }
+    }
+
+    let contextBooks = relevantBooks;
+    if (hitAuthors.size > 0 || hitGenres.size > 0) {
+      const or: { author?: { in: string[] }; genre?: { in: string[] } }[] = [];
+      if (hitAuthors.size > 0) or.push({ author: { in: [...hitAuthors] } });
+      if (hitGenres.size > 0) or.push({ genre: { in: [...hitGenres] } });
+      const metaRows = await prisma.book.findMany({
+        where: { userId, OR: or },
+        take: 8,
+      });
+      const seen = new Set(relevantBooks.map((b) => b.id));
+      const extra: SimilarBook[] = metaRows
+        .filter((b) => !seen.has(b.id))
+        .map((b) => ({
+          id: b.id,
+          title: b.title,
+          author: b.author,
+          publishedDate: b.publishedDate,
+          synopsis: b.synopsis,
+          genre: b.genre,
+          status: String(b.status),
+          rating: b.rating,
+          distance: 0,
+        }));
+      contextBooks = [...relevantBooks, ...extra].slice(0, 8);
+      console.log(
+        `[oracle] Híbrido: autores=[${[...hitAuthors].join(", ")}] gêneros=[${[...hitGenres].join(", ")}] → +${extra.length} livros`
+      );
+    }
+
     const context =
-      relevantBooks.length > 0
-        ? relevantBooks
+      contextBooks.length > 0
+        ? contextBooks
             .map(
               (b, i) =>
                 `${i + 1}. "${b.title}" — ${b.author}` +
@@ -332,7 +387,7 @@ export async function POST(request: NextRequest) {
         let buffer = "";
         let fullText = "";
 
-        const sources = relevantBooks.map((b) => ({
+        const sources = contextBooks.map((b) => ({
           id: b.id,
           title: b.title,
           author: b.author,

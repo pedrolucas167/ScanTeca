@@ -45,12 +45,16 @@ export function bookToEmbeddingText(book: {
   author: string;
   synopsis?: string | null;
   genre?: string | null;
+  notes?: string | null;
+  rating?: number | null;
 }): string {
   return [
     book.title,
     book.author,
     book.genre ?? "",
     book.synopsis ?? "",
+    book.rating ? `Avaliação do leitor: ${book.rating}/5` : "",
+    book.notes ? `Notas do leitor: ${book.notes}` : "",
   ]
     .filter(Boolean)
     .join(" — ");
