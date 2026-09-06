@@ -17,7 +17,7 @@ export default function ManualAddPage() {
     publishedDate: "",
     synopsis: "",
     coverUrl: "",
-    status: "TO_READ" as "READ" | "TO_READ" | "WISHLIST",
+    status: "TO_READ" as "READ" | "READING" | "TO_READ" | "WISHLIST",
     collection: "Minha Biblioteca",
     notes: "",
     rating: "" as string,
@@ -301,12 +301,13 @@ export default function ManualAddPage() {
             onChange={(e) =>
               setForm({
                 ...form,
-                status: e.target.value as "READ" | "TO_READ" | "WISHLIST",
+                status: e.target.value as "READ" | "READING" | "TO_READ" | "WISHLIST",
               })
             }
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
           >
             <option value="TO_READ">A ler</option>
+            <option value="READING">Lendo</option>
             <option value="READ">Lido</option>
             <option value="WISHLIST">Desejo</option>
           </select>

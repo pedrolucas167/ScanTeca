@@ -11,6 +11,7 @@ datasource db {
 
 enum BookStatus {
   READ
+  READING
   TO_READ
   WISHLIST
 }
@@ -29,6 +30,9 @@ model Book {
   rating        Int?
   genre         String?
   pages         Int?
+  currentPage   Int?
+  startedAt     DateTime?
+  finishedAt    DateTime?
   customOrder   Int?
   embedding     Unsupported("vector(1536)")?
   userId        String
