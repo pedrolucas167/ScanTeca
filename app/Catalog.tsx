@@ -29,7 +29,8 @@ interface Book {
   publishedDate: string | null;
   synopsis: string | null;
   coverUrl: string | null;
-  status: "READ" | "TO_READ" | "WISHLIST";
+  status: "READ" | "READING" | "TO_READ" | "WISHLIST";
+  currentPage: number | null;
   collection: string;
   notes: string | null;
   rating: number | null;
@@ -43,12 +44,14 @@ interface Book {
 
 const statusLabels: Record<string, string> = {
   READ: "Lido",
+  READING: "Lendo",
   TO_READ: "A ler",
   WISHLIST: "Desejo",
 };
 
 const statusClasses: Record<string, string> = {
   READ: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  READING: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   TO_READ: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   WISHLIST: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
 };
@@ -198,6 +201,7 @@ export default function Catalog({
     return {
       total: bookList.length,
       read: read.length,
+      reading: bookList.filter((b) => b.status === "READING").length,
       toRead: bookList.filter((b) => b.status === "TO_READ").length,
       wishlist: bookList.filter((b) => b.status === "WISHLIST").length,
       totalPages,
@@ -313,6 +317,7 @@ export default function Catalog({
           synopsis: editingBook.synopsis,
           coverUrl: editingBook.coverUrl,
           status: editingBook.status,
+          currentPage: editingBook.currentPage,
           collection: editingBook.collection,
           notes: editingBook.notes,
           rating: editingBook.rating,
@@ -1013,7 +1018,7 @@ export default function Catalog({
               <p className="mb-4 text-center font-serif text-sm italic text-zinc-500 dark:text-zinc-400">
                 — Ficha da coleção —
               </p>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
                 <div className="text-center">
                   <p className="font-serif text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
                     {stats.total}
@@ -1027,6 +1032,12 @@ export default function Catalog({
                     {stats.read}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Lidos</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-serif text-3xl font-semibold text-orange-600 dark:text-orange-400">
+                    {stats.reading}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Lendo</p>
                 </div>
                 <div className="text-center">
                   <p className="font-serif text-3xl font-semibold text-amber-600 dark:text-amber-400">
@@ -1140,6 +1151,7 @@ export default function Catalog({
             >
               <option value="">Todos os status</option>
               <option value="READ">Lidos</option>
+              <option value="READING">Lendo</option>
               <option value="TO_READ">A ler</option>
               <option value="WISHLIST">Desejos</option>
             </select>
@@ -1304,6 +1316,11 @@ export default function Catalog({
                 >
                   {statusLabels[book.status]}
                 </span>
+                {book.status === "READING" && book.pages ? (
+                  <span className="hidden shrink-0 text-[10px] text-zinc-400 sm:inline dark:text-zinc-500">
+                    pág. {book.currentPage ?? 0}/{book.pages}
+                  </span>
+                ) : null}
                 {book.rating ? (
                   <span className="hidden shrink-0 items-center gap-0.5 text-xs text-yellow-500 sm:flex">
                     <Star className="h-3 w-3 fill-current" />
@@ -1481,6 +1498,21 @@ export default function Catalog({
                       Nota: {book.notes}
                     </p>
                   )}
+                  {book.status === "READING" && book.pages ? (
+                    <div className="mt-2">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-all"
+                          style={{
+                            width: `${Math.min(100, Math.round(((book.currentPage ?? 0) / book.pages) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+                        {book.currentPage ?? 0} de {book.pages} páginas
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="mt-auto flex items-center justify-between pt-3">
                     <span className="inline-block rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
@@ -1749,10 +1781,34 @@ export default function Catalog({
                 className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
               >
                 <option value="TO_READ">A ler</option>
+                <option value="READING">Lendo</option>
                 <option value="READ">Lido</option>
                 <option value="WISHLIST">Desejo</option>
               </select>
             </div>
+
+            {editingBook.status === "READING" && (
+              <div className="mb-4">
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Página atual
+                  {editingBook.pages ? ` (de ${editingBook.pages})` : ""}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={editingBook.pages ?? undefined}
+                  value={editingBook.currentPage ?? ""}
+                  onChange={(e) =>
+                    setEditingBook({
+                      ...editingBook,
+                      currentPage: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  placeholder="Ex: 42"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+                />
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">

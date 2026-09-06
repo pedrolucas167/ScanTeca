@@ -134,7 +134,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = body;
+    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder } = body;
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
@@ -170,7 +170,20 @@ export async function PATCH(request: NextRequest) {
     if (publishedDate !== undefined) data.publishedDate = publishedDate || null;
     if (synopsis !== undefined) data.synopsis = synopsis || null;
     if (coverUrl !== undefined) data.coverUrl = effectiveCoverUrl || null;
-    if (status !== undefined) data.status = status as BookStatus;
+    if (status !== undefined) {
+      data.status = status as BookStatus;
+      // Marca timestamps de leitura na transição de status
+      if (status === "READING") {
+        if (!existing.startedAt) data.startedAt = new Date();
+        data.finishedAt = null;
+      } else if (status === "READ") {
+        if (!existing.startedAt) data.startedAt = new Date();
+        data.finishedAt = new Date();
+      } else {
+        data.finishedAt = null;
+      }
+    }
+    if (currentPage !== undefined) data.currentPage = currentPage ? Number(currentPage) : null;
     if (collection !== undefined) data.collection = collection || "Minha Biblioteca";
     if (notes !== undefined) data.notes = notes || null;
     if (rating !== undefined) data.rating = rating ?? null;
