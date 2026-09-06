@@ -9,6 +9,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { BookOpen, Heart } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,9 +46,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Tema inicial antes da pintura: localStorage > preferência do sistema */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}",
+          }}
+        />
         <ClerkProvider>
           <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
             <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
@@ -100,6 +109,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     </button>
                   </SignUpButton>
                 </Show>
+                <ThemeToggle />
                 <Show when="signed-in">
                   <UserButton />
                 </Show>

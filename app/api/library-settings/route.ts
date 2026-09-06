@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
       shareEnabled?: boolean;
     };
 
+    const existing = await prisma.librarySetting.findUnique({
+      where: { userId },
+    });
+
     const updateData: Record<string, unknown> = {};
     const createData: Record<string, unknown> = { userId };
 
@@ -64,15 +68,10 @@ export async function POST(request: NextRequest) {
     if (shareEnabled !== undefined) {
       updateData.shareEnabled = shareEnabled;
       createData.shareEnabled = shareEnabled;
-      if (shareEnabled) {
-        const existing = await prisma.librarySetting.findUnique({
-          where: { userId },
-        });
-        if (!existing?.shareId) {
-          const shareId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-          updateData.shareId = shareId;
-          createData.shareId = shareId;
-        }
+      if (shareEnabled && !existing?.shareId) {
+        const shareId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+        updateData.shareId = shareId;
+        createData.shareId = shareId;
       }
     }
 
@@ -86,6 +85,19 @@ export async function POST(request: NextRequest) {
         shareId: (createData.shareId as string) || null,
       },
     });
+
+    // Renomear a biblioteca renomeia a coleção homônima nos livros —
+    // o card exibe book.collection, então sem isso o nome antigo persistia
+    if (
+      updateData.name &&
+      existing?.name &&
+      existing.name !== updateData.name
+    ) {
+      await prisma.book.updateMany({
+        where: { userId, collection: existing.name },
+        data: { collection: updateData.name as string },
+      });
+    }
 
     return NextResponse.json({ setting });
   } catch (error) {

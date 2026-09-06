@@ -416,7 +416,16 @@ export default function Catalog({
       const data = await res.json();
 
       if (res.ok) {
+        // O servidor renomeia a coleção homônima — espelha no estado local
+        const oldName = libraryName;
         setLibraryName(data.setting.name);
+        setBookList((prev) =>
+          prev.map((b) =>
+            b.collection === oldName
+              ? { ...b, collection: data.setting.name }
+              : b
+          )
+        );
         setIsEditingName(false);
         setMessage("Nome da biblioteca atualizado");
         setTimeout(() => setMessage(null), 3000);
@@ -802,7 +811,7 @@ export default function Catalog({
           Scanteca
         </h1>
 
-        <div className="mx-auto mt-5 flex max-w-lg flex-col items-center justify-center gap-2 sm:flex-row">
+        <div className="mx-auto mt-5 flex max-w-lg flex-col items-center justify-center">
           {isEditingName ? (
             <div className="flex w-full items-center justify-center gap-2 sm:w-auto">
               <input
@@ -838,10 +847,7 @@ export default function Catalog({
               </span>
             </button>
           )}
-          <span className="hidden text-zinc-300 dark:text-zinc-700 sm:inline">
-            ·
-          </span>
-          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+          <p className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">
             {bookList.length} {bookList.length === 1 ? "volume" : "volumes"}
           </p>
         </div>
