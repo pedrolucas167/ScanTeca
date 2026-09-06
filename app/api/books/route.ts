@@ -6,6 +6,7 @@ import { findBookCover } from "@/lib/book-cover";
 import { findSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
+import { getDefaultCollection, resolveCollection } from "@/lib/default-collection";
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const defaultCollection = await getDefaultCollection(userId);
+
     const book = await prisma.book.create({
       data: {
         isbn: cleanedIsbn || `MANUAL-${crypto.randomUUID()}`,
@@ -84,7 +87,7 @@ export async function POST(request: NextRequest) {
         synopsis: effectiveSynopsis,
         coverUrl: effectiveCoverUrl || null,
         status: (status as BookStatus) || BookStatus.TO_READ,
-        collection: collection || "Minha Biblioteca",
+        collection: resolveCollection(collection, defaultCollection),
         notes: notes || null,
         rating: rating ?? null,
         genre: genre || null,
@@ -181,7 +184,10 @@ export async function PATCH(request: NextRequest) {
       }
     }
     if (currentPage !== undefined) data.currentPage = currentPage ? Number(currentPage) : null;
-    if (collection !== undefined) data.collection = collection || "Minha Biblioteca";
+    if (collection !== undefined) {
+      const defaultCollection = await getDefaultCollection(userId);
+      data.collection = resolveCollection(collection, defaultCollection);
+    }
     if (notes !== undefined) data.notes = notes || null;
     if (rating !== undefined) data.rating = rating ?? null;
     if (genre !== undefined) data.genre = genre || null;

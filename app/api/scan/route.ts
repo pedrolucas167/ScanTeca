@@ -5,6 +5,7 @@ import { findBookCover } from "@/lib/book-cover";
 import { findSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
+import { getDefaultCollection } from "@/lib/default-collection";
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -278,6 +279,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const defaultCollection = await getDefaultCollection(userId);
+
     const book = await prisma.book.create({
       data: {
         isbn: cleaned,
@@ -288,6 +291,7 @@ export async function POST(request: NextRequest) {
         coverUrl: bookData.coverUrl,
         genre: bookData.genre,
         pages: bookData.pages,
+        collection: defaultCollection,
         userId,
       },
     });
