@@ -589,6 +589,24 @@ export default function OraclePage() {
       </div>
 
       <div className="border-t border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+        {messages.length > 0 && suggestions.length > 0 && !loading && (
+          <div className="mx-auto mb-2 flex max-w-3xl gap-2 overflow-x-auto pb-1">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setInput(s);
+                  inputRef.current?.focus();
+                }}
+                title="Clique para preencher — edite ou envie"
+                className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:text-indigo-400"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <form
           onSubmit={handleSubmit}
           className="mx-auto flex max-w-3xl items-center gap-2"
