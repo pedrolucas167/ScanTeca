@@ -42,9 +42,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, shareEnabled } = body as {
+    const { name, shareEnabled, yearlyGoal } = body as {
       name?: string;
       shareEnabled?: boolean;
+      yearlyGoal?: number | null;
     };
 
     const existing = await prisma.librarySetting.findUnique({
@@ -63,6 +64,17 @@ export async function POST(request: NextRequest) {
       }
       updateData.name = name.trim();
       createData.name = name.trim();
+    }
+
+    if (yearlyGoal !== undefined) {
+      if (yearlyGoal !== null && (!Number.isInteger(yearlyGoal) || yearlyGoal < 1)) {
+        return NextResponse.json(
+          { error: "Meta anual deve ser um número inteiro positivo" },
+          { status: 400 }
+        );
+      }
+      updateData.yearlyGoal = yearlyGoal;
+      createData.yearlyGoal = yearlyGoal;
     }
 
     if (shareEnabled !== undefined) {
