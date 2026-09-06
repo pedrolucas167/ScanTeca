@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
     const trimmed = question;
 
     // Memória: salva a pergunta e carrega histórico + perfil em paralelo
-    const [historyDesc, setting] = await Promise.all([
+    const [historyDesc, setting, , readingNow] = await Promise.all([
       prisma.oracleMessage.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
@@ -224,6 +224,16 @@ export async function POST(request: NextRequest) {
       prisma.librarySetting.findUnique({ where: { userId } }),
       prisma.oracleMessage.create({
         data: { userId, role: "user", content: trimmed },
+      }),
+      prisma.book.findMany({
+        where: { userId, status: "READING" },
+        select: {
+          title: true,
+          author: true,
+          currentPage: true,
+          pages: true,
+          startedAt: true,
+        },
       }),
     ]);
 
@@ -330,12 +340,38 @@ export async function POST(request: NextRequest) {
                 `${i + 1}. "${b.title}" — ${b.author}` +
                 (b.publishedDate ? ` (${b.publishedDate})` : "") +
                 (b.genre ? ` [${b.genre}]` : "") +
-                `\n   Status: ${b.status === "READ" ? "Lido" : b.status === "TO_READ" ? "A ler" : "Desejo"}` +
+                `\n   Status: ${b.status === "READ" ? "Lido" : b.status === "READING" ? "Lendo" : b.status === "TO_READ" ? "A ler" : "Desejo"}` +
                 (b.rating ? ` | Avaliação: ${b.rating}/5` : "") +
                 (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 500)}` : "")
             )
             .join("\n\n")
         : "Nenhum livro relevante encontrado no acervo.";
+
+    // Progresso de leitura em tempo real — o Oráculo sabe onde o leitor parou
+    const progressSection =
+      readingNow.length > 0
+        ? readingNow
+            .map((b) => {
+              const dias = b.startedAt
+                ? Math.max(
+                    1,
+                    Math.round(
+                      (Date.now() - b.startedAt.getTime()) / 86400000
+                    )
+                  )
+                : null;
+              return (
+                `- "${b.title}" — ${b.author}` +
+                (b.pages && b.currentPage
+                  ? ` | Progresso: pág. ${b.currentPage} de ${b.pages} (${Math.round((b.currentPage / b.pages) * 100)}%)`
+                  : "") +
+                (dias
+                  ? ` | lendo há ${dias} ${dias === 1 ? "dia" : "dias"}`
+                  : "")
+              );
+            })
+            .join("\n")
+        : "";
 
     const profile = setting?.oracleProfile?.trim();
     const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas. Responda usando APENAS os livros do acervo listados na mensagem do usuário — nunca mencione ou recomende livros que não estejam na lista. Seja elegante e cite os livros pelo título. Se a lista estiver vazia ou os livros não tiverem relação com a pergunta, admita com honestidade intelectual que o acervo não cobre o tema e sugira o que o leitor poderia explorar no que ele já tem.${
@@ -350,7 +386,7 @@ export async function POST(request: NextRequest) {
       })),
       {
         role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}\n\nPergunta do usuário: ${trimmed}`,
+        content: `Livros relevantes do acervo:\n${context}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}\n\nPergunta do usuário: ${trimmed}`,
       },
     ];
 
