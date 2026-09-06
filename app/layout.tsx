@@ -51,8 +51,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Tema inicial antes da pintura: localStorage > preferência do sistema.
-            Também restaura o acento de cor (data-accent) salvo pelo seletor. */}
         <script
           dangerouslySetInnerHTML={{
             __html:

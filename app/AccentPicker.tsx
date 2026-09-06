@@ -3,11 +3,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, Palette } from "lucide-react";
 
-/**
- * Seletor de acento de cor. Define data-accent no <html> e persiste em
- * localStorage — o script inline no layout restaura antes da pintura.
- * As paletas remapeiam a escala indigo via CSS vars (ver globals.css).
- */
 const ACCENTS = [
   { id: "indigo", label: "Índigo", color: "#6366f1" },
   { id: "vinho", label: "Vinho", color: "#e11d48" },
@@ -15,7 +10,6 @@ const ACCENTS = [
   { id: "terracota", label: "Terracota", color: "#ea580c" },
 ] as const;
 
-// Evento disparado ao trocar o acento — o useSyncExternalStore re-lê o atributo
 const ACCENT_EVENT = "scanteca-accent-change";
 
 function subscribeAccent(callback: () => void) {
@@ -26,14 +20,12 @@ function subscribeAccent(callback: () => void) {
 export default function AccentPicker() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  // Snapshot no cliente lê data-accent; no server devolve "indigo" (sem mismatch)
   const current = useSyncExternalStore(
     subscribeAccent,
     () => document.documentElement.dataset.accent || "indigo",
     () => "indigo"
   );
 
-  // Fecha ao clicar fora
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
@@ -49,7 +41,6 @@ export default function AccentPicker() {
     try {
       localStorage.setItem("accent", id);
     } catch {
-      // storage indisponível — vale só nesta sessão
     }
     window.dispatchEvent(new Event(ACCENT_EVENT));
   };
