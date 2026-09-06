@@ -24,9 +24,6 @@
   --font-serif: var(--font-garamond), Georgia, "Times New Roman", serif;
 }
 
-/* Temas de acento: remapeiam a escala indigo inteira via CSS vars.
-   No Tailwind v4 as utilities indigo-* resolvem var(--color-indigo-*) em
-   runtime — então nenhuma classe precisa mudar, só a paleta por baixo. */
 [data-accent="vinho"] {
   --color-indigo-50: #fff1f2;
   --color-indigo-100: #ffe4e6;
