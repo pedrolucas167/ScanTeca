@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Send, Sparkles, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Mic,
+  Send,
+  Sparkles,
+  Trash2,
+  Volume2,
+} from "lucide-react";
 
 interface Source {
   id: string;
@@ -16,17 +24,59 @@ interface Message {
   sources?: Source[];
 }
 
+// Web Speech API — SpeechRecognition não está no lib.dom do TS
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult:
+    | ((e: {
+        results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
+      }) => void)
+    | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+function getSpeechRecognition():
+  | (new () => SpeechRecognitionLike)
+  | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+}
+
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  // Suporte à Web Speech API — server snapshot false evita hydration mismatch
+  const speechSupported = useSyncExternalStore(
+    () => () => {},
+    () => getSpeechRecognition() !== undefined,
+    () => false
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const transcriptRef = useRef("");
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Para o reconhecimento de voz ao desmontar
+  useEffect(() => {
+    return () => recognitionRef.current?.stop();
+  }, []);
 
   // Restaura o histórico — o Oráculo lembra das conversas anteriores
   useEffect(() => {
@@ -49,16 +99,17 @@ export default function OraclePage() {
   }, []);
 
   const handleClear = async () => {
+    window.speechSynthesis?.cancel();
     setMessages([]);
     setError(null);
     await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const question = input.trim();
-    if (!question || loading) return;
+  const sendMessage = async (question: string) => {
+    if (!question || loadingRef.current) return;
+    loadingRef.current = true;
 
+    window.speechSynthesis?.cancel();
     setInput("");
     setError(null);
     setLoading(true);
@@ -127,9 +178,67 @@ export default function OraclePage() {
       setError(err instanceof Error ? err.message : "Erro de rede");
       setMessages((prev) => prev.slice(0, -1)); // remove empty assistant msg
     } finally {
+      loadingRef.current = false;
       setLoading(false);
       inputRef.current?.focus();
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(input.trim());
+  };
+
+  // Microfone: transcreve ao vivo no input e envia ao parar de falar
+  const handleMic = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const Ctor = getSpeechRecognition();
+    if (!Ctor) return;
+
+    const rec = new Ctor();
+    rec.lang = "pt-BR";
+    rec.interimResults = true;
+    rec.continuous = false;
+    transcriptRef.current = "";
+
+    rec.onresult = (e) => {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      transcriptRef.current = transcript.trim();
+      setInput(transcriptRef.current);
+    };
+    rec.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+      const said = transcriptRef.current;
+      transcriptRef.current = "";
+      if (said) sendMessage(said);
+    };
+    rec.onerror = () => {
+      setListening(false);
+      recognitionRef.current = null;
+      setError("Não consegui ouvir. Verifique a permissão do microfone.");
+    };
+
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
+  // O Oráculo fala a resposta (TTS nativo do navegador)
+  const speak = (text: string) => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      return;
+    }
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = "pt-BR";
+    window.speechSynthesis.speak(utt);
   };
 
   return (
@@ -263,6 +372,17 @@ export default function OraclePage() {
                     <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-indigo-400" />
                   )}
                 </p>
+                {msg.role === "assistant" &&
+                  msg.content &&
+                  !(loading && i === messages.length - 1) && (
+                    <button
+                      onClick={() => speak(msg.content)}
+                      title="Ouvir resposta"
+                      className="mt-1.5 text-zinc-400 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
+                    >
+                      <Volume2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
               </div>
             </div>
           ))}
@@ -287,10 +407,29 @@ export default function OraclePage() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Pergunte ao Oráculo sobre seus livros..."
+            placeholder={
+              listening
+                ? "Ouvindo... fale sua pergunta"
+                : "Pergunte ao Oráculo sobre seus livros..."
+            }
             disabled={loading}
             className="flex-1 rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
+          {speechSupported && (
+            <button
+              type="button"
+              onClick={handleMic}
+              disabled={loading}
+              title={listening ? "Parar de ouvir" : "Falar com o Oráculo"}
+              className={`rounded-full p-3 shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                listening
+                  ? "animate-pulse bg-red-500 text-white hover:bg-red-600"
+                  : "border border-zinc-300 bg-white text-zinc-500 hover:border-indigo-400 hover:text-indigo-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-indigo-400"
+              }`}
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="submit"
             disabled={loading || !input.trim()}
