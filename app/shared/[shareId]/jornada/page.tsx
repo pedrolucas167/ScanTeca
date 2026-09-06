@@ -50,7 +50,6 @@ export default async function SharedJornadaPage({
     .filter((l) => l.date >= weekAgo)
     .reduce((s, l) => s + l.pages, 0);
 
-  // Streak: dias seguidos com leitura (hoje ou terminando ontem)
   const logDays = new Set(logs.map((l) => l.date.toISOString().slice(0, 10)));
   let streak = 0;
   const cursor = new Date();
@@ -63,7 +62,6 @@ export default async function SharedJornadaPage({
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  // Heatmap das últimas 15 semanas
   const pagesByDay = new Map<string, number>();
   for (const l of logs) {
     const key = l.date.toISOString().slice(0, 10);
@@ -107,7 +105,6 @@ export default async function SharedJornadaPage({
       </section>
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-        {/* Stats públicos */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-700 dark:bg-zinc-900">
             <BookOpen className="mx-auto h-5 w-5 text-green-600 dark:text-green-400" />
@@ -147,7 +144,6 @@ export default async function SharedJornadaPage({
           </div>
         </div>
 
-        {/* Meta do ano (pública) */}
         {setting.yearlyGoal && goalPct !== null && (
           <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
@@ -167,7 +163,6 @@ export default async function SharedJornadaPage({
           </div>
         )}
 
-        {/* Heatmap público */}
         <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
           <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
             Mapa de leitura
@@ -203,7 +198,6 @@ export default async function SharedJornadaPage({
           </p>
         </div>
 
-        {/* Lendo agora (público) */}
         {reading.length > 0 && (
           <div className="mt-10">
             <h2 className="mb-4 flex items-center gap-2 font-serif text-xl font-semibold text-foreground">
