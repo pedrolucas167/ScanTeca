@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
+const VALID_ACCENTS = ["indigo", "vinho", "floresta", "terracota"];
+
 export async function GET() {
   try {
     const { userId } = await auth();
@@ -42,10 +44,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, shareEnabled, yearlyGoal } = body as {
+    const { name, shareEnabled, yearlyGoal, accent } = body as {
       name?: string;
       shareEnabled?: boolean;
       yearlyGoal?: number | null;
+      accent?: string;
     };
 
     const existing = await prisma.librarySetting.findUnique({
@@ -77,6 +80,17 @@ export async function POST(request: NextRequest) {
       createData.yearlyGoal = yearlyGoal;
     }
 
+    if (accent !== undefined) {
+      if (!VALID_ACCENTS.includes(accent)) {
+        return NextResponse.json(
+          { error: "Tema de acento inválido" },
+          { status: 400 }
+        );
+      }
+      updateData.accentTheme = accent;
+      createData.accentTheme = accent;
+    }
+
     if (shareEnabled !== undefined) {
       updateData.shareEnabled = shareEnabled;
       createData.shareEnabled = shareEnabled;
@@ -95,6 +109,7 @@ export async function POST(request: NextRequest) {
         name: (createData.name as string) || "Minha Biblioteca",
         shareEnabled: (createData.shareEnabled as boolean) || false,
         shareId: (createData.shareId as string) || null,
+        accentTheme: (createData.accentTheme as string) || null,
       },
     });
 
