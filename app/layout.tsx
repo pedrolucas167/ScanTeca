@@ -13,6 +13,7 @@ import { BookOpen, Heart } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
+import MobileNav from "./MobileNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -141,6 +142,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Show when="signed-in">
                   <UserButton />
                 </Show>
+                <MobileNav />
               </div>
             </nav>
           </header>
