@@ -842,10 +842,10 @@ export default function Catalog({
           ) : (
             <button
               onClick={() => setIsEditingName(true)}
-              className="group flex items-center gap-2 rounded-lg border border-transparent px-3 py-1 font-serif text-2xl italic text-foreground hover:border-zinc-200 hover:bg-white/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/50"
+              className="group relative flex items-center rounded-lg border border-transparent px-3 py-1 font-serif text-2xl italic text-foreground hover:border-zinc-200 hover:bg-white/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/50"
             >
               {libraryName}
-              <span className="font-sans text-xs font-normal not-italic text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-zinc-500">
+              <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap font-sans text-xs font-normal not-italic text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-zinc-500">
                 (editar)
               </span>
             </button>
