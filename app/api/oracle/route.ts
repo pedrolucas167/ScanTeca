@@ -21,6 +21,9 @@ interface SimilarBook {
 }
 
 const HISTORY_LIMIT = 12;
+// Distância de cosseno máxima para um livro ser considerado relevante.
+// Acima disso é ruído — melhor o Oráculo admitir que não achou nada no acervo.
+const DISTANCE_THRESHOLD = 0.6;
 
 /**
  * Mantém o "perfil do leitor": um resumo curto atualizado pelo próprio LLM
@@ -173,8 +176,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vector similarity search (cosine distance) — no distance threshold,
-    // always return the 5 closest books even if similarity is weak.
+    // Vector similarity search (cosine distance) — pega os 5 mais próximos
+    // e corta os que passam do threshold: distância alta = livro irrelevante
     const vector = `[${questionEmbedding.join(",")}]`;
     const similarBooks = await prisma.$queryRaw<SimilarBook[]>`
       SELECT id, title, author, "publishedDate", synopsis, genre,
@@ -186,14 +189,21 @@ export async function POST(request: NextRequest) {
       LIMIT 5
     `;
 
+    const relevantBooks = similarBooks.filter(
+      (b) => Number(b.distance) < DISTANCE_THRESHOLD
+    );
+
     console.log(
-      "[oracle] Livros retornados pela busca vetorial:",
-      similarBooks.map((b) => `${b.title} (dist=${Number(b.distance).toFixed(4)})`)
+      "[oracle] Busca vetorial:",
+      similarBooks
+        .map((b) => `${b.title} (dist=${Number(b.distance).toFixed(4)})`)
+        .join(", "),
+      `→ ${relevantBooks.length} relevantes (< ${DISTANCE_THRESHOLD})`
     );
 
     const context =
-      similarBooks.length > 0
-        ? similarBooks
+      relevantBooks.length > 0
+        ? relevantBooks
             .map(
               (b, i) =>
                 `${i + 1}. "${b.title}" — ${b.author}` +
@@ -207,7 +217,7 @@ export async function POST(request: NextRequest) {
         : "Nenhum livro relevante encontrado no acervo.";
 
     const profile = setting?.oracleProfile?.trim();
-    const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas. Responda usando APENAS os livros do acervo listados na mensagem do usuário. Seja elegante e cite os livros pelo título. Se os livros não forem suficientes para responder, diga isso com honestidade intelectual.${
+    const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas. Responda usando APENAS os livros do acervo listados na mensagem do usuário — nunca mencione ou recomende livros que não estejam na lista. Seja elegante e cite os livros pelo título. Se a lista estiver vazia ou os livros não tiverem relação com a pergunta, admita com honestidade intelectual que o acervo não cobre o tema e sugira o que o leitor poderia explorar no que ele já tem.${
       profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""
     }`;
 
@@ -256,7 +266,7 @@ export async function POST(request: NextRequest) {
         let buffer = "";
         let fullText = "";
 
-        const sources = similarBooks.map((b) => ({
+        const sources = relevantBooks.map((b) => ({
           id: b.id,
           title: b.title,
           author: b.author,
