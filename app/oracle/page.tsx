@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, Send, Sparkles, Trash2 } from "lucide-react";
 
 interface Source {
   id: string;
@@ -27,6 +27,32 @@ export default function OraclePage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Restaura o histórico — o Oráculo lembra das conversas anteriores
+  useEffect(() => {
+    fetch("/api/oracle")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.messages?.length) {
+          setMessages(
+            data.messages.map(
+              (m: { role: string; content: string; sources?: Source[] }) => ({
+                role: m.role as "user" | "assistant",
+                content: m.content,
+                sources: m.sources ?? undefined,
+              })
+            )
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleClear = async () => {
+    setMessages([]);
+    setError(null);
+    await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,8 +149,17 @@ export default function OraclePage() {
             </h1>
           </div>
           <p className="ml-auto hidden text-xs text-zinc-400 sm:block dark:text-zinc-500">
-            Pergunte sobre o seu acervo
+            Pergunte sobre o seu acervo — ele lembra de você
           </p>
+          {messages.length > 0 && (
+            <button
+              onClick={handleClear}
+              title="Limpar conversa"
+              className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -142,7 +177,8 @@ export default function OraclePage() {
                 O Oráculo conhece a ficha de cada livro do seu catálogo —
                 título, autor, sinopse e gênero. Pergunte em linguagem natural
                 e ele responde com base no <strong>seu</strong> acervo,
-                indicando quais livros usou como referência.
+                indicando quais livros usou como referência. Ele lembra das
+                suas conversas e aprende suas preferências a cada interação.
               </p>
               <div className="mx-auto mt-5 grid max-w-lg grid-cols-1 gap-2 text-left sm:grid-cols-3">
                 <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">

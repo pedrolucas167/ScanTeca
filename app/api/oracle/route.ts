@@ -19,6 +19,69 @@ interface SimilarBook {
   distance: number;
 }
 
+const HISTORY_LIMIT = 12;
+
+/**
+ * Mantém o "perfil do leitor": um resumo curto atualizado pelo próprio LLM
+ * após cada interação. É o que permite ao Oráculo criar uma relação com a
+ * pessoa — lembrar preferências, livros citados e o momento de leitura.
+ */
+async function updateReaderProfile(
+  userId: string,
+  currentProfile: string | null | undefined,
+  question: string,
+  answer: string,
+  apiKey: string
+) {
+  try {
+    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer":
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "Scanteca Oráculo",
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        stream: false,
+        max_tokens: 250,
+        messages: [
+          {
+            role: "user",
+            content: `Você mantém o perfil de um leitor com base nas conversas dele com um oráculo literário.
+
+Perfil atual:
+${currentProfile?.trim() || "(vazio)"}
+
+Última interação:
+Leitor: ${question}
+Oráculo: ${answer.slice(0, 800)}
+
+Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros citados, momento de leitura, pedidos recorrentes. Se nada novo foi revelado, responda exatamente: SEM MUDANÇA. Responda apenas com o perfil.`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return;
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = data.choices?.[0]?.message?.content?.trim();
+    if (text && !text.startsWith("SEM MUDAN")) {
+      await prisma.librarySetting.upsert({
+        where: { userId },
+        create: { userId, oracleProfile: text },
+        update: { oracleProfile: text },
+      });
+    }
+  } catch (err) {
+    console.error("[oracle] profile update error:", err);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -48,7 +111,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const questionEmbedding = await generateEmbedding(question.trim());
+    const trimmed = question.trim();
+
+    // Memória: salva a pergunta e carrega histórico + perfil em paralelo
+    const [questionEmbedding, historyDesc, setting] = await Promise.all([
+      generateEmbedding(trimmed),
+      prisma.oracleMessage.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: HISTORY_LIMIT,
+      }),
+      prisma.librarySetting.findUnique({ where: { userId } }),
+      prisma.oracleMessage.create({
+        data: { userId, role: "user", content: trimmed },
+      }),
+    ]);
+
     if (!questionEmbedding) {
       return new Response(
         JSON.stringify({ error: "Falha ao gerar embedding da pergunta" }),
@@ -89,12 +167,22 @@ export async function POST(request: NextRequest) {
             .join("\n\n")
         : "Nenhum livro relevante encontrado no acervo.";
 
-    const prompt = `Você é um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Responda à pergunta do usuário usando APENAS os seguintes livros do acervo pessoal dele. Seja elegante e cite os livros pelo título. Se os livros não forem suficientes para responder, diga isso com honestidade intelectual.
+    const profile = setting?.oracleProfile?.trim();
+    const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas. Responda usando APENAS os livros do acervo listados na mensagem do usuário. Seja elegante e cite os livros pelo título. Se os livros não forem suficientes para responder, diga isso com honestidade intelectual.${
+      profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""
+    }`;
 
-Livros relevantes do acervo:
-${context}
-
-Pergunta do usuário: ${question.trim()}`;
+    const messages = [
+      { role: "system" as const, content: systemPrompt },
+      ...historyDesc.reverse().map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      {
+        role: "user" as const,
+        content: `Livros relevantes do acervo:\n${context}\n\nPergunta do usuário: ${trimmed}`,
+      },
+    ];
 
     const llmRes = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
@@ -106,7 +194,7 @@ Pergunta do usuário: ${question.trim()}`;
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        messages: [{ role: "user", content: prompt }],
+        messages,
         stream: true,
       }),
     });
@@ -127,6 +215,7 @@ Pergunta do usuário: ${question.trim()}`;
       async start(controller) {
         const reader = llmRes.body!.getReader();
         let buffer = "";
+        let fullText = "";
 
         const sources = similarBooks.map((b) => ({
           id: b.id,
@@ -156,6 +245,7 @@ Pergunta do usuário: ${question.trim()}`;
                 const json = JSON.parse(payload);
                 const delta = json.choices?.[0]?.delta?.content;
                 if (delta) {
+                  fullText += delta;
                   controller.enqueue(
                     encoder.encode(
                       `data: ${JSON.stringify({ text: delta })}\n\n`
@@ -167,6 +257,29 @@ Pergunta do usuário: ${question.trim()}`;
             }
           }
         } finally {
+          // Persiste a resposta e atualiza o perfil do leitor antes de fechar
+          // (o texto já foi entregue; o custo extra é invisível para o usuário)
+          try {
+            if (fullText.trim()) {
+              await prisma.oracleMessage.create({
+                data: {
+                  userId,
+                  role: "assistant",
+                  content: fullText,
+                  sources,
+                },
+              });
+            }
+            await updateReaderProfile(
+              userId,
+              setting?.oracleProfile,
+              trimmed,
+              fullText,
+              apiKey
+            );
+          } catch (err) {
+            console.error("[oracle] memory persist error:", err);
+          }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         }
@@ -182,6 +295,62 @@ Pergunta do usuário: ${question.trim()}`;
     });
   } catch (error) {
     console.error("Erro em POST /api/oracle:", error);
+    return new Response(
+      JSON.stringify({ error: "Erro interno do servidor" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+/** GET /api/oracle — restaura o histórico da conversa (últimas 50 mensagens). */
+export async function GET() {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const desc = await prisma.oracleMessage.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return new Response(JSON.stringify({ messages: desc.reverse() }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Erro em GET /api/oracle:", error);
+    return new Response(
+      JSON.stringify({ error: "Erro interno do servidor" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+/** DELETE /api/oracle — limpa a conversa (o perfil do leitor é mantido). */
+export async function DELETE() {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    await prisma.oracleMessage.deleteMany({ where: { userId } });
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Erro em DELETE /api/oracle:", error);
     return new Response(
       JSON.stringify({ error: "Erro interno do servidor" }),
       { status: 500, headers: { "Content-Type": "application/json" } }

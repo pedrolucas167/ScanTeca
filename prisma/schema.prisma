@@ -59,9 +59,21 @@ model Review {
 }
 
 model LibrarySetting {
-  id           String  @id @default(cuid())
-  userId       String  @unique
-  name         String  @default("Minha Biblioteca")
-  shareId      String? @unique
-  shareEnabled Boolean @default(false)
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  name          String  @default("Minha Biblioteca")
+  shareId       String? @unique
+  shareEnabled  Boolean @default(false)
+  oracleProfile String?
+}
+
+model OracleMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  content   String
+  sources   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
