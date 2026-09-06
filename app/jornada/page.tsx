@@ -9,6 +9,7 @@ import {
   Flame,
   Gauge,
   Layers,
+  Timer,
   ArrowRight,
 } from "lucide-react";
 import GoalCard from "./GoalCard";
@@ -30,12 +31,16 @@ export default async function JornadaPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const [books, setting] = await Promise.all([
+  const [books, setting, logs] = await Promise.all([
     prisma.book.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.librarySetting.findUnique({ where: { userId } }),
+    prisma.readingLog.findMany({
+      where: { userId },
+      select: { date: true },
+    }),
   ]);
 
   const now = new Date();
@@ -78,6 +83,19 @@ export default async function JornadaPage() {
         )
       : null;
 
+  // Streak: dias seguidos com leitura registrada (hoje ou terminando ontem)
+  const logDays = new Set(logs.map((l) => l.date.toISOString().slice(0, 10)));
+  let streak = 0;
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  if (!logDays.has(cursor.toISOString().slice(0, 10))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  while (logDays.has(cursor.toISOString().slice(0, 10))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-br from-indigo-50/60 via-white to-amber-50/40 px-4 py-12 text-center dark:border-zinc-800 dark:from-indigo-950/20 dark:via-zinc-950 dark:to-amber-950/10">
@@ -95,7 +113,7 @@ export default async function JornadaPage() {
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         {/* Stats do ano */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-700 dark:bg-zinc-900">
             <BookOpen className="mx-auto h-5 w-5 text-green-600 dark:text-green-400" />
             <p className="mt-2 font-serif text-3xl font-semibold text-foreground">
@@ -124,12 +142,21 @@ export default async function JornadaPage() {
             </p>
           </div>
           <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-700 dark:bg-zinc-900">
-            <Flame className="mx-auto h-5 w-5 text-orange-600 dark:text-orange-400" />
+            <Timer className="mx-auto h-5 w-5 text-orange-600 dark:text-orange-400" />
             <p className="mt-2 font-serif text-3xl font-semibold text-foreground">
               {avgDays !== null ? `${avgDays}d` : "—"}
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Tempo médio por livro
+            </p>
+          </div>
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-700 dark:bg-zinc-900">
+            <Flame className="mx-auto h-5 w-5 text-red-500 dark:text-red-400" />
+            <p className="mt-2 font-serif text-3xl font-semibold text-foreground">
+              {streak}
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {streak === 1 ? "Dia seguido" : "Dias seguidos"}
             </p>
           </div>
         </div>
