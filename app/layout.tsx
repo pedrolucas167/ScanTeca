@@ -10,6 +10,7 @@ import {
 } from "@clerk/nextjs";
 import { BookOpen, Heart } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import AccentPicker from "./AccentPicker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -50,11 +51,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Tema inicial antes da pintura: localStorage > preferência do sistema */}
+        {/* Tema inicial antes da pintura: localStorage > preferência do sistema.
+            Também restaura o acento de cor (data-accent) salvo pelo seletor. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}",
+              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');var a=localStorage.getItem('accent');if(a)document.documentElement.dataset.accent=a}catch(e){}",
           }}
         />
         <ClerkProvider>
@@ -115,6 +117,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     </button>
                   </SignUpButton>
                 </Show>
+                <AccentPicker />
                 <ThemeToggle />
                 <Show when="signed-in">
                   <UserButton />
