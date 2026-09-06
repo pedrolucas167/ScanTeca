@@ -173,6 +173,13 @@ export default async function JornadaPage() {
                     ? Math.min(100, Math.round((b.currentPage / b.pages) * 100))
                     : 0;
                 const days = b.startedAt ? daysBetween(b.startedAt, now) : null;
+                // Previsão: ritmo atual (págs/dia) projetado nas páginas restantes
+                const etaDays =
+                  b.pages && b.currentPage && b.currentPage > 0 && days
+                    ? Math.ceil(
+                        (b.pages - b.currentPage) / (b.currentPage / days)
+                      )
+                    : null;
                 return (
                   <Link
                     key={b.id}
@@ -214,6 +221,12 @@ export default async function JornadaPage() {
                         {days !== null &&
                           ` · há ${days} ${days === 1 ? "dia" : "dias"}`}
                       </p>
+                      {etaDays !== null && etaDays > 0 && (
+                        <p className="mt-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                          Nesse ritmo, termina em ~{etaDays}{" "}
+                          {etaDays === 1 ? "dia" : "dias"}
+                        </p>
+                      )}
                     </div>
                   </Link>
                 );
