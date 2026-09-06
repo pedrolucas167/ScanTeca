@@ -134,7 +134,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder } = body;
+    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder, sessionNote } = body;
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
@@ -202,10 +202,35 @@ export async function PATCH(request: NextRequest) {
       const delta = newPage - (existing.currentPage ?? 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      // Anotação da sessão: acumula no log do dia (uma linha por sessão)
+      const cleanNote =
+        typeof sessionNote === "string" && sessionNote.trim()
+          ? sessionNote.trim()
+          : null;
+      const existingLog = cleanNote
+        ? await prisma.readingLog.findUnique({
+            where: { userId_date: { userId, date: today } },
+          })
+        : null;
       await prisma.readingLog.upsert({
         where: { userId_date: { userId, date: today } },
-        update: { pages: { increment: delta } },
-        create: { userId, bookId: id, date: today, pages: delta },
+        update: {
+          pages: { increment: delta },
+          ...(cleanNote
+            ? {
+                note: existingLog?.note
+                  ? `${existingLog.note}\n${cleanNote}`
+                  : cleanNote,
+              }
+            : {}),
+        },
+        create: {
+          userId,
+          bookId: id,
+          date: today,
+          pages: delta,
+          note: cleanNote,
+        },
       });
     }
 

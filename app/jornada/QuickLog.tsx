@@ -15,6 +15,7 @@ export default function QuickLog({ books }: { books: ReadingBook[] }) {
   const router = useRouter();
   const [bookId, setBookId] = useState(books[0]?.id ?? "");
   const [pages, setPages] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -34,11 +35,13 @@ export default function QuickLog({ books }: { books: ReadingBook[] }) {
         body: JSON.stringify({
           id: selected.id,
           currentPage: (selected.currentPage ?? 0) + n,
+          sessionNote: note.trim() || undefined,
         }),
       });
       if (res.ok) {
         setFeedback(`+${n} ${n === 1 ? "página" : "páginas"} registradas!`);
         setPages("");
+        setNote("");
         router.refresh();
       } else {
         setFeedback("Erro ao registrar");
@@ -90,6 +93,15 @@ export default function QuickLog({ books }: { books: ReadingBook[] }) {
           </span>
         )}
       </div>
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        placeholder="Anotação da sessão (opcional) — ex.: parei no cap. 7, citação boa na pág. 112"
+        maxLength={500}
+        className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-foreground placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder:text-zinc-500"
+      />
     </div>
   );
 }
