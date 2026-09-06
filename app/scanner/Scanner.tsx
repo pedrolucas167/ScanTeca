@@ -42,7 +42,7 @@ export default function Scanner() {
       setLoading(true);
       setResult({
         type: "info",
-        message: `ISBN ${isbn} detectado. Buscando...`,
+        message: `ISBN ${isbn} detectado — buscando dados do livro...`,
       });
 
       try {
@@ -262,35 +262,9 @@ export default function Scanner() {
         )}
       </div>
 
-      {loading && (
-        <div className="mt-6 flex items-center gap-2 text-indigo-600">
-          <svg
-            className="h-5 w-5 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          <span className="text-sm font-medium">Processando...</span>
-        </div>
-      )}
-
       {result && (
         <div
-          className={`mt-6 w-full max-w-md rounded-lg p-4 text-sm font-medium ${
+          className={`mt-6 flex w-full max-w-md items-center justify-center gap-2.5 rounded-lg p-4 text-sm font-medium ${
             result.type === "success"
               ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
               : result.type === "error"
@@ -298,7 +272,29 @@ export default function Scanner() {
                 : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
           }`}
         >
-          {result.message}
+          {loading && (
+            <svg
+              className="h-4 w-4 shrink-0 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          )}
+          <span>{result.message}</span>
         </div>
       )}
 
