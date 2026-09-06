@@ -81,6 +81,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   Jornada
                 </Link>
                 <Link
+                  href="/manifesto"
+                  className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-foreground sm:inline dark:text-zinc-400"
+                >
+                  Manifesto
+                </Link>
+                <Link
                   href="/scanner"
                   className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 sm:px-4 sm:text-sm"
                 >
