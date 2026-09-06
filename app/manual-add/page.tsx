@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Check, PlusCircle, Search, Sparkles } from "lucide-react";
 
@@ -24,6 +24,22 @@ export default function ManualAddPage() {
     genre: "",
     pages: "" as string,
   });
+
+  useEffect(() => {
+    fetch("/api/library-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const name = data?.setting?.name;
+        if (name) {
+          setForm((f) =>
+            f.collection === "Minha Biblioteca"
+              ? { ...f, collection: name }
+              : f
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSearchCoverByTitle = async () => {
     if (!form.title.trim()) {

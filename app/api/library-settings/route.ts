@@ -114,14 +114,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Renomear a biblioteca renomeia a coleção homônima nos livros —
-    // o card exibe book.collection, então sem isso o nome antigo persistia
+    // o card exibe book.collection, então sem isso o nome antigo persistia.
+    // "Minha Biblioteca" é o default legado de livros criados antes do
+    // nome real ser usado como coleção.
     if (
       updateData.name &&
       existing?.name &&
       existing.name !== updateData.name
     ) {
       await prisma.book.updateMany({
-        where: { userId, collection: existing.name },
+        where: {
+          userId,
+          collection: { in: [existing.name, "Minha Biblioteca"] },
+        },
         data: { collection: updateData.name as string },
       });
     }
