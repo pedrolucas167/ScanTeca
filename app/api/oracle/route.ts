@@ -86,6 +86,64 @@ Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros 
   }
 }
 
+/**
+ * Reescreve a pergunta como autossuficiente usando o histórico — essencial
+ * para o embedding de follow-ups ("e o autor dele?", "tem mais dele?"),
+ * que sozinhos não apontam para livro nenhum no espaço vetorial.
+ */
+async function contextualizeQuestion(
+  question: string,
+  history: { role: string; content: string }[],
+  apiKey: string
+): Promise<string> {
+  if (history.length === 0) return question;
+  try {
+    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer":
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "Scanteca Oráculo",
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        stream: false,
+        max_tokens: 80,
+        messages: [
+          {
+            role: "user",
+            content: `Reescreva a última pergunta do leitor como uma pergunta autossuficiente, incorporando títulos, autores e temas citados na conversa. Se já for autossuficiente, repita-a. Responda apenas com a pergunta reescrita.
+
+Conversa recente:
+${history
+  .slice(0, 6)
+  .reverse()
+  .map(
+    (m) =>
+      `${m.role === "user" ? "Leitor" : "Oráculo"}: ${m.content.slice(0, 300)}`
+  )
+  .join("\n")}
+
+Última pergunta do leitor: ${question}`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return question;
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const rewritten = data.choices?.[0]?.message?.content?.trim();
+    return rewritten && rewritten.length > 0 && rewritten.length < 500
+      ? rewritten
+      : question;
+  } catch {
+    return question;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -156,8 +214,7 @@ export async function POST(request: NextRequest) {
     const trimmed = question;
 
     // Memória: salva a pergunta e carrega histórico + perfil em paralelo
-    const [questionEmbedding, historyDesc, setting] = await Promise.all([
-      generateEmbedding(trimmed),
+    const [historyDesc, setting] = await Promise.all([
       prisma.oracleMessage.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
@@ -168,6 +225,15 @@ export async function POST(request: NextRequest) {
         data: { userId, role: "user", content: trimmed },
       }),
     ]);
+
+    // Reescreve a pergunta com o contexto da conversa antes de embeddar —
+    // follow-ups ("e o autor dele?") não carregam sentido sozinhos
+    const retrievalQuery = await contextualizeQuestion(
+      trimmed,
+      historyDesc,
+      apiKey
+    );
+    const questionEmbedding = await generateEmbedding(retrievalQuery);
 
     if (!questionEmbedding) {
       return new Response(

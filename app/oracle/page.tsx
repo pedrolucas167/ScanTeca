@@ -103,7 +103,12 @@ export default function OraclePage() {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.onended = () => URL.revokeObjectURL(url);
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        audioRef.current = null;
+        // Modo conversa: terminou de falar, volta a ouvir sozinho
+        if (voiceOnRef.current && micSupported) void handleMic();
+      };
       await audio.play();
     } catch {
     }
@@ -278,6 +283,7 @@ export default function OraclePage() {
       return;
     }
     try {
+      stopAudio(); // barge-in: começar a falar interrompe o Oráculo
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
