@@ -6,6 +6,7 @@ import { generateEmbedding } from "@/lib/embeddings";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const CHAT_MODEL =
   process.env.ORACLE_CHAT_MODEL || "meta-llama/llama-3.1-8b-instruct";
+const STT_MODEL = process.env.ORACLE_STT_MODEL || "openai/whisper-1";
 
 interface SimilarBook {
   id: string;
@@ -103,15 +104,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question } = (await request.json()) as { question?: string };
-    if (!question || typeof question !== "string" || !question.trim()) {
+    const body = (await request.json()) as {
+      question?: string;
+      audio?: { data?: string; format?: string };
+    };
+
+    let question = typeof body.question === "string" ? body.question.trim() : "";
+
+    // Entrada por voz: transcreve o áudio via STT do OpenRouter (Whisper)
+    if (!question && body.audio?.data) {
+      const sttRes = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer":
+            process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          "X-Title": "Scanteca Oráculo",
+        },
+        body: JSON.stringify({
+          model: STT_MODEL,
+          input_audio: {
+            data: body.audio.data,
+            format: body.audio.format || "webm",
+          },
+          language: "pt",
+        }),
+      });
+      if (!sttRes.ok) {
+        const err = await sttRes.text();
+        console.error("[oracle] STT error:", sttRes.status, err);
+        return new Response(
+          JSON.stringify({ error: "Não consegui transcrever o áudio" }),
+          { status: 502, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      const sttData = (await sttRes.json()) as { text?: string };
+      question = sttData.text?.trim() ?? "";
+    }
+
+    if (!question) {
       return new Response(
         JSON.stringify({ error: "Pergunta é obrigatória" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const trimmed = question.trim();
+    const trimmed = question;
 
     // Memória: salva a pergunta e carrega histórico + perfil em paralelo
     const [questionEmbedding, historyDesc, setting] = await Promise.all([
@@ -222,6 +261,10 @@ export async function POST(request: NextRequest) {
           title: b.title,
           author: b.author,
         }));
+        // Transcrição primeiro — o cliente mostra o que foi ouvido no mic
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ transcript: trimmed })}\n\n`)
+        );
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`)
         );

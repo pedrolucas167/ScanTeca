@@ -10,6 +10,7 @@ import {
   Sparkles,
   Trash2,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 
 interface Source {
@@ -24,58 +25,39 @@ interface Message {
   sources?: Source[];
 }
 
-// Web Speech API — SpeechRecognition não está no lib.dom do TS
-interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult:
-    | ((e: {
-        results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
-      }) => void)
-    | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-}
-
-function getSpeechRecognition():
-  | (new () => SpeechRecognitionLike)
-  | undefined {
-  if (typeof window === "undefined") return undefined;
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
-
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
-  // Suporte à Web Speech API — server snapshot false evita hydration mismatch
-  const speechSupported = useSyncExternalStore(
+  const [recording, setRecording] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(false);
+  // getUserMedia é universal — server snapshot false evita hydration mismatch
+  const micSupported = useSyncExternalStore(
     () => () => {},
-    () => getSpeechRecognition() !== undefined,
+    () =>
+      typeof navigator !== "undefined" &&
+      !!navigator.mediaDevices?.getUserMedia,
     () => false
   );
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const transcriptRef = useRef("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const loadingRef = useRef(false);
+  const voiceOnRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Para o reconhecimento de voz ao desmontar
+  // Para gravação e áudio ao desmontar
   useEffect(() => {
-    return () => recognitionRef.current?.stop();
+    return () => {
+      mediaRecorderRef.current?.stop();
+      audioRef.current?.pause();
+    };
   }, []);
 
   // Restaura o histórico — o Oráculo lembra das conversas anteriores
@@ -98,25 +80,117 @@ export default function OraclePage() {
       .catch(() => {});
   }, []);
 
-  const handleClear = async () => {
-    window.speechSynthesis?.cancel();
-    setMessages([]);
-    setError(null);
-    await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+  };
+
+  // Voz do Oráculo via endpoint TTS do OpenRouter
+  const speak = async (text: string) => {
+    try {
+      stopAudio();
+      const res = await fetch("/api/oracle/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+    } catch {
+    }
+  };
+
+  const toggleVoice = () => {
+    const next = !voiceOn;
+    voiceOnRef.current = next;
+    setVoiceOn(next);
+    if (!next) stopAudio();
+  };
+
+  // Lê o stream SSE do Oráculo; atualiza mensagens e retorna o texto completo
+  const readOracleStream = async (res: Response): Promise<string> => {
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") continue;
+
+        try {
+          const json = JSON.parse(payload);
+          if (json.transcript) {
+            // Mostra o que foi transcrito do áudio na mensagem do usuário
+            setMessages((prev) => {
+              const updated = [...prev];
+              const userIdx = updated.length - 2;
+              if (updated[userIdx]?.role === "user") {
+                updated[userIdx] = {
+                  ...updated[userIdx],
+                  content: json.transcript,
+                };
+              }
+              return updated;
+            });
+          }
+          if (json.sources) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                sources: json.sources,
+              };
+              return updated;
+            });
+          }
+          if (json.text) {
+            fullText += json.text;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                content: updated[updated.length - 1].content + json.text,
+              };
+              return updated;
+            });
+          }
+        } catch {
+        }
+      }
+    }
+    return fullText;
   };
 
   const sendMessage = async (question: string) => {
     if (!question || loadingRef.current) return;
     loadingRef.current = true;
 
-    window.speechSynthesis?.cancel();
+    stopAudio();
     setInput("");
     setError(null);
     setLoading(true);
 
-    const userMsg: Message = { role: "user", content: question };
-    const assistantMsg: Message = { role: "assistant", content: "" };
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: question },
+      { role: "assistant", content: "" },
+    ]);
 
     try {
       const res = await fetch("/api/oracle", {
@@ -130,50 +204,8 @@ export default function OraclePage() {
         throw new Error(data?.error || "Erro ao consultar o Oráculo");
       }
 
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const payload = trimmed.slice(5).trim();
-          if (payload === "[DONE]") continue;
-
-          try {
-            const json = JSON.parse(payload);
-            if (json.sources) {
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...updated[updated.length - 1],
-                  sources: json.sources,
-                };
-                return updated;
-              });
-            }
-            if (json.text) {
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...updated[updated.length - 1],
-                  content: updated[updated.length - 1].content + json.text,
-                };
-                return updated;
-              });
-            }
-          } catch {
-          }
-        }
-      }
+      const fullText = await readOracleStream(res);
+      if (voiceOnRef.current && fullText.trim()) void speak(fullText);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro de rede");
       setMessages((prev) => prev.slice(0, -1)); // remove empty assistant msg
@@ -184,61 +216,94 @@ export default function OraclePage() {
     }
   };
 
+  // Envia o áudio gravado — o Whisper transcreve no servidor
+  const sendAudio = async (blob: Blob) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+
+    stopAudio();
+    setError(null);
+    setLoading(true);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: "🎤 Transcrevendo áudio..." },
+      { role: "assistant", content: "" },
+    ]);
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob);
+      });
+      const base64 = dataUrl.split(",")[1];
+      const format = blob.type.split("/")[1]?.split(";")[0] || "webm";
+
+      const res = await fetch("/api/oracle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: { data: base64, format } }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Erro ao consultar o Oráculo");
+      }
+
+      const fullText = await readOracleStream(res);
+      if (voiceOnRef.current && fullText.trim()) void speak(fullText);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro de rede");
+      setMessages((prev) => prev.slice(0, -2)); // remove placeholder + resposta
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(input.trim());
   };
 
-  // Microfone: transcreve ao vivo no input e envia ao parar de falar
-  const handleMic = () => {
-    if (listening) {
-      recognitionRef.current?.stop();
+  // Microfone: grava com MediaRecorder e envia ao parar
+  const handleMic = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
       return;
     }
-    const Ctor = getSpeechRecognition();
-    if (!Ctor) return;
-
-    const rec = new Ctor();
-    rec.lang = "pt-BR";
-    rec.interimResults = true;
-    rec.continuous = false;
-    transcriptRef.current = "";
-
-    rec.onresult = (e) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) {
-        transcript += e.results[i][0].transcript;
-      }
-      transcriptRef.current = transcript.trim();
-      setInput(transcriptRef.current);
-    };
-    rec.onend = () => {
-      setListening(false);
-      recognitionRef.current = null;
-      const said = transcriptRef.current;
-      transcriptRef.current = "";
-      if (said) sendMessage(said);
-    };
-    rec.onerror = () => {
-      setListening(false);
-      recognitionRef.current = null;
-      setError("Não consegui ouvir. Verifique a permissão do microfone.");
-    };
-
-    recognitionRef.current = rec;
-    setListening(true);
-    rec.start();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/ogg";
+      const rec = new MediaRecorder(stream, { mimeType: mime });
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        mediaRecorderRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: mime });
+        chunksRef.current = [];
+        if (blob.size > 0) void sendAudio(blob);
+      };
+      mediaRecorderRef.current = rec;
+      setRecording(true);
+      rec.start();
+    } catch {
+      setError("Não consegui acessar o microfone. Verifique a permissão.");
+    }
   };
 
-  // O Oráculo fala a resposta (TTS nativo do navegador)
-  const speak = (text: string) => {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      return;
-    }
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = "pt-BR";
-    window.speechSynthesis.speak(utt);
+  const handleClear = async () => {
+    stopAudio();
+    setMessages([]);
+    setError(null);
+    await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
   };
 
   return (
@@ -260,6 +325,25 @@ export default function OraclePage() {
           <p className="ml-auto hidden text-xs text-zinc-400 sm:block dark:text-zinc-500">
             Pergunte sobre o seu acervo — ele lembra de você
           </p>
+          <button
+            onClick={toggleVoice}
+            title={
+              voiceOn
+                ? "Desativar voz do Oráculo"
+                : "Oráculo fala as respostas"
+            }
+            className={`rounded-full p-2 transition-colors ${
+              voiceOn
+                ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400"
+                : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            }`}
+          >
+            {voiceOn ? (
+              <Volume2 className="h-4 w-4" />
+            ) : (
+              <VolumeX className="h-4 w-4" />
+            )}
+          </button>
           {messages.length > 0 && (
             <button
               onClick={handleClear}
@@ -408,21 +492,21 @@ export default function OraclePage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              listening
-                ? "Ouvindo... fale sua pergunta"
+              recording
+                ? "Gravando... toque no microfone para enviar"
                 : "Pergunte ao Oráculo sobre seus livros..."
             }
             disabled={loading}
             className="flex-1 rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
-          {speechSupported && (
+          {micSupported && (
             <button
               type="button"
               onClick={handleMic}
               disabled={loading}
-              title={listening ? "Parar de ouvir" : "Falar com o Oráculo"}
+              title={recording ? "Parar e enviar" : "Falar com o Oráculo"}
               className={`rounded-full p-3 shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                listening
+                recording
                   ? "animate-pulse bg-red-500 text-white hover:bg-red-600"
                   : "border border-zinc-300 bg-white text-zinc-500 hover:border-indigo-400 hover:text-indigo-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-indigo-400"
               }`}
