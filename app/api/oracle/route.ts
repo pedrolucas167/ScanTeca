@@ -214,8 +214,12 @@ export async function POST(request: NextRequest) {
 
     const trimmed = question;
 
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+
     // Memória: salva a pergunta e carrega histórico + perfil em paralelo
-    const [historyDesc, setting, , readingNow] = await Promise.all([
+    const [historyDesc, setting, , readingNow, weekLogs] = await Promise.all([
       prisma.oracleMessage.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
@@ -234,6 +238,10 @@ export async function POST(request: NextRequest) {
           pages: true,
           startedAt: true,
         },
+      }),
+      prisma.readingLog.findMany({
+        where: { userId, date: { gte: weekAgo } },
+        select: { date: true, pages: true },
       }),
     ]);
 
@@ -373,6 +381,16 @@ export async function POST(request: NextRequest) {
             .join("\n")
         : "";
 
+    // Resumo da semana: páginas e dias de leitura nos últimos 7 dias
+    const weekPages = weekLogs.reduce((s, l) => s + l.pages, 0);
+    const weekDays = new Set(
+      weekLogs.map((l) => l.date.toISOString().slice(0, 10))
+    ).size;
+    const weekSection =
+      weekPages > 0
+        ? `\n\nAtividade recente do usuário: ${weekPages} páginas lidas nos últimos 7 dias, em ${weekDays} ${weekDays === 1 ? "dia" : "dias"} de leitura.`
+        : "";
+
     const profile = setting?.oracleProfile?.trim();
     const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas. Responda usando APENAS os livros do acervo listados na mensagem do usuário — nunca mencione ou recomende livros que não estejam na lista. Seja elegante e cite os livros pelo título. Se a lista estiver vazia ou os livros não tiverem relação com a pergunta, admita com honestidade intelectual que o acervo não cobre o tema e sugira o que o leitor poderia explorar no que ele já tem.${
       profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""
@@ -386,7 +404,7 @@ export async function POST(request: NextRequest) {
       })),
       {
         role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}\n\nPergunta do usuário: ${trimmed}`,
+        content: `Livros relevantes do acervo:\n${context}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}\n\nPergunta do usuário: ${trimmed}`,
       },
     ];
 
