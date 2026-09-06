@@ -70,6 +70,7 @@ model LibrarySetting {
   shareEnabled  Boolean @default(false)
   oracleProfile String?
   yearlyGoal    Int?
+  accentTheme   String?
 }
 
 model ReadingLog {

@@ -43,6 +43,11 @@ export default function AccentPicker() {
     } catch {
     }
     window.dispatchEvent(new Event(ACCENT_EVENT));
+    fetch("/api/library-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accent: id }),
+    }).catch(() => {});
   };
 
   return (

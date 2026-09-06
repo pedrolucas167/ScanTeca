@@ -8,7 +8,9 @@ import {
   Show,
   UserButton,
 } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { BookOpen, Heart } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import "./globals.css";
@@ -43,18 +45,31 @@ export const viewport: Viewport = {
   themeColor: "#6366f1",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  let accent: string | null = null;
+  try {
+    const { userId } = await auth();
+    if (userId) {
+      const setting = await prisma.librarySetting.findUnique({
+        where: { userId },
+        select: { accentTheme: true },
+      });
+      accent = setting?.accentTheme ?? null;
+    }
+  } catch {}
+
   return (
     <html
       lang="pt-BR"
       suppressHydrationWarning
+      data-accent={accent ?? undefined}
       className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');var a=localStorage.getItem('accent');if(a)document.documentElement.dataset.accent=a}catch(e){}",
+              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');var el=document.documentElement;if(!el.dataset.accent){var a=localStorage.getItem('accent');if(a)el.dataset.accent=a}}catch(e){}",
           }}
         />
         <ClerkProvider>
