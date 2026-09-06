@@ -32,6 +32,7 @@ export default function OraclePage() {
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   // getUserMedia é universal — server snapshot false evita hydration mismatch
   const micSupported = useSyncExternalStore(
     () => () => {},
@@ -75,6 +76,9 @@ export default function OraclePage() {
               })
             )
           );
+        }
+        if (data?.suggestions?.length) {
+          setSuggestions(data.suggestions);
         }
       })
       .catch(() => {});
@@ -387,7 +391,7 @@ export default function OraclePage() {
                     Recomenda leituras
                   </p>
                   <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    &ldquo;O que ler depois de Duna?&rdquo;
+                    &ldquo;O que ler depois do meu último livro?&rdquo;
                   </p>
                 </div>
                 <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
@@ -404,11 +408,14 @@ export default function OraclePage() {
                 biblioteca.&rdquo;
               </p>
               <div className="mt-6 grid w-full max-w-md gap-2">
-                {[
-                  "Quais livros de ficção científica eu tenho?",
-                  "Me recomende um livro do meu acervo para ler agora",
-                  "Qual livro da minha coleção fala sobre filosofia?",
-                ].map((suggestion) => (
+                {(suggestions.length > 0
+                  ? suggestions
+                  : [
+                      "Quais livros eu tenho no meu acervo?",
+                      "Me recomende um livro para ler agora",
+                      "Por onde eu começo?",
+                    ]
+                ).map((suggestion) => (
                   <button
                     key={suggestion}
                     onClick={() => {

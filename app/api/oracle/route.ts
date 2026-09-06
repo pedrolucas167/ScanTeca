@@ -345,7 +345,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** GET /api/oracle — restaura o histórico da conversa (últimas 50 mensagens). */
+/**
+ * GET /api/oracle — restaura o histórico (últimas 50 mensagens) e devolve
+ * sugestões de pergunta geradas a partir de livros reais do acervo.
+ */
 export async function GET() {
   try {
     const { userId } = await auth();
@@ -356,16 +359,49 @@ export async function GET() {
       });
     }
 
-    const desc = await prisma.oracleMessage.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const [desc, books] = await Promise.all([
+      prisma.oracleMessage.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      // Amostra do acervo: lidos primeiro (fazem sentido em "o que ler depois"),
+      // depois o resto em ordem aleatória
+      prisma.$queryRaw<
+        { title: string; author: string; genre: string | null }[]
+      >`
+        SELECT title, author, genre
+        FROM "Book"
+        WHERE "userId" = ${userId}
+        ORDER BY CASE status WHEN 'READ' THEN 0 WHEN 'TO_READ' THEN 1 ELSE 2 END,
+                 RANDOM()
+        LIMIT 4
+      `,
+    ]);
 
-    return new Response(JSON.stringify({ messages: desc.reverse() }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const suggestions: string[] = [];
+    if (books[0]) suggestions.push(`O que ler depois de ${books[0].title}?`);
+    if (books[1])
+      suggestions.push(`Me recomende algo parecido com ${books[1].title}`);
+    const genre = books.find((b) => b.genre)?.genre;
+    if (genre) suggestions.push(`O que eu tenho de ${genre}?`);
+    else if (books[2])
+      suggestions.push(`O que você acha de ${books[2].author}?`);
+    if (suggestions.length === 0) {
+      suggestions.push(
+        "Quais livros eu tenho no meu acervo?",
+        "Me recomende um livro para ler agora",
+        "Por onde eu começo?"
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ messages: desc.reverse(), suggestions }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("Erro em GET /api/oracle:", error);
     return new Response(
