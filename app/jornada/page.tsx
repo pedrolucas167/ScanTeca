@@ -40,7 +40,7 @@ export default async function JornadaPage() {
     prisma.librarySetting.findUnique({ where: { userId } }),
     prisma.readingLog.findMany({
       where: { userId },
-      select: { date: true, pages: true },
+      select: { id: true, date: true, pages: true, note: true, bookId: true },
     }),
   ]);
 
@@ -109,6 +109,13 @@ export default async function JornadaPage() {
   heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay())); // sábado desta semana
   const heatStart = new Date(heatEnd);
   heatStart.setDate(heatStart.getDate() - (HEAT_WEEKS * 7 - 1));
+
+  // Notas de leitura recentes (anotações feitas no registro rápido)
+  const bookTitleById = new Map(books.map((b) => [b.id, b.title]));
+  const recentNotes = logs
+    .filter((l) => l.note)
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 5);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -218,6 +225,33 @@ export default async function JornadaPage() {
             Últimas {HEAT_WEEKS} semanas · tons mais fortes = mais páginas no dia
           </p>
         </div>
+
+        {/* Notas de leitura */}
+        {recentNotes.length > 0 && (
+          <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+            <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
+              Notas de leitura
+            </h2>
+            <ul className="space-y-3">
+              {recentNotes.map((l) => (
+                <li
+                  key={l.id}
+                  className="border-l-2 border-indigo-300 pl-3 dark:border-indigo-700"
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                    {l.date.toLocaleDateString("pt-BR")}
+                    {l.bookId && bookTitleById.get(l.bookId)
+                      ? ` · ${bookTitleById.get(l.bookId)}`
+                      : ""}
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-300">
+                    {l.note}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Lendo agora */}
         <div className="mt-10">

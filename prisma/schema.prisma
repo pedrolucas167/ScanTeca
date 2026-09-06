@@ -78,6 +78,7 @@ model ReadingLog {
   bookId    String?
   date      DateTime @db.Date
   pages     Int
+  note      String?
   createdAt DateTime @default(now())
 
   @@unique([userId, date])
