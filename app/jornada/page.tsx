@@ -10,6 +10,8 @@ import {
   Gauge,
   Layers,
   Timer,
+  Medal,
+  Trophy,
   ArrowRight,
 } from "lucide-react";
 import GoalCard from "./GoalCard";
@@ -40,7 +42,7 @@ export default async function JornadaPage() {
     prisma.librarySetting.findUnique({ where: { userId } }),
     prisma.readingLog.findMany({
       where: { userId },
-      select: { date: true, pages: true },
+      select: { id: true, date: true, pages: true, note: true, bookId: true },
     }),
   ]);
 
@@ -97,6 +99,29 @@ export default async function JornadaPage() {
     cursor.setDate(cursor.getDate() - 1);
   }
 
+  // Recorde: maior sequência de dias consecutivos já alcançada
+  const sortedDays = [...logDays].sort();
+  let bestStreak = 0;
+  let run = 0;
+  let prevDay: string | null = null;
+  for (const d of sortedDays) {
+    if (prevDay) {
+      const diff =
+        (new Date(d).getTime() - new Date(prevDay).getTime()) / 86400000;
+      run = diff === 1 ? run + 1 : 1;
+    } else {
+      run = 1;
+    }
+    bestStreak = Math.max(bestStreak, run);
+    prevDay = d;
+  }
+
+  const badges = [
+    { days: 7, label: "Semana de fogo", icon: Flame },
+    { days: 30, label: "Mês imparável", icon: Medal },
+    { days: 100, label: "Centurião", icon: Trophy },
+  ];
+
   // Heatmap: páginas por dia nas últimas 15 semanas (estilo GitHub)
   const HEAT_WEEKS = 15;
   const pagesByDay = new Map<string, number>();
@@ -109,6 +134,13 @@ export default async function JornadaPage() {
   heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay())); // sábado desta semana
   const heatStart = new Date(heatEnd);
   heatStart.setDate(heatStart.getDate() - (HEAT_WEEKS * 7 - 1));
+
+  // Notas de leitura recentes (anotações feitas no registro rápido)
+  const bookTitleById = new Map(books.map((b) => [b.id, b.title]));
+  const recentNotes = logs
+    .filter((l) => l.note)
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 5);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -123,6 +155,14 @@ export default async function JornadaPage() {
           Ler mais e melhor: acompanhe o ritmo, termine o que começou e mantenha
           a fila andando.
         </p>
+        {setting?.shareEnabled && setting.shareId && (
+          <Link
+            href={`/shared/${setting.shareId}/jornada`}
+            className="mt-2 inline-block text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          >
+            Ver página pública da sua jornada →
+          </Link>
+        )}
       </section>
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
@@ -175,6 +215,50 @@ export default async function JornadaPage() {
           </div>
         </div>
 
+        {/* Conquistas de streak */}
+        <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-serif text-lg font-semibold text-foreground">
+              Conquistas
+            </h2>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              Recorde: {bestStreak} {bestStreak === 1 ? "dia" : "dias"} seguidos
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {badges.map((b) => {
+              const unlocked = bestStreak >= b.days;
+              const Icon = b.icon;
+              return (
+                <div
+                  key={b.days}
+                  className={`rounded-lg border p-3 text-center ${
+                    unlocked
+                      ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30"
+                      : "border-zinc-200 bg-zinc-50 opacity-60 dark:border-zinc-700 dark:bg-zinc-800/50"
+                  }`}
+                >
+                  <Icon
+                    className={`mx-auto h-6 w-6 ${
+                      unlocked
+                        ? "text-amber-500 dark:text-amber-400"
+                        : "text-zinc-400 dark:text-zinc-600"
+                    }`}
+                  />
+                  <p className="mt-1 text-xs font-semibold text-foreground">
+                    {b.label}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    {unlocked
+                      ? `${b.days} dias seguidos`
+                      : `Faltam ${b.days - bestStreak} dias`}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Meta do ano */}
         <div className="mt-6">
           <GoalCard
@@ -218,6 +302,33 @@ export default async function JornadaPage() {
             Últimas {HEAT_WEEKS} semanas · tons mais fortes = mais páginas no dia
           </p>
         </div>
+
+        {/* Notas de leitura */}
+        {recentNotes.length > 0 && (
+          <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+            <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
+              Notas de leitura
+            </h2>
+            <ul className="space-y-3">
+              {recentNotes.map((l) => (
+                <li
+                  key={l.id}
+                  className="border-l-2 border-indigo-300 pl-3 dark:border-indigo-700"
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                    {l.date.toLocaleDateString("pt-BR")}
+                    {l.bookId && bookTitleById.get(l.bookId)
+                      ? ` · ${bookTitleById.get(l.bookId)}`
+                      : ""}
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-300">
+                    {l.note}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Lendo agora */}
         <div className="mt-10">
