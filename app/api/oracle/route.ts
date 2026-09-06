@@ -22,15 +22,8 @@ interface SimilarBook {
 }
 
 const HISTORY_LIMIT = 12;
-// Distância de cosseno máxima para um livro ser considerado relevante.
-// Acima disso é ruído — melhor o Oráculo admitir que não achou nada no acervo.
 const DISTANCE_THRESHOLD = 0.6;
 
-/**
- * Mantém o "perfil do leitor": um resumo curto atualizado pelo próprio LLM
- * após cada interação. É o que permite ao Oráculo criar uma relação com a
- * pessoa — lembrar preferências, livros citados e o momento de leitura.
- */
 async function updateReaderProfile(
   userId: string,
   currentProfile: string | null | undefined,
@@ -87,11 +80,6 @@ Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros 
   }
 }
 
-/**
- * Reescreve a pergunta como autossuficiente usando o histórico — essencial
- * para o embedding de follow-ups ("e o autor dele?", "tem mais dele?"),
- * que sozinhos não apontam para livro nenhum no espaço vetorial.
- */
 async function contextualizeQuestion(
   question: string,
   history: { role: string; content: string }[],
@@ -173,7 +161,6 @@ export async function POST(request: NextRequest) {
 
     let question = typeof body.question === "string" ? body.question.trim() : "";
 
-    // Entrada por voz: transcreve o áudio via STT do OpenRouter (Whisper)
     if (!question && body.audio?.data) {
       const sttRes = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
         method: "POST",
@@ -218,7 +205,6 @@ export async function POST(request: NextRequest) {
     weekAgo.setDate(weekAgo.getDate() - 7);
     weekAgo.setHours(0, 0, 0, 0);
 
-    // Memória: salva a pergunta e carrega histórico + perfil em paralelo
     const [historyDesc, setting, , readingNow, weekLogs] = await Promise.all([
       prisma.oracleMessage.findMany({
         where: { userId },
@@ -245,8 +231,6 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
-    // Reescreve a pergunta com o contexto da conversa antes de embeddar —
-    // follow-ups ("e o autor dele?") não carregam sentido sozinhos
     const retrievalQuery = await contextualizeQuestion(
       trimmed,
       historyDesc,
@@ -261,8 +245,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vector similarity search (cosine distance) — pega os 5 mais próximos
-    // e corta os que passam do threshold: distância alta = livro irrelevante
     const vector = `[${questionEmbedding.join(",")}]`;
     const similarBooks = await prisma.$queryRaw<SimilarBook[]>`
       SELECT id, title, author, "publishedDate", synopsis, genre,
@@ -286,8 +268,6 @@ export async function POST(request: NextRequest) {
       `→ ${relevantBooks.length} relevantes (< ${DISTANCE_THRESHOLD})`
     );
 
-    // Busca híbrida: se a pergunta cita autor/gênero do acervo, esses livros
-    // entram no contexto mesmo com distância vetorial alta
     const qWords = new Set(normalize(retrievalQuery));
     const qText = normalize(retrievalQuery).join(" ");
     const meta = await prisma.$queryRaw<
@@ -355,7 +335,6 @@ export async function POST(request: NextRequest) {
             .join("\n\n")
         : "Nenhum livro relevante encontrado no acervo.";
 
-    // Progresso de leitura em tempo real — o Oráculo sabe onde o leitor parou
     const progressSection =
       readingNow.length > 0
         ? readingNow
@@ -381,7 +360,6 @@ export async function POST(request: NextRequest) {
             .join("\n")
         : "";
 
-    // Resumo da semana: páginas e dias de leitura nos últimos 7 dias
     const weekPages = weekLogs.reduce((s, l) => s + l.pages, 0);
     const weekDays = new Set(
       weekLogs.map((l) => l.date.toISOString().slice(0, 10))
@@ -450,7 +428,6 @@ Duas situações distintas:
           title: b.title,
           author: b.author,
         }));
-        // Transcrição primeiro — o cliente mostra o que foi ouvido no mic
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ transcript: trimmed })}\n\n`)
         );
@@ -489,8 +466,6 @@ Duas situações distintas:
             }
           }
         } finally {
-          // Persiste a resposta e atualiza o perfil do leitor antes de fechar
-          // (o texto já foi entregue; o custo extra é invisível para o usuário)
           try {
             if (fullText.trim()) {
               await prisma.oracleMessage.create({
@@ -534,10 +509,6 @@ Duas situações distintas:
   }
 }
 
-/**
- * GET /api/oracle — restaura o histórico (últimas 50 mensagens) e devolve
- * sugestões de pergunta geradas a partir de livros reais do acervo.
- */
 export async function GET() {
   try {
     const { userId } = await auth();
@@ -554,8 +525,6 @@ export async function GET() {
         orderBy: { createdAt: "desc" },
         take: 50,
       }),
-      // Amostra do acervo: lidos primeiro (fazem sentido em "o que ler depois"),
-      // depois o resto em ordem aleatória
       prisma.$queryRaw<
         { title: string; author: string; genre: string | null }[]
       >`
@@ -600,7 +569,6 @@ export async function GET() {
   }
 }
 
-/** DELETE /api/oracle — limpa a conversa (o perfil do leitor é mantido). */
 export async function DELETE() {
   try {
     const { userId } = await auth();

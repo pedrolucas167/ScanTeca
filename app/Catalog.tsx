@@ -113,7 +113,6 @@ export default function Catalog({
   const [copied, setCopied] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  // Captured once on mount — Date.now() during render is impure (react-hooks/purity)
   const [now] = useState(() => Date.now());
 
   const quote = literaryQuotes[
@@ -421,7 +420,6 @@ export default function Catalog({
       const data = await res.json();
 
       if (res.ok) {
-        // O servidor renomeia a coleção homônima — espelha no estado local
         const oldName = libraryName;
         setLibraryName(data.setting.name);
         setBookList((prev) =>
@@ -1117,7 +1115,6 @@ export default function Catalog({
             className="w-full rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
 
-          {/* Mobile: botão Filtros + contador — o painel abre sob demanda */}
           <div className="flex items-center justify-between lg:hidden">
             <button
               type="button"
@@ -1735,7 +1732,6 @@ export default function Catalog({
                   <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                     Pré-visualização da capa
                   </p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={editingBook.coverUrl}
                     alt={`Capa de ${editingBook.title}`}
