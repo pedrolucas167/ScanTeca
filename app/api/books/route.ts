@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
         isbn: cleanedIsbn || undefined,
       }));
 
-    // Prefere a data da primeira publicação da obra, não da edição/reimpressão
     let effectivePublishedDate: string | null = publishedDate || null;
     const originalYear = await findOriginalPublishYear({
       title,
@@ -154,7 +153,6 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // If coverUrl is being cleared, try to find a new one automatically
     let effectiveCoverUrl = coverUrl;
     if (coverUrl === "" || coverUrl === undefined) {
       effectiveCoverUrl = await findBookCover({
@@ -172,7 +170,6 @@ export async function PATCH(request: NextRequest) {
     if (coverUrl !== undefined) data.coverUrl = effectiveCoverUrl || null;
     if (status !== undefined) {
       data.status = status as BookStatus;
-      // Marca timestamps de leitura na transição de status
       if (status === "READING") {
         if (!existing.startedAt) data.startedAt = new Date();
         data.finishedAt = null;
@@ -196,13 +193,11 @@ export async function PATCH(request: NextRequest) {
       data,
     });
 
-    // Registra atividade de leitura do dia (alimenta o streak da Jornada)
     const newPage = currentPage ? Number(currentPage) : null;
     if (newPage !== null && newPage > (existing.currentPage ?? 0)) {
       const delta = newPage - (existing.currentPage ?? 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      // Anotação da sessão: acumula no log do dia (uma linha por sessão)
       const cleanNote =
         typeof sessionNote === "string" && sessionNote.trim()
           ? sessionNote.trim()
@@ -234,7 +229,6 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    // Regenera embedding quando campos semânticos mudam (inclui notas do leitor)
     if (
       title !== undefined ||
       author !== undefined ||

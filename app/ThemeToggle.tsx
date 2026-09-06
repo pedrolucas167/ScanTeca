@@ -2,10 +2,6 @@
 
 import { Moon, Sun } from "lucide-react";
 
-/**
- * Alterna a classe .dark no <html>. Os dois ícones ficam no DOM e o CSS
- * decide qual exibir — sem estado, sem hydration mismatch.
- */
 export default function ThemeToggle() {
   const toggle = () => {
     const next = !document.documentElement.classList.contains("dark");
@@ -13,7 +9,6 @@ export default function ThemeToggle() {
     try {
       localStorage.setItem("theme", next ? "dark" : "light");
     } catch {
-      // storage indisponível (modo privado) — tema vale só nesta sessão
     }
   };
 

@@ -51,7 +51,6 @@ export default async function JornadaPage() {
 
   const reading = books.filter((b) => b.status === "READING");
   const read = books.filter((b) => b.status === "READ");
-  // finishedAt só existe pra leituras novas — createdAt como proxy pros legados
   const readThisYear = read.filter((b) => {
     const d = b.finishedAt ?? b.createdAt;
     return d.getFullYear() === year;
@@ -64,7 +63,6 @@ export default async function JornadaPage() {
     read.reduce((s, b) => s + (b.pages ?? 0), 0) +
     reading.reduce((s, b) => s + (b.currentPage ?? 0), 0);
 
-  // Ritmo: média de páginas/dia dos livros com início e fim registrados
   const paced = read.filter((b) => b.startedAt && b.finishedAt && b.pages);
   const pace =
     paced.length > 0
@@ -86,7 +84,6 @@ export default async function JornadaPage() {
         )
       : null;
 
-  // Streak: dias seguidos com leitura registrada (hoje ou terminando ontem)
   const logDays = new Set(logs.map((l) => l.date.toISOString().slice(0, 10)));
   let streak = 0;
   const cursor = new Date();
@@ -99,7 +96,6 @@ export default async function JornadaPage() {
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  // Recorde: maior sequência de dias consecutivos já alcançada
   const sortedDays = [...logDays].sort();
   let bestStreak = 0;
   let run = 0;
@@ -122,7 +118,6 @@ export default async function JornadaPage() {
     { days: 100, label: "Centurião", icon: Trophy },
   ];
 
-  // Heatmap: páginas por dia nas últimas 15 semanas (estilo GitHub)
   const HEAT_WEEKS = 15;
   const pagesByDay = new Map<string, number>();
   for (const l of logs) {
@@ -131,11 +126,10 @@ export default async function JornadaPage() {
   }
   const heatEnd = new Date();
   heatEnd.setHours(0, 0, 0, 0);
-  heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay())); // sábado desta semana
+  heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay()));
   const heatStart = new Date(heatEnd);
   heatStart.setDate(heatStart.getDate() - (HEAT_WEEKS * 7 - 1));
 
-  // Notas de leitura recentes (anotações feitas no registro rápido)
   const bookTitleById = new Map(books.map((b) => [b.id, b.title]));
   const recentNotes = logs
     .filter((l) => l.note)
@@ -166,7 +160,6 @@ export default async function JornadaPage() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-        {/* Stats do ano */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-700 dark:bg-zinc-900">
             <BookOpen className="mx-auto h-5 w-5 text-green-600 dark:text-green-400" />
@@ -215,7 +208,6 @@ export default async function JornadaPage() {
           </div>
         </div>
 
-        {/* Conquistas de streak */}
         <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-serif text-lg font-semibold text-foreground">
@@ -259,7 +251,6 @@ export default async function JornadaPage() {
           </div>
         </div>
 
-        {/* Meta do ano */}
         <div className="mt-6">
           <GoalCard
             initialGoal={setting?.yearlyGoal ?? null}
@@ -268,7 +259,6 @@ export default async function JornadaPage() {
           />
         </div>
 
-        {/* Heatmap de leitura */}
         <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
           <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
             Mapa de leitura
@@ -303,7 +293,6 @@ export default async function JornadaPage() {
           </p>
         </div>
 
-        {/* Notas de leitura */}
         {recentNotes.length > 0 && (
           <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
             <h2 className="mb-3 font-serif text-lg font-semibold text-foreground">
@@ -330,7 +319,6 @@ export default async function JornadaPage() {
           </div>
         )}
 
-        {/* Lendo agora */}
         <div className="mt-10">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-serif text-xl font-semibold text-foreground">
@@ -371,7 +359,6 @@ export default async function JornadaPage() {
                     ? Math.min(100, Math.round((b.currentPage / b.pages) * 100))
                     : 0;
                 const days = b.startedAt ? daysBetween(b.startedAt, now) : null;
-                // Previsão: ritmo atual (págs/dia) projetado nas páginas restantes
                 const etaDays =
                   b.pages && b.currentPage && b.currentPage > 0 && days
                     ? Math.ceil(
@@ -434,7 +421,6 @@ export default async function JornadaPage() {
           )}
         </div>
 
-        {/* Fila */}
         <div className="mt-10">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-serif text-xl font-semibold text-foreground">
