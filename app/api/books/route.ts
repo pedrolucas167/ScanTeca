@@ -196,6 +196,19 @@ export async function PATCH(request: NextRequest) {
       data,
     });
 
+    // Registra atividade de leitura do dia (alimenta o streak da Jornada)
+    const newPage = currentPage ? Number(currentPage) : null;
+    if (newPage !== null && newPage > (existing.currentPage ?? 0)) {
+      const delta = newPage - (existing.currentPage ?? 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      await prisma.readingLog.upsert({
+        where: { userId_date: { userId, date: today } },
+        update: { pages: { increment: delta } },
+        create: { userId, bookId: id, date: today, pages: delta },
+      });
+    }
+
     // Regenera embedding quando campos semânticos mudam (inclui notas do leitor)
     if (
       title !== undefined ||

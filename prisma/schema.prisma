@@ -72,6 +72,18 @@ model LibrarySetting {
   yearlyGoal    Int?
 }
 
+model ReadingLog {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String?
+  date      DateTime @db.Date
+  pages     Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
 model OracleMessage {
   id        String   @id @default(cuid())
   userId    String
