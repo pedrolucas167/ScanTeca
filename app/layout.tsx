@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, EB_Garamond } from "next/font/google";
+import { Geist, Geist_Mono, EB_Garamond, Playfair_Display, Inter } from "next/font/google";
 import Link from "next/link";
 import {
   ClerkProvider,
@@ -32,6 +32,17 @@ const garamond = EB_Garamond({
   variable: "--font-garamond",
   subsets: ["latin"],
   style: ["normal", "italic"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -84,9 +95,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       suppressHydrationWarning
       data-accent={accent ?? undefined}
-      className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} ${playfair.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Material Symbols — icon font do design Stitch (React faz hoist pro <head>) */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html:
@@ -95,36 +112,46 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         />
         <ClerkProvider>
           <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
-            <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-              <Link
-                href="/"
-                className="flex items-center gap-1.5 text-lg font-bold tracking-tight text-foreground"
-              >
-                <BookOpen className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                Scanteca
-              </Link>
-              <div className="flex items-center gap-2 sm:gap-4">
-                <Link
-                  href="/"
-                  className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-foreground sm:inline dark:text-zinc-400"
-                >
-                  Catálogo
+            <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+              <div className="flex items-center gap-8">
+                <Link href="/" className="group flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-md shadow-indigo-600/20 transition-transform duration-200 group-hover:scale-105">
+                    <BookOpen className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-bold leading-none tracking-tight text-foreground">
+                      Scanteca
+                    </span>
+                    <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-600/80 dark:text-indigo-400/80">
+                      Bibliotheca Personalis
+                    </span>
+                  </div>
                 </Link>
-                <Link
-                  href="/jornada"
-                  className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-foreground sm:inline dark:text-zinc-400"
-                >
-                  Jornada
-                </Link>
-                <Link
-                  href="/manifesto"
-                  className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-foreground sm:inline dark:text-zinc-400"
-                >
-                  Manifesto
-                </Link>
+                <div className="hidden items-center gap-1 md:flex">
+                  <Link
+                    href="/"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Catálogo
+                  </Link>
+                  <Link
+                    href="/jornada"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Jornada
+                  </Link>
+                  <Link
+                    href="/manifesto"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Manifesto
+                  </Link>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <Link
                   href="/scanner"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 sm:px-4 sm:text-sm"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 sm:px-5 sm:py-2.5"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -147,12 +174,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </Link>
                 <Show when="signed-out">
                   <SignInButton mode="modal">
-                    <button className="text-xs font-medium text-zinc-600 transition-colors hover:text-foreground sm:text-sm dark:text-zinc-400">
+                    <button className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800">
                       Entrar
                     </button>
                   </SignInButton>
                   <SignUpButton mode="modal">
-                    <button className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 sm:px-4 sm:text-sm dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
+                    <button className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:px-5 sm:py-2.5 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
                       Cadastrar
                     </button>
                   </SignUpButton>
@@ -167,32 +194,50 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             </nav>
           </header>
           {children}
-          <footer className="border-t border-zinc-200 bg-white py-6 text-center dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="flex items-center justify-center gap-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Feito com
-              <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" /> por{" "}
-              <a
-                href="https://portfoliomarques.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                Pedro Marques
-              </a>
-            </p>
-            <div className="mt-2 flex items-center justify-center gap-4 text-sm">
-              <a
-                href="https://www.linkedin.com/in/pedromarquesdev/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-zinc-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
-              >
-                LinkedIn
-              </a>
+          <footer className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 md:flex-row md:justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800">
+                  <BookOpen className="h-4 w-4 text-white" />
+                </div>
+                <span className="font-serif text-lg font-semibold text-foreground">
+                  Scanteca
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-5 text-sm text-zinc-600 dark:text-zinc-400">
+                <Link href="/manifesto" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
+                  Manifesto
+                </Link>
+                <Link href="/jornada" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
+                  Jornada
+                </Link>
+                <Link href="/oracle" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
+                  Oráculo
+                </Link>
+                <a
+                  href="https://www.linkedin.com/in/pedromarquesdev/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
+                >
+                  LinkedIn
+                </a>
+              </div>
+              <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 md:text-right">
+                © {new Date().getFullYear()} Scanteca — Bibliotheca Personalis.
+                <br />
+                Feito com{" "}
+                <Heart className="inline h-3 w-3 fill-rose-500 text-rose-500" /> por{" "}
+                <a
+                  href="https://portfoliomarques.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  Pedro Marques
+                </a>
+              </p>
             </div>
-            <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
-              © {new Date().getFullYear()} Scanteca. Todos os direitos reservados.
-            </p>
           </footer>
         </ClerkProvider>
         <PwaRegister />
