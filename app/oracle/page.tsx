@@ -47,6 +47,7 @@ export default function OraclePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const micSupported = useSyncExternalStore(
@@ -462,15 +463,53 @@ export default function OraclePage() {
           </button>
           {messages.length > 0 && (
             <button
-              onClick={handleClear}
+              onClick={() => setShowClearConfirm(true)}
               title="Limpar conversa"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface active:scale-95"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-error-container/30 hover:text-error active:scale-95"
             >
               <Icon name="delete" className="text-lg" />
             </button>
           )}
         </div>
       </header>
+
+      {/* Clear confirmation dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-outline-variant/30 bg-surface-container p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-error-container/30">
+                <Icon name="delete" className="text-xl text-error" />
+              </div>
+              <div>
+                <h2 className="font-headline-sm text-headline-sm font-semibold text-on-surface">
+                  Excluir histórico?
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Toda a conversa será apagada permanentemente.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 rounded-full border border-outline-variant/30 bg-surface-container px-4 py-2.5 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-bright"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setShowClearConfirm(false);
+                  handleClear();
+                }}
+                className="flex-1 rounded-full bg-error px-4 py-2.5 font-label-md text-label-md text-white transition-colors hover:bg-error/80"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main */}
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-56 pt-4">
