@@ -6,6 +6,12 @@ import { findSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { getDefaultCollection } from "@/lib/default-collection";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const scanSchema = z.object({
+  isbn: z.string("ISBN é obrigatório").min(1, "ISBN é obrigatório"),
+});
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -56,15 +62,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { isbn } = body as { isbn: string };
-
-    if (!isbn || typeof isbn !== "string") {
-      return NextResponse.json(
-        { error: "ISBN é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, scanSchema);
+    if (!parsed.ok) return parsed.response;
+    const { isbn } = parsed.data;
 
     const cleaned = isbn.replace(/[^0-9X]/gi, "");
 

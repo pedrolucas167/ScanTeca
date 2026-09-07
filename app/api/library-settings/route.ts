@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
 
-const VALID_ACCENTS = ["indigo", "vinho", "floresta", "terracota"];
+const VALID_ACCENTS = ["indigo", "vinho", "floresta", "terracota"] as const;
+
+const settingsSchema = z.object({
+  name: z
+    .string("Nome da biblioteca é obrigatório")
+    .trim()
+    .min(1, "Nome da biblioteca é obrigatório")
+    .optional(),
+  yearlyGoal: z
+    .number("Meta anual deve ser um número inteiro positivo")
+    .int("Meta anual deve ser um número inteiro positivo")
+    .min(1, "Meta anual deve ser um número inteiro positivo")
+    .nullish(),
+  accent: z.enum(VALID_ACCENTS, "Tema de acento inválido").optional(),
+  shareEnabled: z.boolean("shareEnabled deve ser booleano").optional(),
+});
 
 export async function GET() {
   try {
@@ -43,13 +61,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { name, shareEnabled, yearlyGoal, accent } = body as {
-      name?: string;
-      shareEnabled?: boolean;
-      yearlyGoal?: number | null;
-      accent?: string;
-    };
+    const parsed = await readJson(request, settingsSchema);
+    if (!parsed.ok) return parsed.response;
+    const { name, shareEnabled, yearlyGoal, accent } = parsed.data;
 
     const existing = await prisma.librarySetting.findUnique({
       where: { userId },
@@ -59,34 +73,16 @@ export async function POST(request: NextRequest) {
     const createData: Record<string, unknown> = { userId };
 
     if (name !== undefined) {
-      if (typeof name !== "string" || name.trim().length === 0) {
-        return NextResponse.json(
-          { error: "Nome da biblioteca é obrigatório" },
-          { status: 400 }
-        );
-      }
-      updateData.name = name.trim();
-      createData.name = name.trim();
+      updateData.name = name;
+      createData.name = name;
     }
 
     if (yearlyGoal !== undefined) {
-      if (yearlyGoal !== null && (!Number.isInteger(yearlyGoal) || yearlyGoal < 1)) {
-        return NextResponse.json(
-          { error: "Meta anual deve ser um número inteiro positivo" },
-          { status: 400 }
-        );
-      }
       updateData.yearlyGoal = yearlyGoal;
       createData.yearlyGoal = yearlyGoal;
     }
 
     if (accent !== undefined) {
-      if (!VALID_ACCENTS.includes(accent)) {
-        return NextResponse.json(
-          { error: "Tema de acento inválido" },
-          { status: 400 }
-        );
-      }
       updateData.accentTheme = accent;
       createData.accentTheme = accent;
     }
@@ -112,6 +108,10 @@ export async function POST(request: NextRequest) {
         accentTheme: (createData.accentTheme as string) || null,
       },
     });
+
+    if (accent !== undefined) {
+      revalidateTag(`accent-theme:${userId}`, "max");
+    }
 
     // Renomear a biblioteca renomeia a coleção homônima nos livros —
     // o card exibe book.collection, então sem isso o nome antigo persistia.

@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { readJson, optionalNumber } from "@/lib/validation";
+import { z } from "zod";
+
+const reviewSchema = z.object({
+  content: z
+    .string("Conteúdo da review é obrigatório")
+    .trim()
+    .min(1, "Conteúdo da review é obrigatório"),
+  rating: optionalNumber,
+  userName: z.string().nullish(),
+});
 
 export async function GET(
   _request: NextRequest,
@@ -41,19 +52,9 @@ export async function POST(
     }
 
     const { id } = await params;
-    const body = await request.json();
-    const { content, rating, userName } = body as {
-      content?: string;
-      rating?: number;
-      userName?: string;
-    };
-
-    if (!content || typeof content !== "string" || content.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Conteúdo da review é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, reviewSchema);
+    if (!parsed.ok) return parsed.response;
+    const { content, rating, userName } = parsed.data;
 
     const book = await prisma.book.findUnique({
       where: { id },
@@ -68,7 +69,7 @@ export async function POST(
 
     const review = await prisma.review.create({
       data: {
-        content: content.trim(),
+        content,
         rating: rating ?? null,
         bookId: id,
         userId,

@@ -3,6 +3,18 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embeddings";
 import { normalize } from "@/lib/book-cover";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const oracleSchema = z.object({
+  question: z.string().nullish(),
+  audio: z
+    .object({
+      data: z.string().nullish(),
+      format: z.string().nullish(),
+    })
+    .nullish(),
+});
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const CHAT_MODEL =
@@ -154,14 +166,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as {
-      question?: string;
-      audio?: { data?: string; format?: string };
-    };
+    const parsed = await readJson(request, oracleSchema);
+    if (!parsed.ok) return parsed.response;
+    const { audio } = parsed.data;
 
-    let question = typeof body.question === "string" ? body.question.trim() : "";
+    let question = parsed.data.question?.trim() ?? "";
 
-    if (!question && body.audio?.data) {
+    if (!question && audio?.data) {
       const sttRes = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
         method: "POST",
         headers: {
@@ -174,8 +185,8 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           model: STT_MODEL,
           input_audio: {
-            data: body.audio.data,
-            format: body.audio.format || "webm",
+            data: audio.data,
+            format: audio.format || "webm",
           },
           language: "pt",
         }),
