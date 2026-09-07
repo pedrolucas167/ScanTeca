@@ -1,5 +1,11 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const ttsSchema = z.object({
+  text: z.string("Texto é obrigatório").trim().min(1, "Texto é obrigatório"),
+});
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const TTS_MODEL = process.env.ORACLE_TTS_MODEL || "openai/tts-1";
@@ -24,13 +30,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { text } = (await request.json()) as { text?: string };
-    if (!text || typeof text !== "string" || !text.trim()) {
-      return new Response(JSON.stringify({ error: "Texto é obrigatório" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const parsed = await readJson(request, ttsSchema);
+    if (!parsed.ok) return parsed.response;
+    const { text } = parsed.data;
 
     const res = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
       method: "POST",

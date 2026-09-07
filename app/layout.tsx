@@ -9,6 +9,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { unstable_cache } from "next/cache";
 import { BookOpen, Heart } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
@@ -54,16 +55,27 @@ export const viewport: Viewport = {
   themeColor: "#6366f1",
 };
 
+// Cache por usuário — invalidado via revalidateTag no POST /api/library-settings.
+// Sem a tag, um accent velho do cache sobrescreveria o localStorage fresco.
+const getAccentTheme = (userId: string) =>
+  unstable_cache(
+    async () => {
+      const setting = await prisma.librarySetting.findUnique({
+        where: { userId },
+        select: { accentTheme: true },
+      });
+      return setting?.accentTheme ?? null;
+    },
+    ["accent-theme", userId],
+    { tags: [`accent-theme:${userId}`], revalidate: 3600 }
+  )();
+
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   let accent: string | null = null;
   try {
     const { userId } = await auth();
     if (userId) {
-      const setting = await prisma.librarySetting.findUnique({
-        where: { userId },
-        select: { accentTheme: true },
-      });
-      accent = setting?.accentTheme ?? null;
+      accent = await getAccentTheme(userId);
     }
   } catch {}
 

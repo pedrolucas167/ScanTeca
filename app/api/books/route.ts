@@ -7,6 +7,30 @@ import { findSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { getDefaultCollection, resolveCollection } from "@/lib/default-collection";
+import { readJson, bookStatusSchema, optionalNumber } from "@/lib/validation";
+import { z } from "zod";
+
+const bookCreateSchema = z.object({
+  isbn: z.string().nullish(),
+  title: z.string("Título é obrigatório").trim().min(1, "Título é obrigatório"),
+  author: z.string().nullish(),
+  publishedDate: z.string().nullish(),
+  synopsis: z.string().nullish(),
+  coverUrl: z.string().nullish(),
+  status: bookStatusSchema.nullish(),
+  collection: z.string().nullish(),
+  notes: z.string().nullish(),
+  rating: optionalNumber,
+  genre: z.string().nullish(),
+  pages: optionalNumber,
+  customOrder: optionalNumber,
+});
+
+const bookUpdateSchema = bookCreateSchema.partial().extend({
+  id: z.string("ID do livro é obrigatório").min(1, "ID do livro é obrigatório"),
+  currentPage: optionalNumber,
+  sessionNote: z.string().nullish(),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,15 +40,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { isbn, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = body;
-
-    if (!title || typeof title !== "string") {
-      return NextResponse.json(
-        { error: "Título é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, bookCreateSchema);
+    if (!parsed.ok) return parsed.response;
+    const { isbn, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = parsed.data;
 
     const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : null;
 
@@ -53,20 +71,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const authorParam = author ?? undefined;
+
     const effectiveCoverUrl = coverUrl ||
-      (await findBookCover({ title, author, isbn: cleanedIsbn || undefined }));
+      (await findBookCover({ title, author: authorParam, isbn: cleanedIsbn || undefined }));
     const effectiveSynopsis =
       synopsis ||
       (await findSynopsis({
         title,
-        author,
+        author: authorParam,
         isbn: cleanedIsbn || undefined,
       }));
 
     let effectivePublishedDate: string | null = publishedDate || null;
     const originalYear = await findOriginalPublishYear({
       title,
-      author,
+      author: authorParam,
       isbn: cleanedIsbn || undefined,
     });
     if (originalYear) {
@@ -86,12 +106,12 @@ export async function POST(request: NextRequest) {
         publishedDate: effectivePublishedDate,
         synopsis: effectiveSynopsis,
         coverUrl: effectiveCoverUrl || null,
-        status: (status as BookStatus) || BookStatus.TO_READ,
+        status: status || BookStatus.TO_READ,
         collection: resolveCollection(collection, defaultCollection),
         notes: notes || null,
         rating: rating ?? null,
         genre: genre || null,
-        pages: pages ? Number(pages) : null,
+        pages: pages || null,
         customOrder: customOrder ?? null,
         userId,
       },
@@ -135,15 +155,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder, sessionNote } = body;
-
-    if (!id || typeof id !== "string") {
-      return NextResponse.json(
-        { error: "ID do livro é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, bookUpdateSchema);
+    if (!parsed.ok) return parsed.response;
+    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder, sessionNote } = parsed.data;
 
     const existing = await prisma.book.findFirst({
       where: { id, userId },
@@ -172,7 +186,7 @@ export async function PATCH(request: NextRequest) {
     if (synopsis !== undefined) data.synopsis = synopsis || null;
     if (coverUrl !== undefined) data.coverUrl = effectiveCoverUrl || null;
     if (status !== undefined) {
-      data.status = status as BookStatus;
+      data.status = status;
       if (status === "READING") {
         if (!existing.startedAt) data.startedAt = new Date();
         data.finishedAt = null;
@@ -183,7 +197,7 @@ export async function PATCH(request: NextRequest) {
         data.finishedAt = null;
       }
     }
-    if (currentPage !== undefined) data.currentPage = currentPage ? Number(currentPage) : null;
+    if (currentPage !== undefined) data.currentPage = currentPage || null;
     if (collection !== undefined) {
       const defaultCollection = await getDefaultCollection(userId);
       data.collection = resolveCollection(collection, defaultCollection);
@@ -191,7 +205,7 @@ export async function PATCH(request: NextRequest) {
     if (notes !== undefined) data.notes = notes || null;
     if (rating !== undefined) data.rating = rating ?? null;
     if (genre !== undefined) data.genre = genre || null;
-    if (pages !== undefined) data.pages = pages ? Number(pages) : null;
+    if (pages !== undefined) data.pages = pages || null;
     if (customOrder !== undefined) data.customOrder = customOrder ?? null;
 
     const book = await prisma.book.update({
