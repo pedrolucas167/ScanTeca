@@ -3,60 +3,87 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ArrowLeft, ScanLine, Search } from "lucide-react";
 import BookSearch from "./BookSearch";
 
 const Scanner = dynamic(() => import("./Scanner"), { ssr: false });
 
 type Tab = "scan" | "search";
 
+function Icon({
+  name,
+  className = "",
+  fill = false,
+}: {
+  name: string;
+  className?: string;
+  fill?: boolean;
+}) {
+  return (
+    <span
+      className={`material-symbols-outlined ${className}`}
+      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
+    >
+      {name}
+    </span>
+  );
+}
+
 export default function AddBookClient({ initialTab }: { initialTab: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-8">
-      <div className={`w-full ${tab === "search" ? "max-w-3xl" : "max-w-2xl"}`}>
-        <Link
-          href="/"
-          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar ao catálogo
-        </Link>
+    <div className="relative flex flex-1 flex-col bg-surface text-on-surface">
+      <header className="sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/20 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface active:scale-95"
+          >
+            <Icon name="close" className="text-[20px]" />
+          </Link>
+          <span className="font-headline-lg-mobile text-headline-lg-mobile tracking-tight text-on-surface">
+            {tab === "scan" ? "Scanner ISBN" : "Buscar Livro"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-primary-container/40 bg-primary-container/20 px-2 py-1 font-label-md text-label-md text-primary">
+            {tab === "scan" ? "Scanner" : "Pesquisa"}
+          </span>
+        </div>
+      </header>
 
-        <h1 className="mb-6 text-center text-2xl font-bold text-foreground">
-          Adicionar livro
-        </h1>
-
-        <div className="mb-8 flex justify-center">
-          <div className="inline-flex rounded-full border border-zinc-300 bg-white p-1 dark:border-zinc-600 dark:bg-zinc-800">
+      <div className="z-30 bg-gradient-to-b from-surface/90 via-surface/40 to-transparent px-4 pb-3 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center rounded-full border border-outline-variant/30 bg-surface-container-high/80 p-1 backdrop-blur-md">
             <button
               type="button"
               onClick={() => setTab("scan")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-label-sm text-label-sm transition-all ${
                 tab === "scan"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:text-foreground dark:text-zinc-400"
+                  ? "bg-primary-container text-on-primary-container shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              <ScanLine className="h-4 w-4" />
-              Escanear ISBN
+              <Icon name="qr_code_scanner" className="text-[14px]" fill={tab === "scan"} />
+              <span>ISBN / EAN</span>
             </button>
             <button
               type="button"
               onClick={() => setTab("search")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-label-sm text-label-sm transition-colors ${
                 tab === "search"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:text-foreground dark:text-zinc-400"
+                  ? "bg-primary-container text-on-primary-container shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              <Search className="h-4 w-4" />
-              Buscar livro
+              <Icon name="search" className="text-[14px]" />
+              <span>Buscar livro</span>
             </button>
           </div>
         </div>
+      </div>
 
+      <div className="flex flex-1 flex-col">
         {tab === "scan" ? <Scanner /> : <BookSearch />}
       </div>
     </div>

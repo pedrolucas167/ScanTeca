@@ -2,16 +2,6 @@
 
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  BookOpen,
-  Mic,
-  Send,
-  Sparkles,
-  Trash2,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
 
 interface Source {
   id: string;
@@ -24,6 +14,32 @@ interface Message {
   content: string;
   sources?: Source[];
 }
+
+function Icon({
+  name,
+  className = "",
+  fill = false,
+}: {
+  name: string;
+  className?: string;
+  fill?: boolean;
+}) {
+  return (
+    <span
+      className={`material-symbols-outlined ${className}`}
+      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
+    >
+      {name}
+    </span>
+  );
+}
+
+const DEFAULT_SUGGESTIONS = [
+  "O que ler num fim de semana chuvoso?",
+  "Livros sobre viagens no tempo",
+  "Volume mais antigo do acervo?",
+  "+500 páginas não lidas",
+];
 
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -186,8 +202,7 @@ export default function OraclePage() {
         maybeAutoListen();
       };
       await audio.play();
-    } catch {
-    }
+    } catch {}
   };
 
   const toggleVoice = () => {
@@ -254,8 +269,7 @@ export default function OraclePage() {
               return updated;
             });
           }
-        } catch {
-        }
+        } catch {}
       }
     }
     if (voiceOnRef.current) feedTts("", true);
@@ -398,243 +412,279 @@ export default function OraclePage() {
     await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
   };
 
+  const activeSuggestions =
+    suggestions.length > 0 ? suggestions : DEFAULT_SUGGESTIONS;
+
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="border-b border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
-          <Link
-            href="/"
-            className="text-zinc-500 transition-colors hover:text-foreground dark:text-zinc-400"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-            <h1 className="font-serif text-xl font-semibold text-foreground">
-              Oráculo
-            </h1>
+    <div className="flex flex-1 flex-col bg-surface text-on-surface">
+      {/* Header */}
+      <header className="sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+        <div className="flex items-center gap-space-xs">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20">
+            <Icon name="auto_awesome" className="text-xl text-primary" />
           </div>
-          <p className="ml-auto hidden text-xs text-zinc-400 sm:block dark:text-zinc-500">
-            Pergunte sobre o seu acervo — ele lembra de você
-          </p>
+          <div>
+            <div className="flex items-center gap-space-2xs">
+              <h1 className="font-headline-md text-headline-md italic leading-none text-on-surface">
+                Oráculo
+              </h1>
+              <span className="rounded bg-primary-container/20 px-1.5 py-0.5 font-caption text-caption font-semibold uppercase tracking-widest text-primary">
+                RAG
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <p className="font-caption text-[11px] leading-tight text-on-surface-variant">
+                342 volumes indexados <span className="text-outline">(pgvector)</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-space-2xs">
+          <span className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface">
+            <Icon name="shelves" className="text-sm text-tertiary" />
+            <span>Acervo Todo</span>
+            <Icon name="expand_more" className="text-xs text-outline" />
+          </span>
           <button
             onClick={toggleVoice}
-            title={
+            title={voiceOn ? "Desativar voz" : "Oráculo fala as respostas"}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors duration-150 active:scale-95 ${
               voiceOn
-                ? "Desativar voz do Oráculo"
-                : "Oráculo fala as respostas"
-            }
-            className={`rounded-full p-2 transition-colors ${
-              voiceOn
-                ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400"
-                : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                ? "bg-primary-container/20 text-primary"
+                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
             }`}
           >
-            {voiceOn ? (
-              <Volume2 className="h-4 w-4" />
-            ) : (
-              <VolumeX className="h-4 w-4" />
-            )}
+            <Icon name="tune" className="text-lg" />
           </button>
           {messages.length > 0 && (
             <button
               onClick={handleClear}
               title="Limpar conversa"
-              className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface active:scale-95"
             >
-              <Trash2 className="h-4 w-4" />
+              <Icon name="delete" className="text-lg" />
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="mx-auto max-w-3xl space-y-6">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center py-10 text-center sm:py-16">
-              <div className="mb-4 rounded-2xl bg-indigo-100 p-4 dark:bg-indigo-900/30">
-                <Sparkles className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <h2 className="font-serif text-2xl font-semibold text-foreground">
-                Consulte o Oráculo
-              </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                O Oráculo conhece a ficha de cada livro do seu catálogo —
-                título, autor, sinopse e gênero. Pergunte em linguagem natural
-                e ele responde com base no <strong>seu</strong> acervo,
-                indicando quais livros usou como referência. Ele lembra das
-                suas conversas e aprende suas preferências a cada interação.
+      {/* Main */}
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-56 pt-4">
+        {/* Welcome card */}
+        <div className="relative mb-6 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest/60 p-space-md backdrop-blur-sm">
+          <div className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-primary-container/10 blur-2xl" />
+          <div className="relative flex items-start gap-space-xs">
+            <Icon
+              name="psychology"
+              className="mt-0.5 text-lg text-primary"
+            />
+            <div>
+              <p className="font-label-md text-label-md font-semibold text-primary">
+                Diálogo Sináptico com sua Estante
               </p>
-              <div className="mx-auto mt-5 grid max-w-lg grid-cols-1 gap-2 text-left sm:grid-cols-3">
-                <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
-                  <p className="text-xs font-semibold text-foreground">
-                    Encontra por tema
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    &ldquo;O que eu tenho sobre filosofia?&rdquo;
-                  </p>
-                </div>
-                <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
-                  <p className="text-xs font-semibold text-foreground">
-                    Recomenda leituras
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    &ldquo;O que ler depois do meu último livro?&rdquo;
-                  </p>
-                </div>
-                <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
-                  <p className="text-xs font-semibold text-foreground">
-                    Conversa sobre o acervo
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    &ldquo;Qual meu livro mais denso?&rdquo;
-                  </p>
-                </div>
-              </div>
-              <p className="mx-auto mt-5 max-w-md font-serif text-sm italic text-zinc-500 dark:text-zinc-400">
-                &ldquo;Sempre imaginei que o paraíso fosse uma espécie de
-                biblioteca.&rdquo;
+              <p className="mt-0.5 font-body-sm text-body-sm text-on-surface-variant">
+                Você está conversando com os livros da sua estante física.
+                Pergunte sobre temas cruzados, ideias ou onde encontrar uma
+                citação exata.
               </p>
-              <div className="mt-6 grid w-full max-w-md gap-2">
-                {(suggestions.length > 0
-                  ? suggestions
-                  : [
-                      "Quais livros eu tenho no meu acervo?",
-                      "Me recomende um livro para ler agora",
-                      "Por onde eu começo?",
-                    ]
-                ).map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => {
-                      setInput(suggestion);
-                      inputRef.current?.focus();
-                    }}
-                    className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-left text-sm text-zinc-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/20"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
             </div>
-          )}
-
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                  msg.role === "user"
-                    ? "bg-indigo-600 text-white"
-                    : "border border-zinc-200 bg-white text-foreground dark:border-zinc-700 dark:bg-zinc-900"
-                }`}
-              >
-                {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5 border-b border-zinc-100 pb-2 dark:border-zinc-800">
-                    {msg.sources.map((s) => (
-                      <Link
-                        key={s.id}
-                        href={`/books/${s.id}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
-                      >
-                        <BookOpen className="h-3 w-3" />
-                        {s.title}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                  {msg.content}
-                  {msg.role === "assistant" && loading && i === messages.length - 1 && (
-                    <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-indigo-400" />
-                  )}
-                </p>
-                {msg.role === "assistant" &&
-                  msg.content &&
-                  !(loading && i === messages.length - 1) && (
-                    <button
-                      onClick={() => speak(msg.content)}
-                      title="Ouvir resposta"
-                      className="mt-1.5 text-zinc-400 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
-                    >
-                      <Volume2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-              </div>
-            </div>
-          ))}
-
-          {error && (
-            <div className="rounded-lg bg-red-100 p-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
-          <div ref={bottomRef} />
+          </div>
         </div>
-      </div>
 
-      <div className="border-t border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950">
-        {messages.length > 0 && suggestions.length > 0 && !loading && (
-          <div className="mx-auto mb-2 flex max-w-3xl gap-2 overflow-x-auto pb-1">
-            {suggestions.map((s) => (
+        {messages.length === 0 && (
+          <div className="flex flex-wrap gap-2">
+            {activeSuggestions.map((suggestion) => (
               <button
-                key={s}
-                type="button"
+                key={suggestion}
                 onClick={() => {
-                  setInput(s);
+                  setInput(suggestion);
                   inputRef.current?.focus();
                 }}
-                title="Clique para preencher — edite ou envie"
-                className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:text-indigo-400"
+                className="rounded-full border border-outline-variant/40 bg-surface-container px-3 py-1.5 text-left font-caption text-caption text-on-surface transition-colors hover:border-primary/50 hover:bg-surface-container-high"
               >
-                {s}
+                {suggestion}
               </button>
             ))}
           </div>
         )}
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex max-w-3xl items-center gap-2"
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              recording
-                ? "Gravando... toque no microfone para enviar"
-                : "Pergunte ao Oráculo sobre seus livros..."
-            }
-            disabled={loading}
-            className="flex-1 rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
-          />
-          {micSupported && (
-            <button
-              type="button"
-              onClick={handleMic}
-              disabled={loading}
-              title={recording ? "Parar e enviar" : "Falar com o Oráculo"}
-              className={`rounded-full p-3 shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                recording
-                  ? "animate-pulse bg-red-500 text-white hover:bg-red-600"
-                  : "border border-zinc-300 bg-white text-zinc-500 hover:border-indigo-400 hover:text-indigo-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-indigo-400"
-              }`}
-            >
-              <Mic className="h-4 w-4" />
-            </button>
+
+        {messages.map((msg, i) => (
+          <div key={i} className="mb-6">
+            {msg.role === "user" ? (
+              <div className="flex flex-col items-end gap-1 pl-8">
+                <div className="rounded-2xl rounded-tr-xs border border-white/10 bg-primary-container px-space-md py-space-sm shadow-md">
+                  <p className="font-body-md text-body-md leading-relaxed text-white">
+                    {msg.content}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 pr-1 font-caption text-caption text-outline-variant">
+                  <span>Você</span>
+                  <span>•</span>
+                  <span>
+                    {new Date().toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-start gap-space-sm pr-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/40 bg-primary/20">
+                    <Icon name="auto_awesome" className="text-xs text-primary" />
+                  </div>
+                  <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-primary">
+                    Oráculo da Bibliotheca
+                  </span>
+                  {!loading && i === messages.length - 1 && (
+                    <span className="font-caption text-caption text-outline">
+                      retrieval em 180ms
+                    </span>
+                  )}
+                </div>
+                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm">
+                  <p className="whitespace-pre-wrap font-body-md text-body-md leading-relaxed text-on-surface">
+                    {msg.content}
+                    {loading && i === messages.length - 1 && (
+                      <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
+                    )}
+                  </p>
+
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="space-y-2.5">
+                      {msg.sources.map((s) => (
+                        <Link
+                          key={s.id}
+                          href={`/books/${s.id}`}
+                          className="flex items-start gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-space-sm transition-colors hover:border-primary/50"
+                        >
+                          <div className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-md border border-outline-variant/50 bg-surface-container-high shadow-sm">
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary-container/40 to-secondary-container/30" />
+                            <span className="absolute bottom-1 right-1 rounded bg-surface-dim/90 px-1 font-mono text-[9px] text-primary">
+                              vol.
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-caption text-caption font-semibold uppercase tracking-wider text-primary">
+                                Fonte
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary-container/20 px-2 py-0.5 text-[11px] text-primary">
+                                <Icon name="bookmark" className="text-xs" />
+                                Acervo
+                              </span>
+                            </div>
+                            <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
+                              {s.title}
+                            </h3>
+                            <p className="font-body-sm text-body-sm text-on-surface-variant">
+                              {s.author}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  {msg.content &&
+                    !(loading && i === messages.length - 1) &&
+                    msg.role === "assistant" && (
+                      <button
+                        onClick={() => speak(msg.content)}
+                        title="Ouvir resposta"
+                        className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-on-surface"
+                      >
+                        <Icon name="volume_up" className="text-sm" />
+                        <span>Ouvir</span>
+                      </button>
+                    )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {error && (
+          <div className="mb-4 rounded-lg bg-error-container/20 p-3 font-body-sm text-body-sm text-error">
+            {error}
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </main>
+
+      {/* Fixed bottom */}
+      <div className="pointer-events-none fixed bottom-0 left-0 z-40 w-full bg-gradient-to-t from-surface via-surface/95 to-transparent pt-4">
+        <div className="pointer-events-auto mx-auto flex w-full max-w-lg flex-col gap-2.5 px-4 pb-4">
+          {messages.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+              {activeSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => {
+                    setInput(suggestion);
+                    inputRef.current?.focus();
+                  }}
+                  className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-outline-variant/40 bg-surface-container/90 px-3 py-1.5 font-caption text-caption text-on-surface shadow-sm transition-colors hover:border-primary/50 hover:bg-surface-container-high active:scale-95"
+                >
+                  <Icon name="auto_awesome" className="text-xs text-primary" />
+                  <span>{suggestion}</span>
+                </button>
+              ))}
+            </div>
           )}
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="rounded-full bg-indigo-600 p-3 text-white shadow-md transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+
+          <form
+            onSubmit={handleSubmit}
+            className="relative flex items-center gap-1.5 rounded-full border border-outline-variant/50 bg-surface-container/95 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
           >
-            <Send className="h-4 w-4" />
-          </button>
-        </form>
+            <span className="flex flex-shrink-0 items-center gap-1 rounded-full border border-outline-variant/30 bg-surface-container-high py-1 pl-2.5 pr-2 text-[11px] font-medium text-on-surface-variant">
+              <Icon name="local_library" className="text-xs text-primary" />
+              <span className="hidden sm:inline">Estante</span>
+              <Icon name="unfold_more" className="text-[10px]" />
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={
+                recording
+                  ? "Gravando... toque no microfone para enviar"
+                  : "Pergunte ao seu acervo físico..."
+              }
+              disabled={loading}
+              className="flex-1 bg-transparent border-0 px-1 py-1 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 focus:outline-none focus:ring-0 disabled:opacity-60"
+            />
+            {micSupported && (
+              <button
+                type="button"
+                onClick={handleMic}
+                disabled={loading}
+                title={recording ? "Parar e enviar" : "Falar com o Oráculo"}
+                className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors active:scale-90 disabled:opacity-50 ${
+                  recording
+                    ? "animate-pulse bg-error text-white"
+                    : "text-outline hover:bg-surface-container-high hover:text-on-surface"
+                }`}
+              >
+                <Icon name="mic" className="text-lg" />
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-white shadow-[0_0_16px_rgba(91,80,230,0.5)] transition-all hover:bg-inverse-primary active:scale-95 disabled:opacity-50"
+            >
+              <Icon name="arrow_upward" className="text-lg" />
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

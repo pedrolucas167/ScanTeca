@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Check, Plus } from "lucide-react";
 
 interface SearchResult {
   googleId: string;
@@ -17,6 +16,25 @@ interface SearchResult {
   genre: string | null;
   isbn: string | null;
   coverUrl: string | null;
+}
+
+function Icon({
+  name,
+  className = "",
+  fill = false,
+}: {
+  name: string;
+  className?: string;
+  fill?: boolean;
+}) {
+  return (
+    <span
+      className={`material-symbols-outlined ${className}`}
+      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
+    >
+      {name}
+    </span>
+  );
 }
 
 export default function BookSearch() {
@@ -157,37 +175,43 @@ export default function BookSearch() {
   };
 
   return (
-    <div className="w-full max-w-3xl">
-      <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
+    <div className="flex flex-1 flex-col bg-surface px-4 pb-6 pt-2 text-on-surface">
+      <p className="mb-4 font-body-sm text-body-sm text-on-surface-variant">
         Pesquise por título, autor ou ISBN e adicione com um clique. Gênero e
         páginas são preenchidos automaticamente quando disponíveis.
       </p>
 
-      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => {
-            const value = e.target.value;
-            setQuery(value);
-            if (!value.trim()) {
-              setResults([]);
-              setSearched(false);
-              setMessage(null);
-              if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-                searchTimeoutRef.current = null;
+      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+        <div className="relative flex-1">
+          <Icon
+            name="search"
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-outline"
+          />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              const value = e.target.value;
+              setQuery(value);
+              if (!value.trim()) {
+                setResults([]);
+                setSearched(false);
+                setMessage(null);
+                if (searchTimeoutRef.current) {
+                  clearTimeout(searchTimeoutRef.current);
+                  searchTimeoutRef.current = null;
+                }
               }
-            }
-          }}
-          placeholder="Ex: Dom Casmurro, Machado de Assis, 97885..."
-          className="flex-1 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm text-foreground placeholder-zinc-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
-          autoFocus
-        />
+            }}
+            placeholder="Ex: Dom Casmurro, Machado de Assis, 97885..."
+            className="w-full rounded-full border border-outline-variant/40 bg-surface-container py-2.5 pl-10 pr-4 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            autoFocus
+          />
+        </div>
         <button
           type="submit"
           disabled={loading}
-          className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+          className="rounded-full bg-primary-container px-5 py-2.5 font-label-md text-label-md text-on-primary-container shadow-md transition-colors hover:bg-inverse-primary disabled:cursor-not-allowed disabled:opacity-70"
         >
           {loading ? "Buscando..." : "Buscar"}
         </button>
@@ -195,10 +219,10 @@ export default function BookSearch() {
 
       {message && (
         <div
-          className={`mb-6 rounded-lg p-3 text-sm font-medium ${
+          className={`mb-4 rounded-lg p-3 font-body-sm text-body-sm font-medium ${
             message.includes("adicionado")
-              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-emerald-950/40 text-emerald-300"
+              : "bg-error-container/20 text-error"
           }`}
         >
           {message}
@@ -207,10 +231,10 @@ export default function BookSearch() {
 
       {searched && !loading && results.length === 0 && !message && (
         <div className="flex flex-col items-center py-16 text-center">
-          <BookOpen className="mb-4 h-12 w-12 text-zinc-300 dark:text-zinc-700" />
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <Icon name="menu_book" className="mb-4 text-5xl text-outline/30" />
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
             Nenhum resultado. Tente outro termo ou{" "}
-            <Link href="/manual-add" className="text-indigo-600 underline">
+            <Link href="/manual-add" className="text-primary underline">
               adicione manualmente
             </Link>
             .
@@ -224,9 +248,9 @@ export default function BookSearch() {
           return (
             <div
               key={book.googleId}
-              className="flex gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+              className="flex gap-4 rounded-xl border border-outline-variant/30 bg-surface-container p-4 shadow-sm"
             >
-              <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">
+              <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-md border border-outline-variant/30 bg-surface-container-high">
                 {book.coverUrl ? (
                   <Image
                     src={book.coverUrl}
@@ -236,29 +260,29 @@ export default function BookSearch() {
                     sizes="80px"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-zinc-400">
-                    <BookOpen className="h-8 w-8" />
+                  <div className="flex h-full items-center justify-center text-outline">
+                    <Icon name="menu_book" className="text-3xl" />
                   </div>
                 )}
               </div>
 
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-foreground">
+                <h3 className="font-body-sm text-body-sm font-bold text-on-surface">
                   {book.title}
                   {book.subtitle && (
-                    <span className="font-normal text-zinc-500">
+                    <span className="font-normal text-on-surface-variant">
                       : {book.subtitle}
                     </span>
                   )}
                 </h3>
-                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-0.5 font-caption text-caption text-on-surface-variant">
                   {book.author}
                 </p>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-zinc-400 dark:text-zinc-500">
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 font-caption text-caption text-outline">
                   {book.publishedDate && <span>{book.publishedDate}</span>}
                   {book.pages && <span>{book.pages} págs</span>}
                   {book.genre && (
-                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] dark:bg-zinc-800">
+                    <span className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px]">
                       {book.genre}
                     </span>
                   )}
@@ -267,7 +291,7 @@ export default function BookSearch() {
                   )}
                 </div>
                 {book.synopsis && (
-                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-on-surface-variant">
                     {book.synopsis}
                   </p>
                 )}
@@ -277,20 +301,20 @@ export default function BookSearch() {
                 <button
                   onClick={() => handleAdd(book)}
                   disabled={loading || added}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 font-label-sm text-label-sm font-semibold transition-colors ${
                     added
-                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                      ? "bg-emerald-950/40 text-emerald-300"
+                      : "bg-primary-container text-on-primary-container hover:bg-inverse-primary disabled:cursor-not-allowed disabled:opacity-70"
                   }`}
                 >
                   {added ? (
                     <>
-                      <Check className="h-3.5 w-3.5" />
+                      <Icon name="check" className="text-sm" />
                       Adicionado
                     </>
                   ) : (
                     <>
-                      <Plus className="h-3.5 w-3.5" />
+                      <Icon name="add" className="text-sm" />
                       Adicionar
                     </>
                   )}
@@ -305,7 +329,7 @@ export default function BookSearch() {
         <div className="mt-8 text-center">
           <button
             onClick={() => router.push("/")}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+            className="font-body-sm text-body-sm font-medium text-primary hover:text-primary-fixed-dim"
           >
             Ir para o catálogo →
           </button>
