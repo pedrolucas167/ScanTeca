@@ -23,11 +23,11 @@ export default function LandingPage() {
           <div className="mx-auto mt-10 max-w-2xl rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
             <Quote className="mx-auto mb-4 h-6 w-6 text-indigo-400" />
             <blockquote className="font-serif text-lg italic leading-relaxed text-foreground sm:text-xl">
-              "Comecei minha vida como hei de acabá-la, sem dúvida: no meio dos
+              &ldquo;Comecei minha vida como hei de acabá-la, sem dúvida: no meio dos
               livros. [...] Mas os livros foram meus passarinhos e meus ninhos,
               meus animais domésticos, meu estábulo e minha biblioteca; a
               biblioteca, num recanto, realizava o mundo em espessura e em
-              fito, o feitiço enciclopédico."
+              fito, o feitiço enciclopédico.&rdquo;
             </blockquote>
             <p className="mt-4 font-serif text-sm not-italic text-zinc-500 dark:text-zinc-400">
               — Jean-Paul Sartre,{" "}
