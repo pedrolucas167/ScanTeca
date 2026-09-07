@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { z } from "zod";
@@ -107,6 +108,10 @@ export async function POST(request: NextRequest) {
         accentTheme: (createData.accentTheme as string) || null,
       },
     });
+
+    if (accent !== undefined) {
+      revalidateTag(`accent-theme:${userId}`, "max");
+    }
 
     // Renomear a biblioteca renomeia a coleção homônima nos livros —
     // o card exibe book.collection, então sem isso o nome antigo persistia.
