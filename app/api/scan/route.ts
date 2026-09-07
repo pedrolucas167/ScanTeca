@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const defaultCollection = await getDefaultCollection(userId);
+    const collection = await getDefaultCollection(userId);
 
     const book = await prisma.book.create({
       data: {
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
         coverUrl: bookData.coverUrl,
         genre: bookData.genre,
         pages: bookData.pages,
-        collection: defaultCollection,
+        collectionId: collection.id,
         userId,
       },
     });
@@ -312,7 +312,10 @@ export async function POST(request: NextRequest) {
       `;
     }
 
-    return NextResponse.json({ book, message: "Livro adicionado com sucesso" }, { status: 201 });
+    return NextResponse.json(
+      { book: { ...book, collection: collection.name }, message: "Livro adicionado com sucesso" },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Erro em /api/scan:", error);
     return NextResponse.json(

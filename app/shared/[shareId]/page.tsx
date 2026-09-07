@@ -38,6 +38,7 @@ export default async function SharedCatalogPage({
   const books = await prisma.book.findMany({
     where: { userId: setting.userId },
     orderBy: { createdAt: "desc" },
+    include: { collection: { select: { name: true } } },
   });
 
   const readCount = books.filter((b) => b.status === "READ").length;
@@ -138,7 +139,7 @@ export default async function SharedCatalogPage({
 
                   <div className="mt-auto pt-3">
                     <span className="inline-block rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                      {book.collection}
+                      {book.collection.name}
                     </span>
                   </div>
                 </div>

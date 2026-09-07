@@ -6,9 +6,16 @@ import { findBookCover } from "@/lib/book-cover";
 import { findSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
-import { getDefaultCollection, resolveCollection } from "@/lib/default-collection";
+import { resolveCollection } from "@/lib/default-collection";
 import { readJson, bookStatusSchema, optionalNumber } from "@/lib/validation";
 import { z } from "zod";
+
+const withCollection = { collection: { select: { name: true } } } as const;
+
+// Mantém o contrato da API: collection sai como string (nome), não como objeto.
+function serializeBook<T extends { collection: { name: string } }>(book: T) {
+  return { ...book, collection: book.collection.name };
+}
 
 const bookCreateSchema = z.object({
   isbn: z.string().nullish(),
@@ -61,12 +68,13 @@ export async function POST(request: NextRequest) {
               userId,
             },
           },
+          include: withCollection,
         })
       : null;
 
     if (existing) {
       return NextResponse.json(
-        { book: existing, message: "Livro já cadastrado" },
+        { book: serializeBook(existing), message: "Livro já cadastrado" },
         { status: 200 }
       );
     }
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const defaultCollection = await getDefaultCollection(userId);
+    const bookCollection = await resolveCollection(userId, collection);
 
     const book = await prisma.book.create({
       data: {
@@ -107,7 +115,7 @@ export async function POST(request: NextRequest) {
         synopsis: effectiveSynopsis,
         coverUrl: effectiveCoverUrl || null,
         status: status || BookStatus.TO_READ,
-        collection: resolveCollection(collection, defaultCollection),
+        collectionId: bookCollection.id,
         notes: notes || null,
         rating: rating ?? null,
         genre: genre || null,
@@ -115,6 +123,7 @@ export async function POST(request: NextRequest) {
         customOrder: customOrder ?? null,
         userId,
       },
+      include: withCollection,
     });
 
     const embedding = await generateEmbedding(
@@ -135,7 +144,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { book, message: "Livro adicionado com sucesso" },
+      { book: serializeBook(book), message: "Livro adicionado com sucesso" },
       { status: 201 }
     );
   } catch (error) {
@@ -199,8 +208,7 @@ export async function PATCH(request: NextRequest) {
     }
     if (currentPage !== undefined) data.currentPage = currentPage || null;
     if (collection !== undefined) {
-      const defaultCollection = await getDefaultCollection(userId);
-      data.collection = resolveCollection(collection, defaultCollection);
+      data.collectionId = (await resolveCollection(userId, collection)).id;
     }
     if (notes !== undefined) data.notes = notes || null;
     if (rating !== undefined) data.rating = rating ?? null;
@@ -211,6 +219,7 @@ export async function PATCH(request: NextRequest) {
     const book = await prisma.book.update({
       where: { id },
       data,
+      include: withCollection,
     });
 
     const newPage = currentPage ? Number(currentPage) : null;
@@ -276,7 +285,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { book, message: "Livro atualizado com sucesso" },
+      { book: serializeBook(book), message: "Livro atualizado com sucesso" },
       { status: 200 }
     );
   } catch (error) {

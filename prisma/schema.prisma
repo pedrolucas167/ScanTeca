@@ -25,7 +25,8 @@ model Book {
   synopsis      String?
   coverUrl      String?
   status        BookStatus @default(TO_READ)
-  collection    String     @default("Minha Biblioteca")
+  collectionId  String
+  collection    Collection @relation(fields: [collectionId], references: [id], onDelete: Restrict)
   notes         String?
   rating        Int?
   genre         String?
@@ -43,8 +44,19 @@ model Book {
   @@unique([isbn, userId])
   @@index([userId])
   @@index([status])
-  @@index([collection])
+  @@index([collectionId])
   @@index([genre])
+}
+
+model Collection {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  books     Book[]
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model Review {
