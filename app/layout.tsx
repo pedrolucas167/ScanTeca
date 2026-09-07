@@ -141,6 +141,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     Jornada
                   </Link>
                   <Link
+                    href="/rota"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Rota
+                  </Link>
+                  <Link
                     href="/manifesto"
                     className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
                   >
