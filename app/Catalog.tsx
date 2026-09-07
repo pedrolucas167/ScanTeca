@@ -1181,8 +1181,8 @@ export default function Catalog({
                             src={book.coverUrl}
                             alt={`Capa de ${book.title}`}
                             fill
-                            className="object-contain p-1"
-                            sizes="120px"
+                            className="object-cover"
+                            sizes="80px"
                           />
                         ) : (
                           <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-outline">
