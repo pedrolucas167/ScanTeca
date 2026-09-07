@@ -42,6 +42,13 @@ function Icon({
   );
 }
 
+const statusMap: Record<string, string> = {
+  "Na Fila": "TO_READ",
+  "Lendo": "READING",
+  "Lido": "READ",
+  "Consulta": "WISHLIST",
+};
+
 export default function Scanner() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -53,6 +60,7 @@ export default function Scanner() {
   const [showManualInput, setShowManualInput] = useState(false);
   const [scannedBook, setScannedBook] = useState<ScannedBook | null>(null);
   const [statusChip, setStatusChip] = useState("Na Fila");
+  const [saving, setSaving] = useState(false);
   const processingRef = useRef(false);
 
   const stopScanner = useCallback(() => {
@@ -443,11 +451,28 @@ export default function Scanner() {
 
             <div className="flex flex-col gap-3 pt-4">
               <button
-                onClick={() => router.push("/")}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-6 py-3.5 font-label-md text-label-md text-on-primary-container shadow-[0_12px_32px_-8px_rgba(91,80,230,0.4)] transition-all hover:bg-inverse-primary active:scale-[0.98]"
+                onClick={async () => {
+                  if (!scannedBook) return;
+                  setSaving(true);
+                  try {
+                    const dbStatus = statusMap[statusChip] || "TO_READ";
+                    await fetch("/api/books", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id: scannedBook.id, status: dbStatus }),
+                    });
+                  } catch (err) {
+                    console.error("Erro ao salvar status:", err);
+                  } finally {
+                    setSaving(false);
+                    router.push("/");
+                  }
+                }}
+                disabled={saving}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-6 py-3.5 font-label-md text-label-md text-on-primary-container shadow-[0_12px_32px_-8px_rgba(91,80,230,0.4)] transition-all hover:bg-inverse-primary active:scale-[0.98] disabled:opacity-70"
               >
                 <Icon name="add_circle" className="text-[20px]" />
-                <span>Salvar e Próximo</span>
+                <span>{saving ? "Salvando..." : "Salvar e Próximo"}</span>
               </button>
               <button
                 onClick={() => router.push(`/books/${scannedBook.id}`)}
