@@ -16,6 +16,7 @@ export default async function Home() {
     prisma.book.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
+      include: { collection: { select: { name: true } } },
     }),
     prisma.librarySetting.upsert({
       where: { userId },
@@ -27,9 +28,11 @@ export default async function Home() {
     }),
   ]);
 
+  const bookList = books.map((b) => ({ ...b, collection: b.collection.name }));
+
   return (
     <Catalog
-      books={books}
+      books={bookList}
       libraryName={setting.name}
       shareEnabled={setting.shareEnabled}
       shareId={setting.shareId}
