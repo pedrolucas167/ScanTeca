@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, EB_Garamond } from "next/font/google";
+import { Geist, Geist_Mono, EB_Garamond, Playfair_Display, Inter } from "next/font/google";
 import Link from "next/link";
 import {
   ClerkProvider,
@@ -32,6 +32,17 @@ const garamond = EB_Garamond({
   variable: "--font-garamond",
   subsets: ["latin"],
   style: ["normal", "italic"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -84,9 +95,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       suppressHydrationWarning
       data-accent={accent ?? undefined}
-      className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${garamond.variable} ${playfair.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Material Symbols — icon font do design Stitch (React faz hoist pro <head>) */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html:
