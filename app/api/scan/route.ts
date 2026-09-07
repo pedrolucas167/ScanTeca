@@ -11,6 +11,7 @@ import { z } from "zod";
 
 const scanSchema = z.object({
   isbn: z.string("ISBN é obrigatório").min(1, "ISBN é obrigatório"),
+  status: z.enum(["READ", "READING", "TO_READ", "WISHLIST"]).optional(),
 });
 
 interface GoogleBooksVolume {
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = await readJson(request, scanSchema);
     if (!parsed.ok) return parsed.response;
-    const { isbn } = parsed.data;
+    const { isbn, status } = parsed.data;
 
     const cleaned = isbn.replace(/[^0-9X]/gi, "");
 
@@ -291,6 +292,7 @@ export async function POST(request: NextRequest) {
         coverUrl: bookData.coverUrl,
         genre: bookData.genre,
         pages: bookData.pages,
+        status: status || "TO_READ",
         collectionId: collection.id,
         userId,
       },
