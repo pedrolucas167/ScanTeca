@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Check, PlusCircle, Search, Sparkles } from "lucide-react";
+import { PlusCircle, Search, Sparkles } from "lucide-react";
 
 export default function ManualAddPage() {
   const router = useRouter();
