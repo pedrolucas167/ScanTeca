@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const searchAuthorSchema = z
+  .object({
+    title: z.string().nullish(),
+    isbn: z.string().nullish(),
+  })
+  .refine((d) => d.title || d.isbn, {
+    message: "Título ou ISBN é obrigatório",
+  });
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -28,15 +39,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { title, isbn } = body as { title?: string; isbn?: string };
-
-    if (!title && !isbn) {
-      return NextResponse.json(
-        { error: "Título ou ISBN é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, searchAuthorSchema);
+    if (!parsed.ok) return parsed.response;
+    const { title, isbn } = parsed.data;
 
     const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : "";
     const searchTitle = title ? title.trim() : "";

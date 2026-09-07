@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { findWikipediaCover } from "@/lib/book-cover";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const wikiCoverSchema = z.object({
+  title: z.string("Título é obrigatório").min(1, "Título é obrigatório"),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,15 +16,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { title } = body as { title?: string };
-
-    if (!title) {
-      return NextResponse.json(
-        { error: "Título é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, wikiCoverSchema);
+    if (!parsed.ok) return parsed.response;
+    const { title } = parsed.data;
 
     const coverUrl = await findWikipediaCover(title);
 

@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const searchBooksSchema = z.object({
+  query: z
+    .string("Termo de busca é obrigatório")
+    .trim()
+    .min(1, "Termo de busca é obrigatório"),
+});
 
 interface GoogleBooksItem {
   id: string;
@@ -28,18 +37,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { query } = body;
-
-    if (!query || typeof query !== "string" || !query.trim()) {
-      return NextResponse.json(
-        { error: "Termo de busca é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const parsed = await readJson(request, searchBooksSchema);
+    if (!parsed.ok) return parsed.response;
+    const { query } = parsed.data;
 
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-    const q = encodeURIComponent(query.trim());
+    const q = encodeURIComponent(query);
     const url = apiKey
       ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=20&langRestrict=pt&key=${apiKey}`
       : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=20&langRestrict=pt`;

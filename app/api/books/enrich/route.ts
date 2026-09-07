@@ -5,6 +5,10 @@ import { findSynopsis, cleanSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { isTitleSimilar, isAuthorSimilar } from "@/lib/book-cover";
+import { readJson } from "@/lib/validation";
+import { z } from "zod";
+
+const enrichSchema = z.object({ bookId: z.string().nullish() });
 
 interface GoogleBooksItem {
   volumeInfo: {
@@ -121,10 +125,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = (await request.json().catch(() => ({}))) as {
-      bookId?: string;
-    };
-    const bookId = typeof body.bookId === "string" ? body.bookId : null;
+    const parsed = await readJson(request, enrichSchema);
+    if (!parsed.ok) return parsed.response;
+    const bookId = parsed.data.bookId || null;
 
     const books = bookId
       ? await prisma.$queryRaw<BookRow[]>`
