@@ -748,7 +748,7 @@ export default function Catalog({
     return "girafa adulta";
   };
 
-  const shelfBooks = filtered.slice(0, 10);
+  const shelfBooks = filtered;
   const stackBooks = filtered
     .filter((b) => b.status === "READING" || b.status === "TO_READ")
     .slice(0, 6);
@@ -817,13 +817,28 @@ export default function Catalog({
             </Link>
             <button
               onClick={() => setShowFilters((s) => !s)}
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-                showFilters || activeFiltersCount > 0
-                  ? "bg-primary-container/20 text-primary"
-                  : "bg-surface-container text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
+              aria-expanded={showFilters}
+              aria-label={showFilters ? "Fechar filtros" : "Abrir filtros"}
+              title={showFilters ? "Fechar filtros" : "Filtrar acervo"}
+              className={`relative flex h-10 items-center justify-center gap-1.5 rounded-full px-3 transition-all duration-200 ${
+                showFilters
+                  ? "bg-primary-container text-on-primary-container shadow-sm"
+                  : activeFiltersCount > 0
+                    ? "bg-primary-container/20 text-primary"
+                    : "bg-surface-container text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
               }`}
             >
               <Icon name="tune" className="text-[22px]" />
+              {(showFilters || activeFiltersCount > 0) && (
+                <span className="font-label-sm text-[11px] font-semibold hidden sm:inline">
+                  {showFilters ? "Filtros" : `${activeFiltersCount} filtro${activeFiltersCount !== 1 ? "s" : ""}`}
+                </span>
+              )}
+              {activeFiltersCount > 0 && !showFilters && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-on-primary shadow">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -948,7 +963,7 @@ export default function Catalog({
         </section>
 
         {showFilters && (
-          <section className="grid grid-cols-1 gap-3 rounded-xl border border-outline-variant/20 bg-surface-container p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid grid-cols-1 gap-3 rounded-xl border border-outline-variant/20 bg-surface-container p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 sm:grid-cols-2 lg:grid-cols-4">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -1145,7 +1160,7 @@ export default function Catalog({
             </div>
             <div className="relative overflow-hidden rounded-lg border border-white/5 bg-surface-container-lowest/80 p-space-md pb-0">
               <div className="pointer-events-none absolute left-1/2 top-0 h-16 w-3/4 -translate-x-1/2 bg-gradient-to-b from-primary/10 to-transparent blur-xl" />
-              <div className="flex min-h-[220px] items-end gap-4 overflow-x-auto px-2 pb-3 no-scrollbar">
+              <div className="flex min-h-[220px] items-end gap-4 overflow-x-auto px-2 pb-3">
                 {shelfBooks.map((book) => {
                   const cm = spineCm(book.pages);
                   const width = Math.max(64, 60 + cm * 14);
@@ -1166,7 +1181,7 @@ export default function Catalog({
                             src={book.coverUrl}
                             alt={`Capa de ${book.title}`}
                             fill
-                            className="object-cover"
+                            className="object-contain p-1"
                             sizes="120px"
                           />
                         ) : (
