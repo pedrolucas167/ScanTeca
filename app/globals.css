@@ -216,6 +216,21 @@ body {
   0%, 100% { top: 6%; opacity: 0.2; }
   50% { top: 92%; opacity: 1; }
 }
+.scanner-laser {
+  animation: laserSweep 2.8s ease-in-out infinite;
+  box-shadow: 0 0 16px #5b50e6, 0 0 4px #c4c0ff;
+}
+@keyframes laserSweep {
+  0%, 100% { top: 8%; opacity: 0.3; }
+  50% { top: 88%; opacity: 1; }
+}
+.pulse-laser-beam {
+  animation: pulseGlow 1.8s infinite ease-in-out;
+}
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
 .ambient-glow {
   box-shadow: 0 0 45px -5px rgba(91, 80, 230, 0.3);
 }
@@ -231,6 +246,28 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.book-spine-tangible {
+  box-shadow: inset 3px 0 6px -1px rgba(255, 255, 255, 0.15),
+              inset -3px 0 6px -1px rgba(0, 0, 0, 0.7),
+              4px 6px 15px rgba(0, 0, 0, 0.6);
+}
+
+.wood-shelf-gradient {
+  background: linear-gradient(180deg, #1c1d24 0%, #0f1015 60%, #08090d 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+.metric-ruler-tick {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(196, 192, 255, 0.25) 0px,
+    rgba(196, 192, 255, 0.25) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+
 .material-symbols-outlined {
   font-family: "Material Symbols Outlined";
   font-weight: normal;
