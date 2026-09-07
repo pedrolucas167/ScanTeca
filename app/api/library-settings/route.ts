@@ -3,6 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
+import {
+  LEGACY_DEFAULT_COLLECTION,
+  resolveCollection,
+} from "@/lib/default-collection";
 import { z } from "zod";
 
 const VALID_ACCENTS = ["indigo", "vinho", "floresta", "terracota"] as const;
@@ -113,21 +117,29 @@ export async function POST(request: NextRequest) {
       revalidateTag(`accent-theme:${userId}`, "max");
     }
 
-    // Renomear a biblioteca renomeia a coleção homônima nos livros —
-    // o card exibe book.collection, então sem isso o nome antigo persistia.
-    // "Minha Biblioteca" é o default legado de livros criados antes do
-    // nome real ser usado como coleção.
+    // Renomear a biblioteca reponta os livros da coleção homônima (e do
+    // default legado "Minha Biblioteca") pra coleção com o nome novo.
     if (
       updateData.name &&
       existing?.name &&
       existing.name !== updateData.name
     ) {
+      const target = await resolveCollection(userId, updateData.name as string);
       await prisma.book.updateMany({
         where: {
           userId,
-          collection: { in: [existing.name, "Minha Biblioteca"] },
+          collection: {
+            name: { in: [existing.name, LEGACY_DEFAULT_COLLECTION] },
+          },
         },
-        data: { collection: updateData.name as string },
+        data: { collectionId: target.id },
+      });
+      await prisma.collection.deleteMany({
+        where: {
+          userId,
+          name: { in: [existing.name, LEGACY_DEFAULT_COLLECTION] },
+          books: { none: {} },
+        },
       });
     }
 

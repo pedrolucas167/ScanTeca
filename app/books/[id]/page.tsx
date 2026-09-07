@@ -27,6 +27,7 @@ export default async function BookDetailPage({
       reviews: {
         orderBy: { createdAt: "desc" },
       },
+      collection: { select: { name: true } },
     },
   });
 
@@ -110,7 +111,7 @@ export default async function BookDetailPage({
                   {statusLabels[book.status]}
                 </span>
                 <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                  {book.collection}
+                  {book.collection.name}
                 </span>
               </div>
 
