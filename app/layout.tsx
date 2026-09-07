@@ -13,6 +13,8 @@ import { BookOpen, Heart } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
+import PwaRegister from "./PwaRegister";
+import MobileNav from "./MobileNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,10 +36,17 @@ const garamond = EB_Garamond({
 export const metadata: Metadata = {
   title: "Scanteca",
   description: "Scanteca - biblioteca pessoal com scanner de códigos ISBN",
+  applicationName: "Scanteca",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Scanteca",
+  },
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -141,6 +150,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Show when="signed-in">
                   <UserButton />
                 </Show>
+                <MobileNav />
               </div>
             </nav>
           </header>
@@ -173,6 +183,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             </p>
           </footer>
         </ClerkProvider>
+        <PwaRegister />
       </body>
     </html>
   );
