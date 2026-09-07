@@ -1160,10 +1160,10 @@ export default function Catalog({
             </div>
             <div className="relative overflow-hidden rounded-lg border border-white/5 bg-surface-container-lowest/80 p-space-md pb-0">
               <div className="pointer-events-none absolute left-1/2 top-0 h-16 w-3/4 -translate-x-1/2 bg-gradient-to-b from-primary/10 to-transparent blur-xl" />
-              <div className="flex min-h-[220px] items-end gap-4 overflow-x-auto px-2 pb-3">
+              <div className="flex min-h-[220px] items-end gap-2 overflow-x-auto px-2 pb-3">
                 {shelfBooks.map((book) => {
                   const cm = spineCm(book.pages);
-                  const width = Math.max(64, 60 + cm * 14);
+                  const width = Math.max(48, 40 + cm * 10);
                   const height = 160 + Math.min(40, (book.pages ?? 200) / 15);
                   return (
                     <Link
