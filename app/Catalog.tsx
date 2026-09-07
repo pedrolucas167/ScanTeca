@@ -1163,8 +1163,8 @@ export default function Catalog({
               <div className="flex min-h-[220px] items-end gap-2 overflow-x-auto px-2 pb-3">
                 {shelfBooks.map((book) => {
                   const cm = spineCm(book.pages);
-                  const width = Math.max(48, 40 + cm * 10);
-                  const height = 160 + Math.min(40, (book.pages ?? 200) / 15);
+                  const width = Math.min(80, Math.max(48, 44 + Math.min(cm, 4) * 8));
+                  const height = Math.min(200, 160 + Math.min(30, (book.pages ?? 200) / 20));
                   return (
                     <Link
                       key={book.id}
