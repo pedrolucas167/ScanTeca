@@ -1163,7 +1163,7 @@ export default function Catalog({
               <div className="flex min-h-[220px] items-end gap-2 overflow-x-auto px-2 pb-3">
                 {shelfBooks.map((book) => {
                   const cm = spineCm(book.pages);
-                  const width = Math.min(80, Math.max(48, 44 + Math.min(cm, 4) * 8));
+                  const width = Math.min(116, Math.max(68, 62 + Math.min(cm, 4) * 12));
                   const height = Math.min(200, 160 + Math.min(30, (book.pages ?? 200) / 20));
                   return (
                     <Link
@@ -1181,8 +1181,8 @@ export default function Catalog({
                             src={book.coverUrl}
                             alt={`Capa de ${book.title}`}
                             fill
-                            className="object-cover"
-                            sizes="80px"
+                            className="object-contain p-1"
+                            sizes="116px"
                           />
                         ) : (
                           <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-outline">
