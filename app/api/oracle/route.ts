@@ -530,7 +530,7 @@ export async function GET() {
       });
     }
 
-    const [desc, books] = await Promise.all([
+    const [desc, books, bookStats] = await Promise.all([
       prisma.oracleMessage.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
@@ -546,7 +546,18 @@ export async function GET() {
                  RANDOM()
         LIMIT 4
       `,
+      prisma.$queryRaw<{ total: bigint; indexed: bigint }[]>`
+        SELECT COUNT(*) AS total,
+               COUNT(embedding) AS indexed
+        FROM "Book"
+        WHERE "userId" = ${userId}
+      `,
     ]);
+
+    const stats = {
+      total: Number(bookStats[0]?.total ?? 0),
+      indexed: Number(bookStats[0]?.indexed ?? 0),
+    };
 
     const suggestions: string[] = [];
     if (books[0]) suggestions.push(`O que ler depois de ${books[0].title}?`);
@@ -565,7 +576,7 @@ export async function GET() {
     }
 
     return new Response(
-      JSON.stringify({ messages: desc.reverse(), suggestions }),
+      JSON.stringify({ messages: desc.reverse(), suggestions, stats }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
