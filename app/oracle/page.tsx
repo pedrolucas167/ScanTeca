@@ -50,6 +50,7 @@ export default function OraclePage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [stats, setStats] = useState({ total: 0, indexed: 0 });
   const micSupported = useSyncExternalStore(
     () => () => {},
     () =>
@@ -99,6 +100,12 @@ export default function OraclePage() {
         }
         if (data?.suggestions?.length) {
           setSuggestions(data.suggestions);
+        }
+        if (data?.stats) {
+          setStats({
+            total: Number(data.stats.total) || 0,
+            indexed: Number(data.stats.indexed) || 0,
+          });
         }
       })
       .catch(() => {});
@@ -439,7 +446,7 @@ export default function OraclePage() {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
               <p className="font-caption text-[11px] leading-tight text-on-surface-variant">
-                342 volumes indexados <span className="text-outline">(pgvector)</span>
+                {stats.indexed} de {stats.total} volumes indexados <span className="text-outline">(pgvector)</span>
               </p>
             </div>
           </div>

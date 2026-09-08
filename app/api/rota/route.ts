@@ -23,6 +23,7 @@ export async function GET() {
 
     let oracleBookIds: string[] = [];
     if (lastAssistantMsg?.sources) {
+      // Type assertion for the sources
       const sources = lastAssistantMsg.sources as unknown as SourceEntry[];
       oracleBookIds = sources
         .map((s) => s.id)
