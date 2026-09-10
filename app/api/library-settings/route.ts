@@ -24,6 +24,7 @@ const settingsSchema = z.object({
     .nullish(),
   accent: z.enum(VALID_ACCENTS, "Tema de acento inválido").optional(),
   shareEnabled: z.boolean("shareEnabled deve ser booleano").optional(),
+  oracleProfile: z.string().trim().max(2000, "Memória muito longa").nullable().optional(),
 });
 
 export async function GET() {
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = await readJson(request, settingsSchema);
     if (!parsed.ok) return parsed.response;
-    const { name, shareEnabled, yearlyGoal, accent } = parsed.data;
+    const { name, shareEnabled, yearlyGoal, accent, oracleProfile } = parsed.data;
 
     const existing = await prisma.librarySetting.findUnique({
       where: { userId },
@@ -101,6 +102,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (oracleProfile !== undefined) {
+      updateData.oracleProfile = oracleProfile || null;
+      createData.oracleProfile = oracleProfile || null;
+    }
+
     const setting = await prisma.librarySetting.upsert({
       where: { userId },
       update: updateData,
@@ -110,6 +116,7 @@ export async function POST(request: NextRequest) {
         shareEnabled: (createData.shareEnabled as boolean) || false,
         shareId: (createData.shareId as string) || null,
         accentTheme: (createData.accentTheme as string) || null,
+        oracleProfile: (createData.oracleProfile as string) || null,
       },
     });
 

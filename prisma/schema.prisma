@@ -99,12 +99,44 @@ model ReadingLog {
 }
 
 model OracleMessage {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   userId    String
   role      String
   content   String
   sources   Json?
-  createdAt DateTime @default(now())
+  sessionId String?
+  session   OracleSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
 
   @@index([userId])
+  @@index([sessionId])
+}
+
+model OracleSession {
+  id        String          @id @default(cuid())
+  userId    String
+  title     String
+  mode      String          @default("EXPLORE")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  messages  OracleMessage[]
+  artifacts OracleArtifact[]
+
+  @@index([userId, updatedAt])
+}
+
+model OracleArtifact {
+  id        String         @id @default(cuid())
+  userId    String
+  sessionId String?
+  session   OracleSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  type      String
+  title     String
+  content   String
+  sources   Json?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId, updatedAt])
+  @@index([sessionId])
 }

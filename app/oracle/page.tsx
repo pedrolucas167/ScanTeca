@@ -7,12 +7,34 @@ interface Source {
   id: string;
   title: string;
   author: string;
+  status?: string;
+  genre?: string | null;
+  relevance?: number;
+  matchedBy?: string;
+  evidence?: string | null;
 }
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+}
+
+interface OracleSession {
+  id: string;
+  title: string;
+  mode: OracleMode;
+  updatedAt: string;
+  _count?: { messages: number; artifacts: number };
+}
+
+interface OracleArtifact {
+  id: string;
+  title: string;
+  type: string;
+  content: string;
+  sources?: Source[];
+  updatedAt: string;
 }
 
 function Icon({
@@ -41,6 +63,17 @@ const DEFAULT_SUGGESTIONS = [
   "+500 páginas não lidas",
 ];
 
+const ORACLE_MODES = [
+  { id: "RECOMMEND", label: "Recomendar", icon: "recommend" },
+  { id: "EXPLORE", label: "Explorar", icon: "travel_explore" },
+  { id: "COMPARE", label: "Comparar", icon: "compare_arrows" },
+  { id: "JOURNEY", label: "Jornada", icon: "hiking" },
+  { id: "CURATE", label: "Curadoria", icon: "collections_bookmark" },
+  { id: "LOCATE", label: "Localizar", icon: "route" },
+] as const;
+
+type OracleMode = (typeof ORACLE_MODES)[number]["id"];
+
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -51,6 +84,18 @@ export default function OraclePage() {
   const [voiceOn, setVoiceOn] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [stats, setStats] = useState({ total: 0, indexed: 0 });
+  const [profile, setProfile] = useState("");
+  const [profileDraft, setProfileDraft] = useState("");
+  const [showProfile, setShowProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [selectedCompare, setSelectedCompare] = useState<Source[]>([]);
+  const [actionBookId, setActionBookId] = useState<string | null>(null);
+  const [mode, setMode] = useState<OracleMode>("EXPLORE");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<OracleSession[]>([]);
+  const [artifacts, setArtifacts] = useState<OracleArtifact[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [savingArtifact, setSavingArtifact] = useState<number | null>(null);
   const micSupported = useSyncExternalStore(
     () => () => {},
     () =>
@@ -107,6 +152,12 @@ export default function OraclePage() {
             indexed: Number(data.stats.indexed) || 0,
           });
         }
+        if (data?.profile) {
+          setProfile(data.profile);
+          setProfileDraft(data.profile);
+        }
+        setSessions(data?.sessions ?? []);
+        setArtifacts(data?.artifacts ?? []);
       })
       .catch(() => {});
   }, []);
@@ -255,6 +306,21 @@ export default function OraclePage() {
               return updated;
             });
           }
+          if (json.sessionId) {
+            setSessionId(json.sessionId);
+            setSessions((previous) => {
+              if (previous.some((session) => session.id === json.sessionId)) return previous;
+              return [
+                {
+                  id: json.sessionId,
+                  title: "Nova conversa",
+                  mode,
+                  updatedAt: new Date().toISOString(),
+                },
+                ...previous,
+              ];
+            });
+          }
           if (json.sources) {
             setMessages((prev) => {
               const updated = [...prev];
@@ -304,7 +370,7 @@ export default function OraclePage() {
       const res = await fetch("/api/oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, mode, sessionId }),
       });
 
       if (!res.ok) {
@@ -352,7 +418,7 @@ export default function OraclePage() {
       const res = await fetch("/api/oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audio: { data: base64, format } }),
+        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId }),
       });
 
       if (!res.ok) {
@@ -420,6 +486,132 @@ export default function OraclePage() {
     await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
   };
 
+  const updateBookStatus = async (source: Source, status: "READING" | "TO_READ") => {
+    setActionBookId(source.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/books", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: source.id, status }),
+      });
+      if (!response.ok) throw new Error("Não foi possível atualizar o livro");
+      setMessages((previous) =>
+        previous.map((message) => ({
+          ...message,
+          sources: message.sources?.map((item) =>
+            item.id === source.id ? { ...item, status } : item
+          ),
+        }))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao atualizar livro");
+    } finally {
+      setActionBookId(null);
+    }
+  };
+
+  const toggleCompare = (source: Source) => {
+    setSelectedCompare((previous) => {
+      if (previous.some((item) => item.id === source.id)) {
+        return previous.filter((item) => item.id !== source.id);
+      }
+      return previous.length < 2 ? [...previous, source] : [previous[1], source];
+    });
+  };
+
+  const compareSelected = () => {
+    if (selectedCompare.length !== 2) return;
+    const [first, second] = selectedCompare;
+    setSelectedCompare([]);
+    void sendMessage(
+      `Compare os livros "${first.title}", de ${first.author}, e "${second.title}", de ${second.author}. Analise temas, estilo, diferenças e para qual momento de leitura cada um é mais indicado.`
+    );
+  };
+
+  const saveProfile = async (nextProfile: string | null) => {
+    setSavingProfile(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/library-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oracleProfile: nextProfile }),
+      });
+      if (!response.ok) throw new Error("Não foi possível atualizar a memória");
+      const value = nextProfile?.trim() ?? "";
+      setProfile(value);
+      setProfileDraft(value);
+      setShowProfile(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao atualizar memória");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const startNewSession = () => {
+    stopAudio();
+    setSessionId(null);
+    setMessages([]);
+    setSelectedCompare([]);
+    setError(null);
+    setShowLibrary(false);
+    inputRef.current?.focus();
+  };
+
+  const loadSession = async (session: OracleSession) => {
+    if (loadingRef.current) return;
+    setError(null);
+    try {
+      const response = await fetch(`/api/oracle/sessions/${session.id}`);
+      if (!response.ok) throw new Error("Não foi possível abrir a conversa");
+      const data = await response.json();
+      setSessionId(session.id);
+      setMode(session.mode);
+      setMessages(
+        (data.session.messages ?? []).map(
+          (message: { role: string; content: string; sources?: Source[] }) => ({
+            role: message.role as "user" | "assistant",
+            content: message.content,
+            sources: message.sources ?? undefined,
+          })
+        )
+      );
+      setShowLibrary(false);
+      setSelectedCompare([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao abrir conversa");
+    }
+  };
+
+  const saveArtifact = async (message: Message, index: number) => {
+    if (!message.content.trim()) return;
+    setSavingArtifact(index);
+    setError(null);
+    try {
+      const type = mode === "CURATE" ? "CURATION" : mode === "JOURNEY" ? "PLAN" : "NOTE";
+      const response = await fetch("/api/oracle/artifacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          type,
+          title: message.content.trim().split("\n")[0].slice(0, 120),
+          content: message.content,
+          sources: message.sources?.map(({ id, title, author }) => ({ id, title, author })),
+        }),
+      });
+      if (!response.ok) throw new Error("Não foi possível salvar este resultado");
+      const data = await response.json();
+      setArtifacts((previous) => [data.artifact, ...previous]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar resultado");
+    } finally {
+      setSavingArtifact(null);
+    }
+  };
+
   const activeSuggestions =
     suggestions.length > 0 ? suggestions : DEFAULT_SUGGESTIONS;
 
@@ -452,7 +644,32 @@ export default function OraclePage() {
           </div>
         </div>
         <div className="flex items-center gap-space-2xs">
-          <span className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface">
+          <button
+            onClick={() => setShowLibrary(true)}
+            title="Conversas e resultados salvos"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+          >
+            <Icon name="history" className="text-lg" />
+          </button>
+          <button
+            onClick={startNewSession}
+            title="Nova conversa"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+          >
+            <Icon name="add_comment" className="text-lg" />
+          </button>
+          <button
+            onClick={() => {
+              setProfileDraft(profile);
+              setShowProfile(true);
+            }}
+            title="Memória do leitor"
+            className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface transition-colors hover:border-primary/50"
+          >
+            <Icon name="psychology" className="text-sm text-primary" />
+            <span className="hidden sm:inline">Minha memória</span>
+          </button>
+          <span className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface transition-colors hover:border-primary/50">
             <Icon name="shelves" className="text-sm text-tertiary" />
             <span>Acervo Todo</span>
             <Icon name="expand_more" className="text-xs text-outline" />
@@ -479,6 +696,51 @@ export default function OraclePage() {
           )}
         </div>
       </header>
+
+      {showLibrary && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+          <div className="h-full w-full max-w-md overflow-y-auto border-l border-outline-variant/30 bg-surface-container p-5 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-sm text-headline-sm font-semibold text-on-surface">Biblioteca do Oráculo</h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">Conversas e resultados que você decidiu guardar.</p>
+              </div>
+              <button onClick={() => setShowLibrary(false)} aria-label="Fechar biblioteca" className="rounded-full p-1 text-outline hover:bg-surface-container-high">
+                <Icon name="close" />
+              </button>
+            </div>
+            <button onClick={startNewSession} className="mb-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-4 py-2.5 font-label-md font-semibold text-on-primary-container">
+              <Icon name="add_comment" className="text-base" /> Nova conversa
+            </button>
+            <section>
+              <h3 className="mb-2 font-label-md font-semibold uppercase tracking-wider text-primary">Conversas</h3>
+              <div className="space-y-2">
+                {sessions.length === 0 ? (
+                  <p className="rounded-xl border border-outline-variant/30 p-3 font-body-sm text-on-surface-variant">Nenhuma conversa salva ainda.</p>
+                ) : sessions.map((session) => (
+                  <button key={session.id} onClick={() => void loadSession(session)} className={`w-full rounded-xl border p-3 text-left transition-colors ${sessionId === session.id ? "border-primary bg-primary-container/10" : "border-outline-variant/30 bg-surface-container-low hover:border-primary/50"}`}>
+                    <span className="block truncate font-label-md font-semibold text-on-surface">{session.title}</span>
+                    <span className="mt-1 block font-caption text-caption text-outline">{session._count?.messages ?? 0} mensagens · {new Date(session.updatedAt).toLocaleDateString("pt-BR")}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section className="mt-6">
+              <h3 className="mb-2 font-label-md font-semibold uppercase tracking-wider text-primary">Resultados salvos</h3>
+              <div className="space-y-2">
+                {artifacts.length === 0 ? (
+                  <p className="rounded-xl border border-outline-variant/30 p-3 font-body-sm text-on-surface-variant">Salve uma resposta para consultá-la depois.</p>
+                ) : artifacts.map((artifact) => (
+                  <details key={artifact.id} className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest/60 p-3">
+                    <summary className="cursor-pointer font-label-md font-semibold text-on-surface">{artifact.title}</summary>
+                    <p className="mt-3 whitespace-pre-wrap font-body-sm leading-relaxed text-on-surface-variant">{artifact.content}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
 
       {/* Clear confirmation dialog */}
       {showClearConfirm && (
@@ -520,6 +782,24 @@ export default function OraclePage() {
 
       {/* Main */}
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-56 pt-4">
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Modo do Oráculo">
+          {ORACLE_MODES.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setMode(item.id)}
+              aria-pressed={mode === item.id}
+              className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-label-sm text-label-sm transition-colors ${
+                mode === item.id
+                  ? "border-primary bg-primary-container/20 text-primary"
+                  : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
+              }`}
+            >
+              <Icon name={item.icon} className="text-sm" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         {/* Welcome card */}
         <div className="relative mb-6 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest/60 p-space-md backdrop-blur-sm">
           <div className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-primary-container/10 blur-2xl" />
@@ -603,51 +883,118 @@ export default function OraclePage() {
 
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="space-y-2.5">
-                      {msg.sources.map((s) => (
-                        <Link
-                          key={s.id}
-                          href={`/books/${s.id}`}
-                          className="flex items-start gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-space-sm transition-colors hover:border-primary/50"
-                        >
-                          <div className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-md border border-outline-variant/50 bg-surface-container-high shadow-sm">
-                            <div className="absolute inset-0 bg-gradient-to-br from-primary-container/40 to-secondary-container/30" />
-                            <span className="absolute bottom-1 right-1 rounded bg-surface-dim/90 px-1 font-mono text-[9px] text-primary">
-                              vol.
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-caption text-caption font-semibold uppercase tracking-wider text-primary">
-                                Fonte
-                              </span>
-                              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary-container/20 px-2 py-0.5 text-[11px] text-primary">
-                                <Icon name="bookmark" className="text-xs" />
-                                Acervo
+                      {msg.sources.map((source) => {
+                        const selected = selectedCompare.some((item) => item.id === source.id);
+                        const busy = actionBookId === source.id;
+                        return (
+                          <div
+                            key={source.id}
+                            className={`rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-colors ${
+                              selected ? "border-primary" : "border-outline-variant/40"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-caption text-caption font-semibold uppercase tracking-wider text-primary">Fonte do acervo</span>
+                                <Link href={`/books/${source.id}`} className="group mt-1 flex items-center gap-1">
+                                  <h3 className="truncate font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
+                                    {source.title}
+                                  </h3>
+                                  <Icon name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
+                                </Link>
+                                <p className="font-body-sm text-body-sm text-on-surface-variant">{source.author}</p>
+                                {(source.matchedBy || source.relevance !== undefined) && (
+                                  <p className="mt-1 font-caption text-caption text-outline">
+                                    {source.relevance !== undefined ? `${source.relevance}% relevante` : "Relevante"}
+                                    {source.matchedBy ? ` · ${source.matchedBy}` : ""}
+                                  </p>
+                                )}
+                                {source.evidence && (
+                                  <p className="mt-2 line-clamp-2 font-caption text-caption italic leading-relaxed text-on-surface-variant">
+                                    &ldquo;{source.evidence}&rdquo;
+                                  </p>
+                                )}
+                              </div>
+                              <span className="rounded-full border border-primary/30 bg-primary-container/20 px-2 py-0.5 text-[11px] text-primary">
+                                {source.status === "READING" ? "Lendo" : source.status === "TO_READ" ? "A ler" : source.status === "READ" ? "Lido" : "Acervo"}
                               </span>
                             </div>
-                            <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
-                              {s.title}
-                            </h3>
-                            <p className="font-body-sm text-body-sm text-on-surface-variant">
-                              {s.author}
-                            </p>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              <Link
+                                href={`/books/${source.id}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50"
+                              >
+                                <Icon name="menu_book" className="text-xs" /> Abrir
+                              </Link>
+                              <button
+                                onClick={() => void updateBookStatus(source, "READING")}
+                                disabled={busy || source.status === "READING"}
+                                className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50 disabled:opacity-40"
+                              >
+                                <Icon name="play_arrow" className="text-xs" /> Iniciar leitura
+                              </button>
+                              <button
+                                onClick={() => void updateBookStatus(source, "TO_READ")}
+                                disabled={busy || source.status === "TO_READ"}
+                                className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50 disabled:opacity-40"
+                              >
+                                <Icon name="playlist_add" className="text-xs" /> Adicionar à fila
+                              </button>
+                              <button
+                                onClick={() => toggleCompare(source)}
+                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-caption text-caption transition-colors ${
+                                  selected
+                                    ? "border-primary bg-primary-container/20 text-primary"
+                                    : "border-outline-variant/40 text-on-surface hover:border-primary/50"
+                                }`}
+                              >
+                                <Icon name={selected ? "check" : "compare_arrows"} className="text-xs" />
+                                {selected ? "Selecionado" : "Comparar"}
+                              </button>
+                            </div>
                           </div>
+                        );
+                      })}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Link
+                          href={`/rota?books=${encodeURIComponent(msg.sources.map((source) => source.id).join(","))}`}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-primary-container px-3 py-1.5 font-label-sm text-label-sm font-semibold text-on-primary-container"
+                        >
+                          <Icon name="route" className="text-sm" /> Criar rota com estes livros
                         </Link>
-                      ))}
+                        {selectedCompare.length === 2 && (
+                          <button
+                            onClick={compareSelected}
+                            disabled={loading}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 px-3 py-1.5 font-label-sm text-label-sm font-semibold text-primary disabled:opacity-50"
+                          >
+                            <Icon name="compare_arrows" className="text-sm" /> Comparar selecionados
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
-
                   {msg.content &&
                     !(loading && i === messages.length - 1) &&
                     msg.role === "assistant" && (
-                      <button
-                        onClick={() => speak(msg.content)}
-                        title="Ouvir resposta"
-                        className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-on-surface"
-                      >
-                        <Icon name="volume_up" className="text-sm" />
-                        <span>Ouvir</span>
-                      </button>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => speak(msg.content)}
+                          title="Ouvir resposta"
+                          className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-on-surface"
+                        >
+                          <Icon name="volume_up" className="text-sm" />
+                          Ouvir resposta
+                        </button>
+                        <button
+                          onClick={() => void saveArtifact(msg, i)}
+                          disabled={savingArtifact === i}
+                          className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary disabled:opacity-50"
+                        >
+                          <Icon name="bookmark_add" className="text-sm" />
+                          {savingArtifact === i ? "Salvando..." : "Salvar resultado"}
+                        </button>
+                      </div>
                     )}
                 </div>
               </div>
