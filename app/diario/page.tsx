@@ -5,9 +5,10 @@ import DiaryClient from "./DiaryClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function DiaryPage() {
+export default async function DiaryPage({ searchParams }: { searchParams: Promise<{ bookId?: string }> }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
+  const { bookId } = await searchParams;
 
   const [books, active, sessions, entries] = await Promise.all([
     prisma.book.findMany({ where: { userId, status: "READING" }, orderBy: { updatedAt: "desc" }, select: { id: true, title: true, author: true, coverUrl: true, pages: true, currentPage: true } }),
@@ -16,5 +17,5 @@ export default async function DiaryPage() {
     prisma.diaryEntry.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 20, include: { book: { select: { title: true, author: true } } } }),
   ]);
 
-  return <DiaryClient books={books} initialActive={active} sessions={sessions} initialEntries={entries} />;
+  return <DiaryClient books={books} initialActive={active} sessions={sessions} initialEntries={entries} initialBookId={bookId} />;
 }

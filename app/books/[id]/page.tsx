@@ -160,7 +160,7 @@ export default async function BookDetailPage({
 
               {book.status === "READING" && (
                 <Link
-                  href="/diario"
+                  href={`/diario?bookId=${book.id}`}
                   className="mt-4 inline-flex w-fit items-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
                 >
                   Abrir diário de leitura
