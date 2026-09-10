@@ -76,7 +76,11 @@ type OracleMode = (typeof ORACLE_MODES)[number]["id"];
 
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.search).get("question") ?? ""
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -738,6 +742,25 @@ export default function OraclePage() {
                 ))}
               </div>
             </section>
+          </div>
+        </div>
+      )}
+
+      {showProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-outline-variant/30 bg-surface-container p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-headline-sm text-headline-sm font-semibold text-on-surface">Memória do leitor</h2>
+                <p className="mt-1 font-body-sm text-on-surface-variant">Edite o que o Oráculo aprendeu sobre suas preferências e objetivos.</p>
+              </div>
+              <button onClick={() => setShowProfile(false)} aria-label="Fechar" className="rounded-full p-1 text-outline hover:bg-surface-container-high"><Icon name="close" /></button>
+            </div>
+            <textarea value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} maxLength={2000} rows={8} placeholder="Preferências, autores, gêneros, temas e objetivos de leitura..." className="w-full resize-y rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 font-body-sm text-on-surface outline-none focus:border-primary" />
+            <div className="mt-4 flex flex-wrap justify-between gap-2">
+              <button onClick={() => void saveProfile(null)} disabled={savingProfile || !profile} className="rounded-full border border-error/30 px-4 py-2 text-sm text-error disabled:opacity-40">Esquecer tudo</button>
+              <div className="flex gap-2"><button onClick={() => setShowProfile(false)} className="rounded-full border border-outline-variant/40 px-4 py-2 text-sm">Cancelar</button><button onClick={() => void saveProfile(profileDraft)} disabled={savingProfile} className="rounded-full bg-primary-container px-4 py-2 text-sm font-semibold text-on-primary-container disabled:opacity-50">{savingProfile ? "Salvando..." : "Salvar memória"}</button></div>
+            </div>
           </div>
         </div>
       )}

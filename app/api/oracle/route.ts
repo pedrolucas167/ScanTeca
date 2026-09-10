@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
     weekAgo.setDate(weekAgo.getDate() - 7);
     weekAgo.setHours(0, 0, 0, 0);
 
-    const [historyDesc, setting, , readingNow, weekLogs] = await Promise.all([
+    const [historyDesc, setting, , readingNow, weekLogs, diaryEntries] = await Promise.all([
       prisma.oracleMessage.findMany({
         where: { userId, sessionId },
         orderBy: { createdAt: "desc" },
@@ -261,6 +261,17 @@ export async function POST(request: NextRequest) {
       prisma.readingLog.findMany({
         where: { userId, date: { gte: weekAgo } },
         select: { date: true, pages: true },
+      }),
+      prisma.diaryEntry.findMany({
+        where: { userId, ragEnabled: true },
+        orderBy: { createdAt: "desc" },
+        take: 12,
+        select: {
+          type: true,
+          content: true,
+          page: true,
+          book: { select: { title: true, author: true } },
+        },
       }),
     ]);
 
@@ -431,6 +442,12 @@ export async function POST(request: NextRequest) {
         ? `\n\nAtividade recente do usuário: ${weekPages} páginas lidas nos últimos 7 dias, em ${weekDays} ${weekDays === 1 ? "dia" : "dias"} de leitura.`
         : "";
 
+    const diarySection = diaryEntries.length
+      ? `\n\nMemória recente do diário de leitura:\n${diaryEntries
+          .map((entry) => `- [${entry.type}] "${entry.book.title}"${entry.page ? `, pág. ${entry.page}` : ""}: ${entry.content.slice(0, 500)}`)
+          .join("\n")}`
+      : "";
+
     const profile = setting?.oracleProfile?.trim();
     const modeInstructions: Record<
       typeof ORACLE_MODES[number],
@@ -457,7 +474,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
       })),
       {
         role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}\n\nPergunta do usuário: ${trimmed}`,
+        content: `Livros relevantes do acervo:\n${context}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}\n\nPergunta do usuário: ${trimmed}`,
       },
     ];
 

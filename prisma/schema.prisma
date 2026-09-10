@@ -16,6 +16,12 @@ enum BookStatus {
   WISHLIST
 }
 
+enum DiaryEntryType {
+  REFLECTION
+  QUOTE
+  OCR
+}
+
 model Book {
   id            String     @id @default(cuid())
   isbn          String
@@ -40,6 +46,8 @@ model Book {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   reviews       Review[]
+  readingSessions ReadingSession[]
+  diaryEntries    DiaryEntry[]
 
   @@unique([isbn, userId])
   @@index([userId])
@@ -96,6 +104,44 @@ model ReadingLog {
 
   @@unique([userId, date])
   @@index([userId])
+}
+
+model ReadingSession {
+  id          String       @id @default(cuid())
+  userId      String
+  bookId      String
+  book        Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  startedPage Int
+  currentPage Int
+  startedAt   DateTime     @default(now())
+  endedAt     DateTime?
+  durationSec Int?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  entries     DiaryEntry[]
+
+  @@index([userId, startedAt])
+  @@index([bookId, startedAt])
+}
+
+model DiaryEntry {
+  id         String          @id @default(cuid())
+  userId     String
+  bookId     String
+  book       Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sessionId  String?
+  session    ReadingSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  type       DiaryEntryType  @default(REFLECTION)
+  content    String
+  page       Int?
+  tags       String[]        @default([])
+  ragEnabled Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([bookId, createdAt])
+  @@index([sessionId])
 }
 
 model OracleMessage {

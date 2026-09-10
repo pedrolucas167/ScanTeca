@@ -1,6 +1,14 @@
-const CACHE = "scanteca-v1";
+const CACHE = "scanteca-v3";
 const OFFLINE = "/offline.html";
-const PRECACHE = [OFFLINE, "/manifest.json", "/favicon.svg"];
+const PRECACHE = [
+  OFFLINE,
+  "/manifest.json",
+  "/favicon.svg",
+  "/android-chrome-192x192.png",
+  "/android-chrome-512x512.png",
+  "/maskable-icon-512x512.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
