@@ -70,6 +70,7 @@ const ORACLE_MODES = [
   { id: "JOURNEY", label: "Jornada", icon: "hiking" },
   { id: "CURATE", label: "Curadoria", icon: "collections_bookmark" },
   { id: "LOCATE", label: "Localizar", icon: "route" },
+  { id: "ASSISTANT", label: "Assistente", icon: "support_agent" },
 ] as const;
 
 type OracleMode = (typeof ORACLE_MODES)[number]["id"];
@@ -95,6 +96,7 @@ export default function OraclePage() {
   const [selectedCompare, setSelectedCompare] = useState<Source[]>([]);
   const [actionBookId, setActionBookId] = useState<string | null>(null);
   const [mode, setMode] = useState<OracleMode>("EXPLORE");
+  const [temperature, setTemperature] = useState(1);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<OracleSession[]>([]);
   const [artifacts, setArtifacts] = useState<OracleArtifact[]>([]);
@@ -120,6 +122,7 @@ export default function OraclePage() {
   const ttsBufferRef = useRef("");
   const micBusyRef = useRef(false);
   const streamDoneRef = useRef(true);
+  const voiceChatDataRef = useRef<string[]>([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -374,7 +377,7 @@ export default function OraclePage() {
       const res = await fetch("/api/oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, mode, sessionId }),
+        body: JSON.stringify({ question, mode, sessionId, temperature }),
       });
 
       if (!res.ok) {
@@ -422,7 +425,7 @@ export default function OraclePage() {
       const res = await fetch("/api/oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId }),
+        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId, temperature }),
       });
 
       if (!res.ok) {
@@ -431,6 +434,176 @@ export default function OraclePage() {
       }
 
       await readOracleStream(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro de rede");
+      setMessages((prev) => prev.slice(0, -2));
+    } finally {
+      loadingRef.current = false;
+      streamDoneRef.current = true;
+      setLoading(false);
+      maybeAutoListen();
+    }
+  };
+
+  const base64ToBytes = (base64: string) => {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  };
+
+  const playVoiceBlob = (base64Data: string) => {
+    try {
+      if (!base64Data) return;
+      const bytes = base64ToBytes(base64Data);
+      const blob = new Blob([bytes], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audioPlayingRef.current = true;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        audioRef.current = null;
+        audioPlayingRef.current = false;
+        maybeAutoListen();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        audioRef.current = null;
+        audioPlayingRef.current = false;
+        maybeAutoListen();
+      };
+      void audio.play().catch(() => {
+        audioPlayingRef.current = false;
+        maybeAutoListen();
+      });
+    } catch {}
+  };
+
+  const readVoiceStream = async (res: Response): Promise<string> => {
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") continue;
+
+        try {
+          const json = JSON.parse(payload);
+          if (json.sessionId) {
+            setSessionId(json.sessionId);
+            setSessions((previous) => {
+              if (previous.some((session) => session.id === json.sessionId))
+                return previous;
+              return [
+                {
+                  id: json.sessionId,
+                  title: "Nova conversa",
+                  mode,
+                  updatedAt: new Date().toISOString(),
+                },
+                ...previous,
+              ];
+            });
+          }
+          if (json.transcript) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const userIdx = updated.length - 2;
+              if (updated[userIdx]?.role === "user") {
+                updated[userIdx] = {
+                  ...updated[userIdx],
+                  content: json.transcript,
+                };
+              }
+              return updated;
+            });
+          }
+          if (json.audio?.data) {
+            voiceChatDataRef.current.push(json.audio.data);
+            if (json.audio.transcript) {
+              fullText += json.audio.transcript;
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  content:
+                    updated[updated.length - 1].content + json.audio.transcript,
+                };
+                return updated;
+              });
+            }
+          }
+          if (json.text) {
+            fullText += json.text;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                content: updated[updated.length - 1].content + json.text,
+              };
+              return updated;
+            });
+          }
+        } catch {}
+      }
+    }
+    if (voiceChatDataRef.current.length > 0) {
+      const fullBase64 = voiceChatDataRef.current.join("");
+      voiceChatDataRef.current = [];
+      playVoiceBlob(fullBase64);
+    }
+    return fullText;
+  };
+
+  const sendVoice = async (blob: Blob) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    streamDoneRef.current = false;
+
+    stopAudio();
+    setError(null);
+    setLoading(true);
+    voiceChatDataRef.current = [];
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: "🎤 Transcrevendo áudio..." },
+      { role: "assistant", content: "" },
+    ]);
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob);
+      });
+      const base64 = dataUrl.split(",")[1];
+      const format = blob.type.split("/")[1]?.split(";")[0] || "webm";
+
+      const res = await fetch("/api/oracle/voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId, temperature }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Erro no Voice Chat");
+      }
+
+      await readVoiceStream(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro de rede");
       setMessages((prev) => prev.slice(0, -2));
@@ -471,7 +644,10 @@ export default function OraclePage() {
         mediaRecorderRef.current = null;
         const blob = new Blob(chunksRef.current, { type: mime });
         chunksRef.current = [];
-        if (blob.size > 0) void sendAudio(blob);
+        if (blob.size > 0) {
+          if (voiceOnRef.current) void sendVoice(blob);
+          else void sendAudio(blob);
+        }
       };
       mediaRecorderRef.current = rec;
       setRecording(true);
@@ -680,14 +856,14 @@ export default function OraclePage() {
           </span>
           <button
             onClick={toggleVoice}
-            title={voiceOn ? "Desativar voz" : "Oráculo fala as respostas"}
+            title={voiceOn ? "Desativar voz" : "Ativar Voice Chat"}
             className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors duration-150 active:scale-95 ${
               voiceOn
                 ? "bg-primary-container/20 text-primary"
                 : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
             }`}
           >
-            <Icon name="tune" className="text-lg" />
+            <Icon name="voice_chat" className="text-lg" />
           </button>
           {messages.length > 0 && (
             <button
@@ -821,6 +997,26 @@ export default function OraclePage() {
               {item.label}
             </button>
           ))}
+        </div>
+
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest/60 p-2">
+          <Icon name="thermostat" className="text-on-surface-variant" />
+          <span className="font-caption text-caption text-on-surface-variant">
+            Temperatura
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={2}
+            step={0.1}
+            value={temperature}
+            onChange={(e) => setTemperature(Number(e.target.value))}
+            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-outline-variant accent-primary"
+            aria-label="Temperatura da IA"
+          />
+          <span className="min-w-[2.5ch] text-right font-caption text-caption text-primary">
+            {temperature.toFixed(1)}
+          </span>
         </div>
 
         {/* Welcome card */}
