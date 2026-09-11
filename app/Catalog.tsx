@@ -194,7 +194,15 @@ export default function Catalog({
         ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length
         : 0;
 
-    const stackMeters = Math.round(allPages * 0.08) / 1000;
+    const stackMeters =
+      bookList.reduce((sum, b) => {
+        const pages = b.pages;
+        const spineCmValue =
+          !pages || pages <= 0
+            ? 1.0
+            : Math.max(0.8, Math.round((pages * 0.08) * 10) / 10);
+        return sum + spineCmValue;
+      }, 0) / 100;
     const readingHours = Math.round(allPages / 40);
 
     const authorCount = new Map<string, number>();
