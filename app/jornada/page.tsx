@@ -38,8 +38,23 @@ export default async function JornadaPage() {
     prisma.book.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        coverUrl: true,
+        status: true,
+        pages: true,
+        currentPage: true,
+        startedAt: true,
+        finishedAt: true,
+        createdAt: true,
+      },
     }),
-    prisma.librarySetting.findUnique({ where: { userId } }),
+    prisma.librarySetting.findUnique({
+      where: { userId },
+      select: { yearlyGoal: true, shareEnabled: true, shareId: true },
+    }),
     prisma.readingLog.findMany({
       where: { userId },
       select: { id: true, date: true, pages: true, note: true, bookId: true },

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embeddings";
 import { normalize } from "@/lib/book-cover";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE"] as const;
@@ -158,6 +159,13 @@ export async function POST(request: NextRequest) {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "oracle",
+      userId,
+      ...rateLimits.oracle,
+    });
+    if (rateLimit) return rateLimit;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {

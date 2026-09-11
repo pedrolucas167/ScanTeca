@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 function Icon({
   name,
@@ -48,31 +48,17 @@ const statusLabels: Record<string, string> = {
   WISHLIST: "Desejo",
 };
 
-export default function RotaNaEstante() {
-  const [data, setData] = useState<RouteData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<"oracle" | "reading">("oracle");
+export default function RotaNaEstante({ initialData }: { initialData: RouteData }) {
+  const [data] = useState(initialData);
+  const [mode, setMode] = useState<"oracle" | "reading">(
+    initialData.oracle.steps.length === 0 && initialData.reading.steps.length > 0
+      ? "reading"
+      : "oracle"
+  );
   const [collected, setCollected] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const books = new URLSearchParams(window.location.search).get("books");
-    const endpoint = books ? `/api/rota?books=${encodeURIComponent(books)}` : "/api/rota";
-    fetch(endpoint)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: RouteData | null) => {
-        if (d) {
-          setData(d);
-          if (d.oracle.steps.length === 0 && d.reading.steps.length > 0) {
-            setMode("reading");
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
   const steps =
-    mode === "oracle" ? (data?.oracle.steps ?? []) : (data?.reading.steps ?? []);
+    mode === "oracle" ? (data.oracle.steps) : (data.reading.steps);
 
   const activeIdx = steps.findIndex((s) => !collected.has(s.id));
   const activeStep = activeIdx >= 0 ? steps[activeIdx] : null;
@@ -92,17 +78,6 @@ export default function RotaNaEstante() {
     const cm = s.pages ? Math.max(0.8, Math.round(s.pages * 0.08 * 10) / 10) : 1;
     return sum + cm;
   }, 0);
-
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center bg-surface text-on-surface">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <span className="font-body-sm text-body-sm text-on-surface-variant">Carregando roteiro...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-1 flex-col bg-surface text-on-surface">
@@ -143,8 +118,8 @@ export default function RotaNaEstante() {
             >
               <Icon name="auto_awesome" className="text-sm" fill={mode === "oracle"} />
               <span>Oráculo</span>
-              {(data?.oracle.steps.length ?? 0) > 0 && (
-                <span className="font-caption text-caption text-outline">{data!.oracle.steps.length}</span>
+              {(data.oracle.steps.length ?? 0) > 0 && (
+                <span className="font-caption text-caption text-outline">{data.oracle.steps.length}</span>
               )}
             </button>
             <button
@@ -157,8 +132,8 @@ export default function RotaNaEstante() {
             >
               <Icon name="menu_book" className="text-sm" fill={mode === "reading"} />
               <span>Leitura</span>
-              {(data?.reading.steps.length ?? 0) > 0 && (
-                <span className="font-caption text-caption text-outline">{data!.reading.steps.length}</span>
+              {(data.reading.steps.length ?? 0) > 0 && (
+                <span className="font-caption text-caption text-outline">{data.reading.steps.length}</span>
               )}
             </button>
           </div>
@@ -172,7 +147,7 @@ export default function RotaNaEstante() {
                 {mode === "oracle" ? "Roteiro do Oráculo" : "Roteiro de Leitura"}
               </span>
             </div>
-            {mode === "oracle" && data?.oracle.query ? (
+            {mode === "oracle" && data.oracle.query ? (
               <h1 className="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight leading-snug">
                 &ldquo;{data.oracle.query}&rdquo;
               </h1>

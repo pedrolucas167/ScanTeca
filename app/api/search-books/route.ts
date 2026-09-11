@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const searchBooksSchema = z.object({
@@ -36,6 +37,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "search-books",
+      userId,
+      ...rateLimits["search-books"],
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, searchBooksSchema);
     if (!parsed.ok) return parsed.response;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { findSynopsis } from "@/lib/synopsis";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const synopsisSchema = z.object({
@@ -19,6 +20,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "generate-synopsis",
+      userId,
+      ...rateLimits["generate-synopsis"],
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, synopsisSchema);
     if (!parsed.ok) return parsed.response;
