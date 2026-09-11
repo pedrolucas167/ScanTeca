@@ -62,14 +62,69 @@ export default function DescobrirClient({
   const profile = recommendations?.profile ?? {
     affinity: [],
     feedbackCount: 0,
+    recommendationFeedbackCount: 0,
     calibration: 0,
   };
   const primary = recommendations?.primary ?? null;
   const queue = recommendations?.queue ?? [];
   const topAffinity = profile.affinity[0]?.label ?? "seus temas";
   const [primaryFeedback, setPrimaryFeedback] = useState<
-    null | "want" | "dismissed"
+    null | "WANT" | "DISMISSED"
   >(null);
+  const [savingFeedback, setSavingFeedback] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  const savePrimaryFeedback = async (kind: "WANT" | "DISMISSED") => {
+    if (!primary || savingFeedback) return;
+    setFeedbackError(null);
+    const previous = primaryFeedback;
+    setPrimaryFeedback(kind);
+    setSavingFeedback(true);
+    try {
+      const res = await fetch("/api/recommendations/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: primary.title,
+          author: primary.author,
+          kind,
+          source: "primary",
+        }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar feedback");
+    } catch (err) {
+      setPrimaryFeedback(previous);
+      setFeedbackError(
+        err instanceof Error ? err.message : "Erro ao salvar feedback"
+      );
+    } finally {
+      setSavingFeedback(false);
+    }
+  };
+
+  const undoPrimaryFeedback = async () => {
+    if (!primary || savingFeedback) return;
+    setFeedbackError(null);
+    const previous = primaryFeedback;
+    setPrimaryFeedback(null);
+    setSavingFeedback(true);
+    try {
+      const res = await fetch(
+        `/api/recommendations/feedback?title=${encodeURIComponent(
+          primary.title
+        )}&author=${encodeURIComponent(primary.author)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Erro ao desfazer feedback");
+    } catch (err) {
+      setPrimaryFeedback(previous);
+      setFeedbackError(
+        err instanceof Error ? err.message : "Erro ao desfazer feedback"
+      );
+    } finally {
+      setSavingFeedback(false);
+    }
+  };
 
   return (
     <main className="mx-auto min-h-[calc(100dvh-4rem)] max-w-2xl bg-surface px-4 py-6 pb-28 text-on-surface">
@@ -140,7 +195,7 @@ export default function DescobrirClient({
             Adicionar livro
           </Link>
         </section>
-      ) : primaryFeedback === "dismissed" ? (
+      ) : primaryFeedback === "DISMISSED" ? (
         <section className="relative overflow-hidden rounded-[2rem] border border-outline-variant/30 bg-surface-container-low p-8 text-center shadow-2xl">
           <Icon
             name="hide_source"
@@ -154,8 +209,9 @@ export default function DescobrirClient({
           </p>
           <button
             type="button"
-            onClick={() => setPrimaryFeedback(null)}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-bright"
+            onClick={() => void undoPrimaryFeedback()}
+            disabled={savingFeedback}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-bright disabled:opacity-50"
           >
             <Icon name="refresh" className="text-sm" />
             Desfazer
@@ -270,8 +326,9 @@ export default function DescobrirClient({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setPrimaryFeedback("want")}
-                  className="flex h-10 items-center justify-center gap-1.5 rounded-full border border-outline-variant/40 bg-surface-container-high text-[12px] font-label-sm text-on-surface transition-colors hover:bg-surface-bright active:scale-95"
+                  onClick={() => void savePrimaryFeedback("WANT")}
+                  disabled={savingFeedback}
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-full border border-outline-variant/40 bg-surface-container-high text-[12px] font-label-sm text-on-surface transition-colors hover:bg-surface-bright active:scale-95 disabled:opacity-50"
                 >
                   <Icon
                     name="bookmark"
@@ -281,8 +338,9 @@ export default function DescobrirClient({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPrimaryFeedback("dismissed")}
-                  className="group flex h-10 items-center justify-center gap-1 rounded-full border border-outline-variant/25 bg-surface-container/50 text-[12px] font-label-sm text-on-surface-variant transition-colors hover:border-error/40 hover:bg-surface-container-high hover:text-error active:scale-95"
+                  onClick={() => void savePrimaryFeedback("DISMISSED")}
+                  disabled={savingFeedback}
+                  className="group flex h-10 items-center justify-center gap-1 rounded-full border border-outline-variant/25 bg-surface-container/50 text-[12px] font-label-sm text-on-surface-variant transition-colors hover:border-error/40 hover:bg-surface-container-high hover:text-error active:scale-95 disabled:opacity-50"
                 >
                   <Icon
                     name="close"
@@ -291,17 +349,23 @@ export default function DescobrirClient({
                   Não me interessa
                 </button>
               </div>
-              {primaryFeedback === "want" && (
+              {primaryFeedback === "WANT" && (
                 <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary-container/20 py-2 text-[11px] text-primary">
                   <Icon name="check" className="text-[14px]" />
-                  Salvo na lista de desejos
+                  Você curtiu essa recomendação
                   <button
                     type="button"
-                    onClick={() => setPrimaryFeedback(null)}
-                    className="ml-1 text-on-surface-variant underline"
+                    onClick={() => void undoPrimaryFeedback()}
+                    disabled={savingFeedback}
+                    className="ml-1 text-on-surface-variant underline disabled:opacity-50"
                   >
                     Desfazer
                   </button>
+                </div>
+              )}
+              {feedbackError && (
+                <div className="text-center text-[11px] text-error">
+                  {feedbackError}
                 </div>
               )}
             </div>

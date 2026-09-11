@@ -22,6 +22,11 @@ enum DiaryEntryType {
   OCR
 }
 
+enum RecommendationFeedbackKind {
+  WANT
+  DISMISSED
+}
+
 model Book {
   id            String     @id @default(cuid())
   isbn          String
@@ -185,4 +190,21 @@ model OracleArtifact {
 
   @@index([userId, updatedAt])
   @@index([sessionId])
+}
+
+model RecommendationFeedback {
+  id               String                    @id @default(cuid())
+  userId           String
+  title            String
+  author           String
+  normalizedTitle  String
+  normalizedAuthor String
+  kind             RecommendationFeedbackKind
+  source           String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@unique([userId, normalizedTitle, normalizedAuthor])
+  @@index([userId])
+  @@index([userId, kind])
 }
