@@ -47,6 +47,9 @@ CLAUDE.md
 # vercel
 .vercel
 
+# stitch design assets (downloaded temporarily)
+/stitch-assets/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
