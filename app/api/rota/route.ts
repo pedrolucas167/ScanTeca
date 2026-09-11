@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { NextRequest } from "next/server";
 
 interface SourceEntry {
   id: string;
@@ -8,7 +9,7 @@ interface SourceEntry {
   author: string;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -21,8 +22,14 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    let oracleBookIds: string[] = [];
-    if (lastAssistantMsg?.sources) {
+    const requestedBookIds = (request.nextUrl.searchParams.get("books") ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+
+    let oracleBookIds: string[] = requestedBookIds;
+    if (oracleBookIds.length === 0 && lastAssistantMsg?.sources) {
       // Type assertion for the sources
       const sources = lastAssistantMsg.sources as unknown as SourceEntry[];
       oracleBookIds = sources

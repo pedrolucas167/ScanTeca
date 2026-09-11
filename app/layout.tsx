@@ -141,6 +141,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     Jornada
                   </Link>
                   <Link
+                    href="/diario"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Diário
+                  </Link>
+                  <Link
                     href="/rota"
                     className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
                   >
@@ -230,7 +236,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </a>
               </div>
               <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 md:text-right">
-                © {new Date().getFullYear()} Scanteca — Bibliotheca Personalis.
+                &copy; {new Date().getFullYear()} Scanteca — Bibliotheca Personalis.
                 <br />
                 Feito com{" "}
                 <Heart className="inline h-3 w-3 fill-rose-500 text-rose-500" /> por{" "}

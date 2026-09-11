@@ -55,7 +55,9 @@ export default function RotaNaEstante() {
   const [collected, setCollected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetch("/api/rota")
+    const books = new URLSearchParams(window.location.search).get("books");
+    const endpoint = books ? `/api/rota?books=${encodeURIComponent(books)}` : "/api/rota";
+    fetch(endpoint)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: RouteData | null) => {
         if (d) {
