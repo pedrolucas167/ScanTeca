@@ -39,8 +39,13 @@ interface SimilarBook {
   distance: number;
 }
 
-const HISTORY_LIMIT = 12;
+const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.6;
+const MAX_CONTEXT_BOOKS = 6;
+const MAX_DIARY_ENTRIES = 8;
+const MAX_TOKENS_CHAT = 900;
+const MAX_TOKENS_PROFILE = 120;
+const MAX_TOKENS_REWRITE = 60;
 
 async function updateReaderProfile(
   userId: string,
@@ -62,7 +67,7 @@ async function updateReaderProfile(
       body: JSON.stringify({
         model: CHAT_MODEL,
         stream: false,
-        max_tokens: 250,
+        max_tokens: MAX_TOKENS_PROFILE,
         messages: [
           {
             role: "user",
@@ -117,7 +122,7 @@ async function contextualizeQuestion(
       body: JSON.stringify({
         model: CHAT_MODEL,
         stream: false,
-        max_tokens: 80,
+        max_tokens: MAX_TOKENS_REWRITE,
         messages: [
           {
             role: "user",
@@ -274,7 +279,7 @@ export async function POST(request: NextRequest) {
       prisma.diaryEntry.findMany({
         where: { userId, ragEnabled: true },
         orderBy: { createdAt: "desc" },
-        take: 12,
+        take: MAX_DIARY_ENTRIES,
         select: {
           type: true,
           content: true,
@@ -396,7 +401,7 @@ export async function POST(request: NextRequest) {
           };
           return score(b) - score(a);
         })
-        .slice(0, 8);
+        .slice(0, MAX_CONTEXT_BOOKS);
       console.log(
         `[oracle] Híbrido: títulos=[${[...hitBookIds].join(", ")}] autores=[${[...hitAuthors].join(", ")}] gêneros=[${[...hitGenres].join(", ")}] → +${extra.length} livros`
       );
@@ -501,6 +506,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         messages,
         stream: true,
         temperature,
+        max_tokens: MAX_TOKENS_CHAT,
       }),
     });
 
@@ -590,28 +596,38 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           }
         } finally {
           try {
+            const persist: Promise<unknown>[] = [];
             if (fullText.trim()) {
-              await prisma.oracleMessage.create({
-                data: {
-                  userId,
-                  sessionId,
-                  role: "assistant",
-                  content: fullText,
-                  sources,
-                },
-              });
+              persist.push(
+                prisma.oracleMessage.create({
+                  data: {
+                    userId,
+                    sessionId,
+                    role: "assistant",
+                    content: fullText,
+                    sources,
+                  },
+                })
+              );
             }
-            await updateReaderProfile(
-              userId,
-              setting?.oracleProfile,
-              trimmed,
-              fullText,
-              apiKey
+            if (historyDesc.length >= 4) {
+              persist.push(
+                updateReaderProfile(
+                  userId,
+                  setting?.oracleProfile,
+                  trimmed,
+                  fullText,
+                  apiKey
+                )
+              );
+            }
+            persist.push(
+              prisma.oracleSession.update({
+                where: { id: sessionId },
+                data: { mode },
+              })
             );
-            await prisma.oracleSession.update({
-              where: { id: sessionId },
-              data: { mode },
-            });
+            await Promise.all(persist);
           } catch (err) {
             console.error("[oracle] memory persist error:", err);
           }

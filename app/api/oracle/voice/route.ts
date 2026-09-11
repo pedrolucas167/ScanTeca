@@ -52,7 +52,7 @@ function buildSystemPrompt(
   };
   const ctx = books.length
     ? books
-        .slice(0, 30)
+        .slice(0, 8)
         .map(
           (b, i) =>
             `${i + 1}. "${b.title}" — ${b.author}` +
@@ -60,7 +60,7 @@ function buildSystemPrompt(
             (b.genre ? ` [${b.genre}]` : "") +
             ` | Status: ${b.status}` +
             (b.rating ? ` | Nota: ${b.rating}/5` : "") +
-            (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 250)}` : "")
+            (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 150)}` : "")
         )
         .join("\n")
     : "Acervo vazio.";
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
         synopsis: true,
         publishedDate: true,
       },
-      take: 30,
+      take: 8,
     });
 
     const systemPrompt = buildSystemPrompt(books, mode, setting?.oracleProfile);
@@ -208,6 +208,7 @@ export async function POST(request: NextRequest) {
         messages,
         stream: true,
         temperature,
+        max_tokens: 250,
         modalities: ["text", "audio"],
         audio: { voice: VOICE_VOICE, format: VOICE_FORMAT },
       }),
