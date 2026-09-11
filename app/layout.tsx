@@ -16,6 +16,8 @@ import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
 import MobileNav from "./MobileNav";
+import RoutePrefetch from "./RoutePrefetch";
+import WebVitals from "./WebVitals";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -253,6 +255,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </footer>
         </ClerkProvider>
         <PwaRegister />
+        <RoutePrefetch />
+        <WebVitals />
       </body>
     </html>
   );
