@@ -87,6 +87,14 @@ export default function OraclePage() {
   const [recording, setRecording] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    const saved = localStorage.getItem("oraclePlaybackRate");
+    if (!saved) return 1;
+    const rate = Number(saved);
+    return rate > 0 ? rate : 1;
+  });
+  const playbackRateRef = useRef(playbackRate);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [stats, setStats] = useState({ total: 0, indexed: 0 });
   const [profile, setProfile] = useState("");
@@ -128,6 +136,12 @@ export default function OraclePage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
+    localStorage.setItem("oraclePlaybackRate", playbackRate.toString());
+  }, [playbackRate]);
 
   useEffect(() => {
     return () => {
@@ -203,6 +217,7 @@ export default function OraclePage() {
       if (!blob || blob.size === 0) continue;
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = playbackRateRef.current;
       audioRef.current = audio;
       await new Promise<void>((resolve) => {
         audioDoneRef.current = resolve;
@@ -268,6 +283,7 @@ export default function OraclePage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = playbackRateRef.current;
       audioRef.current = audio;
       audio.onended = () => {
         URL.revokeObjectURL(url);
@@ -474,6 +490,7 @@ export default function OraclePage() {
       const blob = new Blob([bytes], { type: "audio/mpeg" });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = playbackRateRef.current;
       audioRef.current = audio;
       audioPlayingRef.current = true;
       audio.onended = () => {
@@ -869,6 +886,19 @@ export default function OraclePage() {
             <span>Acervo Todo</span>
             <Icon name="expand_more" className="text-xs text-outline" />
           </span>
+          <button
+            onClick={() =>
+              setPlaybackRate((prev) => {
+                const SPEEDS = [0.75, 1, 1.25, 1.5];
+                const i = SPEEDS.findIndex((s) => Math.abs(s - prev) < 0.01);
+                return SPEEDS[(i + 1) % SPEEDS.length];
+              })
+            }
+            title="Velocidade da voz"
+            className="flex h-8 min-w-[3.5rem] items-center justify-center rounded-full border border-outline-variant/40 bg-surface-container px-2 text-[11px] font-medium text-on-surface transition-colors hover:border-primary/50 active:scale-95"
+          >
+            {playbackRate.toLocaleString("pt-BR")}x
+          </button>
           <button
             onClick={toggleVoice}
             title={voiceOn ? "Desativar voz" : "Ativar Voice Chat"}
