@@ -1,4 +1,4 @@
-const CACHE = "scanteca-v3";
+const CACHE = "scanteca-v5";
 const OFFLINE = "/offline.html";
 const PRECACHE = [
   OFFLINE,
