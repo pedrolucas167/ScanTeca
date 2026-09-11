@@ -7,6 +7,7 @@ import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { getDefaultCollection } from "@/lib/default-collection";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const scanSchema = z.object({
@@ -62,6 +63,13 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "scan",
+      userId,
+      ...rateLimits.scan,
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, scanSchema);
     if (!parsed.ok) return parsed.response;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { findBookCover } from "@/lib/book-cover";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const searchCoverSchema = z
@@ -21,6 +22,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "search-cover",
+      userId,
+      ...rateLimits["search-cover"],
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, searchCoverSchema);
     if (!parsed.ok) return parsed.response;

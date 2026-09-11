@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const ttsSchema = z.object({
@@ -21,6 +22,13 @@ export async function POST(request: NextRequest) {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "oracle/tts",
+      userId,
+      ...rateLimits["oracle/tts"],
+    });
+    if (rateLimit) return rateLimit;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {

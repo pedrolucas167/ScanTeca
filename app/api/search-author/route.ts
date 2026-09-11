@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const searchAuthorSchema = z
@@ -38,6 +39,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "search-author",
+      userId,
+      ...rateLimits["search-author"],
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, searchAuthorSchema);
     if (!parsed.ok) return parsed.response;
