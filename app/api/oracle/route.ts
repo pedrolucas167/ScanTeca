@@ -7,12 +7,13 @@ import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
-const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE"] as const;
+const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
 const oracleSchema = z.object({
   question: z.string().nullish(),
   mode: z.enum(ORACLE_MODES).default("EXPLORE"),
   sessionId: z.string().cuid().nullish(),
+  temperature: z.coerce.number().min(0).max(2).default(1),
   audio: z
     .object({
       data: z.string().nullish(),
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = await readJson(request, oracleSchema);
     if (!parsed.ok) return parsed.response;
-    const { audio, mode, sessionId: requestedSessionId } = parsed.data;
+    const { audio, mode, sessionId: requestedSessionId, temperature } = parsed.data;
 
     let question = parsed.data.question?.trim() ?? "";
 
@@ -467,6 +468,7 @@ export async function POST(request: NextRequest) {
       JOURNEY: "Considere leituras em andamento, atividade recente e objetivo do leitor para propor o próximo passo sustentável da jornada.",
       CURATE: "Crie uma sequência ordenada de leitura com progressão clara e explique a função de cada obra na curadoria.",
       LOCATE: "Priorize identificar os volumes pedidos e oriente o leitor a usar a ação Criar rota exibida nas fontes.",
+      ASSISTANT: "Aja como um assistente pessoal atencioso e leve: responva dúvidas do dia a dia sobre leituras, organize lembretes, e converse com naturalidade sem soar como um bibliotecário formal.",
     };
     const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas.
 
@@ -498,6 +500,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         model: CHAT_MODEL,
         messages,
         stream: true,
+        temperature,
       }),
     });
 

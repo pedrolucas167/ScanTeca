@@ -9,8 +9,10 @@ const ttsSchema = z.object({
 });
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const TTS_MODEL = process.env.ORACLE_TTS_MODEL || "openai/tts-1";
+const TTS_MODEL =
+  process.env.ORACLE_TTS_MODEL || "openai/gpt-4o-mini-tts-2025-12-15";
 const TTS_VOICE = process.env.ORACLE_TTS_VOICE || "nova";
+const TTS_INSTRUCTIONS = process.env.ORACLE_TTS_INSTRUCTIONS || "";
 
 /** POST /api/oracle/tts — texto → voz via endpoint de speech do OpenRouter. */
 export async function POST(request: NextRequest) {
@@ -56,6 +58,15 @@ export async function POST(request: NextRequest) {
         input: text.trim().slice(0, 1500),
         voice: TTS_VOICE,
         response_format: "mp3",
+        ...(TTS_INSTRUCTIONS
+          ? {
+              provider: {
+                options: {
+                  openai: { instructions: TTS_INSTRUCTIONS },
+                },
+              },
+            }
+          : {}),
       }),
     });
 
