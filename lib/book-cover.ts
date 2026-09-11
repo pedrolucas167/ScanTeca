@@ -1,3 +1,12 @@
+import {
+  isTitleSimilar,
+  isAuthorSimilar,
+  extractMainTitle,
+  normalizeAuthor,
+  upgradeCoverUrl,
+  isUnknownTitle,
+} from "./book-metadata";
+
 interface GoogleBooksVolume {
   totalItems: number;
   items?: {
@@ -41,6 +50,12 @@ interface WikipediaApiResponse {
   };
 }
 
+function pushCandidate(list: string[], url: string | null | undefined) {
+  if (!url) return;
+  const upgraded = upgradeCoverUrl(url);
+  if (upgraded) list.push(upgraded);
+}
+
 export async function findBookCover({
   title,
   author,
@@ -52,8 +67,14 @@ export async function findBookCover({
 }): Promise<string | null> {
   const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : "";
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+  const mainTitle = extractMainTitle(title) || title || "";
 
-  console.log("[findBookCover] title:", title, "author:", author, "isbn:", cleanedIsbn);
+  console.log("[findBookCover] title:", mainTitle, "author:", author, "isbn:", cleanedIsbn);
+
+  if (isUnknownTitle(mainTitle) && !cleanedIsbn) {
+    console.log("[findBookCover] no usable title or isbn, giving up");
+    return null;
+  }
 
   const candidates: string[] = [];
 
@@ -70,7 +91,7 @@ export async function findBookCover({
             const img =
               item.volumeInfo.imageLinks?.thumbnail ??
               item.volumeInfo.imageLinks?.smallThumbnail;
-            if (img) candidates.push(img);
+            pushCandidate(candidates, img);
           }
         }
       }
@@ -86,25 +107,25 @@ export async function findBookCover({
         const data = (await res.json()) as OpenLibraryResponse;
         const book = data[`ISBN:${cleanedIsbn}`];
         const cover = book?.cover?.medium ?? book?.cover?.small;
-        if (cover) candidates.push(cover);
+        pushCandidate(candidates, cover);
       }
     } catch (err) {
       console.error("Open Library cover search error:", err);
     }
   }
 
-  if (!title) {
+  if (!mainTitle) {
     console.log("[findBookCover] no title, giving up");
     return null;
   }
 
-  const queryTitle = title.toLowerCase().trim();
-  const queryAuthor = (author || "").toLowerCase().trim();
+  const queryTitle = mainTitle.toLowerCase().trim();
+  const queryAuthor = (normalizeAuthor(author) || author || "").toLowerCase().trim();
 
   try {
     const queries = [
-      encodeParams(title, author || ""),
-      encodeURIComponent(`${title} ${author || ""}`.trim()),
+      encodeParams(mainTitle, author || ""),
+      encodeURIComponent(`${mainTitle} ${author || ""}`.trim()),
     ];
 
     for (const q of queries) {
@@ -128,7 +149,7 @@ export async function findBookCover({
               isTitleSimilar(queryTitle, foundTitle) &&
               (!queryAuthor || isAuthorSimilar(queryAuthor, foundAuthor))
             ) {
-              candidates.push(img);
+              pushCandidate(candidates, img);
             }
           }
         }
@@ -140,9 +161,9 @@ export async function findBookCover({
 
   try {
     const searchQueries = [
-      `${title} ${author || ""}`.trim(),
-      title,
-      title.replace(/[^\w\s]/g, ""),
+      `${mainTitle} ${author || ""}`.trim(),
+      mainTitle,
+      mainTitle.replace(/[^\w\s]/g, ""),
     ];
 
     for (const q of searchQueries) {
@@ -164,12 +185,15 @@ export async function findBookCover({
           if (!titleMatch) continue;
 
           if (doc.cover_i) {
-            candidates.push(`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`);
+            pushCandidate(
+              candidates,
+              `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+            );
           }
 
           if (doc.cover) {
             const cover = doc.cover?.medium ?? doc.cover?.small;
-            if (cover) candidates.push(cover);
+            pushCandidate(candidates, cover);
           }
 
           if (authorMatch) {
@@ -189,7 +213,8 @@ export async function findBookCover({
                   if (workRes.ok) {
                     const work = await workRes.json();
                     if (work.covers?.[0]) {
-                      candidates.push(
+                      pushCandidate(
+                        candidates,
                         `https://covers.openlibrary.org/b/id/${work.covers[0]}-L.jpg`
                       );
                     }
@@ -197,7 +222,7 @@ export async function findBookCover({
                 }
 
                 const cover = book?.cover?.medium ?? book?.cover?.small;
-                if (cover) candidates.push(cover);
+                pushCandidate(candidates, cover);
               }
             }
           }
@@ -208,8 +233,8 @@ export async function findBookCover({
     console.error("Open Library search error:", err);
   }
 
-  const wikiCover = await findWikipediaCover(`${title} ${author || ""}`.trim());
-  if (wikiCover) candidates.push(wikiCover);
+  const wikiCover = await findWikipediaCover(`${mainTitle} ${author || ""}`.trim());
+  if (wikiCover) pushCandidate(candidates, wikiCover);
 
   for (const url of candidates) {
     if (await isValidImageUrl(url)) {
@@ -283,6 +308,8 @@ export async function findWikipediaCover(
   return null;
 }
 
+export { normalize, isTitleSimilar, isAuthorSimilar } from "./book-metadata";
+
 function encodeParams(title: string, author: string) {
   const parts: string[] = [];
   if (title) parts.push(`intitle:${title}`);
@@ -290,39 +317,3 @@ function encodeParams(title: string, author: string) {
   return parts.join("+");
 }
 
-export function normalize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9áàâãéêíóôõúç\s]/g, "")
-    .split(/\s+/)
-    .filter((w) => w.length > 2);
-}
-
-export function isTitleSimilar(query: string, found: string): boolean {
-  const queryWords = normalize(query);
-  const foundWords = normalize(found);
-  if (queryWords.length === 0 || foundWords.length === 0) return false;
-
-  const common = queryWords.filter((w) =>
-    foundWords.some((fw) => fw === w || fw.startsWith(w) || w.startsWith(fw))
-  );
-
-  // Short titles (<=3 significant words): every word must appear, otherwise
-  // generic words like "bem"/"mal" match unrelated books.
-  if (queryWords.length <= 3) return common.length === queryWords.length;
-
-  // Longer titles (often include subtitle): match if most query words appear
-  return common.length >= Math.max(1, Math.ceil(queryWords.length * 0.5));
-}
-
-export function isAuthorSimilar(query: string, found: string): boolean {
-  const queryWords = normalize(query);
-  const foundWords = normalize(found);
-  // No author to verify against → accept. But when we DO have an author and
-  // the candidate has none, we can't confirm it's the same book → reject.
-  if (queryWords.length === 0) return true;
-  if (foundWords.length === 0) return false;
-  return queryWords.some((w) =>
-    foundWords.some((fw) => fw === w || fw.includes(w) || w.includes(fw))
-  );
-}

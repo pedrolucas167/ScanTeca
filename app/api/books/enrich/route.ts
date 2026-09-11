@@ -4,7 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { findSynopsis, cleanSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
-import { isTitleSimilar, isAuthorSimilar } from "@/lib/book-cover";
+import {
+  isTitleSimilar,
+  isAuthorSimilar,
+  cleanIsbn,
+  extractMainTitle,
+  normalizeAuthor,
+  normalizeGenre,
+} from "@/lib/book-metadata";
 import { readJson } from "@/lib/validation";
 import { z } from "zod";
 
@@ -62,15 +69,18 @@ async function fetchGoogleBooksFields(book: BookRow): Promise<{
   const keyParam = apiKey ? `&key=${apiKey}` : "";
 
   const queries: string[] = [];
-  const cleanedIsbn = book.isbn?.replace(/[^0-9X]/gi, "");
+  const cleanedIsbn = cleanIsbn(book.isbn);
+  const mainTitle = extractMainTitle(book.title) || book.title;
+  const normalAuthor = normalizeAuthor(book.author) || book.author;
+
   if (cleanedIsbn) queries.push(`isbn:${cleanedIsbn}`);
   queries.push(
-    `intitle:${encodeURIComponent(book.title)}+inauthor:${encodeURIComponent(book.author)}`
+    `intitle:${encodeURIComponent(mainTitle)}+inauthor:${encodeURIComponent(normalAuthor)}`
   );
-  queries.push(encodeURIComponent(`${book.title} ${book.author}`));
+  queries.push(encodeURIComponent(`${mainTitle} ${normalAuthor}`));
 
-  const queryTitle = book.title.toLowerCase().trim();
-  const queryAuthor = book.author.toLowerCase().trim();
+  const queryTitle = mainTitle.toLowerCase().trim();
+  const queryAuthor = normalAuthor.toLowerCase().trim();
 
   for (const q of queries) {
     try {
@@ -99,7 +109,7 @@ async function fetchGoogleBooksFields(book: BookRow): Promise<{
 
         return {
           synopsis: cleanSynopsis(info.description),
-          genre: info.categories?.[0] || null,
+          genre: normalizeGenre(info.categories?.[0]),
           pages: info.pageCount || null,
         };
       }

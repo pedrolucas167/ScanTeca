@@ -1,4 +1,5 @@
-export function playBeep() {
+export function playBeep(enabled = true) {
+  if (!enabled) return;
   try {
     const ctx = new AudioContext();
     const oscillator = ctx.createOscillator();

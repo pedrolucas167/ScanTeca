@@ -1,4 +1,10 @@
-import { isTitleSimilar, isAuthorSimilar } from "./book-cover";
+import {
+  isTitleSimilar,
+  isAuthorSimilar,
+  extractMainTitle,
+  normalizeAuthor,
+  cleanIsbn,
+} from "./book-metadata";
 
 interface OpenLibraryDoc {
   title?: string;
@@ -23,12 +29,14 @@ export async function findOriginalPublishYear({
   author?: string;
   isbn?: string;
 }): Promise<number | null> {
-  const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : "";
+  const cleanedIsbn = cleanIsbn(isbn);
+  const mainTitle = extractMainTitle(title) || title || "";
+  const normalAuthor = normalizeAuthor(author) || author || "";
+
+  if (!mainTitle && !cleanedIsbn) return null;
 
   // ISBN → edição exata → work → ano da primeira publicação
-  // (guarda de tamanho: placeholders tipo "MANUAL-<uuid>" viram dígitos
-  // soltos após o replace e não são ISBNs válidos)
-  if (cleanedIsbn.length === 10 || cleanedIsbn.length === 13) {
+  if (cleanedIsbn) {
     try {
       const res = await fetch(
         `https://openlibrary.org/search.json?isbn=${encodeURIComponent(
@@ -45,20 +53,23 @@ export async function findOriginalPublishYear({
     }
   }
 
-  if (!title) return null;
+  if (!mainTitle) return null;
 
   // Título + autor → valida o match antes de aceitar o ano
   try {
-    const params = new URLSearchParams({ title, limit: "10" });
-    if (author) params.set("author", author);
+    const params = new URLSearchParams({
+      title: mainTitle,
+      limit: "10",
+    });
+    if (normalAuthor) params.set("author", normalAuthor);
     params.set("fields", "title,author_name,first_publish_year");
 
     const res = await fetch(`https://openlibrary.org/search.json?${params}`);
     if (!res.ok) return null;
 
     const data = (await res.json()) as OpenLibrarySearchResponse;
-    const queryTitle = title.toLowerCase().trim();
-    const queryAuthor = (author || "").toLowerCase().trim();
+    const queryTitle = mainTitle.toLowerCase().trim();
+    const queryAuthor = (normalAuthor || "").toLowerCase().trim();
 
     for (const doc of data.docs || []) {
       if (typeof doc.first_publish_year !== "number") continue;

@@ -6,21 +6,11 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import type { IScannerControls } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { playBeep } from "@/lib/beep";
+import BookPreviewSheet, { type BookDraft } from "./BookPreviewSheet";
 
 interface ScanResult {
   type: "success" | "error" | "info";
   message: string;
-}
-
-interface ScannedBook {
-  id: string;
-  title: string;
-  author: string;
-  publishedDate?: string | null;
-  coverUrl?: string | null;
-  genre?: string | null;
-  pages?: number | null;
-  collection?: string;
 }
 
 function Icon({
@@ -42,13 +32,6 @@ function Icon({
   );
 }
 
-const statusMap: Record<string, string> = {
-  "Na Fila": "TO_READ",
-  "Lendo": "READING",
-  "Lido": "READ",
-  "Consulta": "WISHLIST",
-};
-
 export default function Scanner() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -58,9 +41,11 @@ export default function Scanner() {
   const [loading, setLoading] = useState(false);
   const [manualIsbn, setManualIsbn] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
-  const [scannedBook, setScannedBook] = useState<ScannedBook | null>(null);
-  const [statusChip, setStatusChip] = useState("Na Fila");
+  const [scannedBook, setScannedBook] = useState<BookDraft | null>(null);
+  const [existing, setExisting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [flashlightOn, setFlashlightOn] = useState(false);
   const processingRef = useRef(false);
 
   const stopScanner = useCallback(() => {
@@ -78,7 +63,7 @@ export default function Scanner() {
       if (processingRef.current) return;
       processingRef.current = true;
 
-      playBeep();
+      playBeep(soundEnabled);
       setLoading(true);
       setResult({
         type: "info",
@@ -89,7 +74,7 @@ export default function Scanner() {
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isbn }),
+          body: JSON.stringify({ isbn, preview: true }),
         });
 
         const data = await res.json();
@@ -97,18 +82,12 @@ export default function Scanner() {
         if (res.ok) {
           setResult({
             type: "success",
-            message: `${data.book.title} — reconhecido com sucesso`,
+            message: data.existing
+              ? "Livro já cadastrado"
+              : `${data.book.title} — reconhecido com sucesso`,
           });
-          setScannedBook({
-            id: data.book.id,
-            title: data.book.title,
-            author: data.book.author,
-            publishedDate: data.book.publishedDate,
-            coverUrl: data.book.coverUrl,
-            genre: data.book.genre,
-            pages: data.book.pages,
-            collection: data.book.collection,
-          });
+          setScannedBook(data.book);
+          setExisting(!!data.existing);
           stopScanner();
         } else {
           setResult({
@@ -128,8 +107,44 @@ export default function Scanner() {
         setLoading(false);
       }
     },
-    [stopScanner]
+    [stopScanner, soundEnabled]
   );
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((prev) => !prev);
+  }, []);
+
+  const toggleFlashlight = useCallback(async () => {
+    if (!videoRef.current?.srcObject) {
+      setResult({
+        type: "info",
+        message: "Inicie o scanner primeiro para usar a lanterna",
+      });
+      return;
+    }
+
+    const stream = videoRef.current.srcObject as MediaStream;
+    const track = stream.getVideoTracks()[0];
+    if (!track) {
+      setResult({ type: "info", message: "Lanterna não disponível" });
+      return;
+    }
+
+    const next = !flashlightOn;
+    try {
+      await track.applyConstraints({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        advanced: [{ torch: next }] as any,
+      });
+      setFlashlightOn(next);
+    } catch (err) {
+      console.error("Erro ao alternar lanterna:", err);
+      setResult({
+        type: "info",
+        message: "Lanterna não suportada neste dispositivo",
+      });
+    }
+  }, [flashlightOn]);
 
   const startScanner = useCallback(async () => {
     try {
@@ -217,17 +232,35 @@ export default function Scanner() {
       <div className="z-30 flex items-center justify-end gap-1.5 bg-gradient-to-b from-surface/90 via-surface/40 to-transparent px-4 pb-3 pt-3">
         <button
           type="button"
-          title="Lanterna"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/40 bg-primary-container/30 text-primary shadow-[0_0_12px_rgba(91,80,230,0.4)] transition-transform active:scale-95"
+          title={flashlightOn ? "Desligar lanterna" : "Ligar lanterna"}
+          onClick={toggleFlashlight}
+          className={`flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-95 ${
+            flashlightOn
+              ? "border-primary bg-primary-container text-on-primary-container shadow-[0_0_12px_rgba(91,80,230,0.6)]"
+              : "border-primary/40 bg-primary-container/30 text-primary shadow-[0_0_12px_rgba(91,80,230,0.4)]"
+          }`}
         >
-          <Icon name="flash_on" className="text-[18px]" fill />
+          <Icon
+            name={flashlightOn ? "flash_off" : "flash_on"}
+            className="text-[18px]"
+            fill={flashlightOn}
+          />
         </button>
         <button
           type="button"
-          title="Som"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-high/80 text-on-surface-variant transition-colors hover:text-on-surface active:scale-95"
+          title={soundEnabled ? "Desativar som" : "Ativar som"}
+          onClick={toggleSound}
+          className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors active:scale-95 ${
+            soundEnabled
+              ? "border-primary/40 bg-primary-container/30 text-primary"
+              : "border-outline-variant/30 bg-surface-container-high/80 text-on-surface-variant hover:text-on-surface"
+          }`}
         >
-          <Icon name="volume_up" className="text-[18px]" />
+          <Icon
+            name={soundEnabled ? "volume_up" : "volume_off"}
+            className="text-[18px]"
+            fill={soundEnabled}
+          />
         </button>
       </div>
 
@@ -350,140 +383,72 @@ export default function Scanner() {
 
       {/* Capture / bottom sheet */}
       {scannedBook && (
-        <main className="relative z-30 -mt-2 px-4 pb-28 pt-4">
-          <div className="w-full rounded-b-lg rounded-t-xl border border-white/10 bg-surface-container-high/90 p-4 shadow-2xl backdrop-blur-xl">
-            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-outline-variant/50" />
+        <BookPreviewSheet
+          book={scannedBook}
+          existing={existing}
+          loading={saving}
+          onConfirm={async (status) => {
+            const book = scannedBook;
+            if (!book) return;
 
-            <div className="mb-4 flex items-center justify-between">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/60 px-2.5 py-1 font-label-sm text-label-sm text-emerald-300">
-                <Icon name="check_circle" className="text-[14px] text-emerald-400" fill />
-                <span>ISBN Reconhecido • EAN-13 Válido</span>
-              </div>
-              <span className="font-caption text-caption text-outline tracking-wider">
-                #{scannedBook.id.slice(0, 8)}
-              </span>
-            </div>
+            if (existing) {
+              if (book.id) {
+                router.push(`/books/${book.id}`);
+              }
+              return;
+            }
 
-            <div className="mb-4 flex items-start gap-4 rounded-lg border border-outline-variant/25 bg-surface-container-lowest/60 p-3">
-              <div
-                className="group relative h-28 w-20 flex-shrink-0 overflow-hidden rounded-md border border-outline-variant/30 shadow-lg"
-                style={{
-                  backgroundImage: scannedBook.coverUrl
-                    ? `url(${scannedBook.coverUrl})`
-                    : "url('/landing/scanner-book.jpg')",
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              >
-                <div className="absolute bottom-0 left-0 top-0 w-2 bg-gradient-to-r from-black/60 to-transparent" />
-              </div>
-              <div className="flex h-28 flex-1 flex-col justify-between overflow-hidden">
-                <div>
-                  <span className="block font-label-sm text-label-sm uppercase tracking-widest text-secondary">
-                    {scannedBook.genre || "Ficção"}
-                  </span>
-                  <h1 className="truncate font-quote-md text-quote-md font-semibold leading-snug tracking-tight text-on-surface">
-                    {scannedBook.title}
-                  </h1>
-                  <p className="truncate font-body-sm text-body-sm font-medium text-on-surface-variant">
-                    {scannedBook.author}
-                  </p>
-                  <p className="truncate font-caption text-caption text-outline">
-                    {scannedBook.publishedDate || "Ed. não informada"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 border-t border-outline-variant/20 pt-1 font-caption text-caption text-on-surface-variant/80">
-                  <span className="flex items-center gap-0.5">
-                    <Icon name="menu_book" className="text-[13px] text-secondary" />
-                    {scannedBook.pages || "—"} págs
-                  </span>
-                  <span>•</span>
-                  <span>Lombada —</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-1">
-              <div className="flex flex-col gap-1">
-                <label className="flex items-center justify-between font-caption text-caption text-on-surface-variant">
-                  <span>Localização Física no Acervo</span>
-                  <span className="cursor-pointer text-[11px] text-primary hover:underline">
-                    Alterar mapa
-                  </span>
-                </label>
-                <div className="flex items-center justify-between rounded-2xl border border-outline-variant/40 bg-surface-container px-3 py-2 text-on-surface">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Icon name="local_library" className="text-[18px] text-primary" />
-                    <span className="truncate font-body-sm text-body-sm font-medium">
-                      {scannedBook.collection || "Estante Principal"} &gt; Prateleira 2
-                      (Ficção)
-                    </span>
-                  </div>
-                  <Icon name="expand_more" className="text-[16px] text-outline-variant" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5 pt-1">
-                <label className="font-caption text-caption text-on-surface-variant">
-                  Estado de Leitura
-                </label>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                  {["Na Fila", "Lendo", "Lido", "Consulta"].map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setStatusChip(s)}
-                      className={`flex items-center gap-1 rounded-full border px-3 py-1 font-label-sm text-label-sm transition-colors ${
-                        statusChip === s
-                          ? "border-primary bg-primary-container text-on-primary-container shadow-[0_0_12px_rgba(91,80,230,0.35)]"
-                          : "border-outline-variant/30 bg-surface-container text-on-surface-variant hover:border-outline-variant"
-                      }`}
-                    >
-                      {statusChip === s && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      )}
-                      <span>{s}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-4">
-              <button
-                onClick={async () => {
-                  if (!scannedBook) return;
-                  setSaving(true);
-                  try {
-                    const dbStatus = statusMap[statusChip] || "TO_READ";
-                    await fetch("/api/books", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ id: scannedBook.id, status: dbStatus }),
-                    });
-                  } catch (err) {
-                    console.error("Erro ao salvar status:", err);
-                  } finally {
-                    setSaving(false);
-                    router.push("/");
-                  }
-                }}
-                disabled={saving}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-6 py-3.5 font-label-md text-label-md text-on-primary-container shadow-[0_12px_32px_-8px_rgba(91,80,230,0.4)] transition-all hover:bg-inverse-primary active:scale-[0.98] disabled:opacity-70"
-              >
-                <Icon name="add_circle" className="text-[20px]" />
-                <span>{saving ? "Salvando..." : "Salvar e Próximo"}</span>
-              </button>
-              <button
-                onClick={() => router.push(`/books/${scannedBook.id}`)}
-                className="flex w-full items-center justify-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container px-6 py-2.5 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-bright active:scale-[0.98]"
-              >
-                <Icon name="psychology" className="text-[18px] text-tertiary" />
-                <span>Ver Ficha Completa & Oráculo</span>
-              </button>
-            </div>
-          </div>
-        </main>
+            setSaving(true);
+            try {
+              const res = await fetch("/api/books", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  isbn: book.isbn,
+                  title: book.title,
+                  author: book.author,
+                  publishedDate: book.publishedDate,
+                  synopsis: book.synopsis,
+                  coverUrl: book.coverUrl,
+                  genre: book.genre,
+                  pages: book.pages,
+                  status,
+                  collection: book.collection,
+                }),
+              });
+              const data = await res.json();
+              if (res.ok) {
+                if (data.message === "Livro já cadastrado" && data.book?.id) {
+                  router.push(`/books/${data.book.id}`);
+                  return;
+                }
+                setResult({
+                  type: "success",
+                  message: `${data.book.title} — adicionado com sucesso`,
+                });
+                router.push("/");
+              } else {
+                setResult({
+                  type: "error",
+                  message: data.error || "Erro ao adicionar livro",
+                });
+                setSaving(false);
+              }
+            } catch (err) {
+              console.error("Erro ao adicionar livro:", err);
+              setResult({ type: "error", message: "Erro de rede ao adicionar" });
+              setSaving(false);
+            }
+          }}
+          onCancel={() => {
+            setScannedBook(null);
+            setExisting(false);
+            processingRef.current = false;
+          }}
+          onViewDetails={
+            scannedBook?.id ? () => router.push(`/books/${scannedBook.id!}`) : undefined
+          }
+        />
       )}
 
       {/* Manual input modal */}
