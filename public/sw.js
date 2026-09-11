@@ -30,6 +30,16 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+function isCacheable(res) {
+  return res && res.ok && res.type === "basic";
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -42,8 +52,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, copy));
+          if (isCacheable(res)) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, copy));
+          }
           return res;
         })
         .catch(() =>
@@ -55,21 +67,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (
+  const isStatic =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/_next/image") ||
-    /\.(png|svg|ico|woff2?)$/.test(url.pathname)
-  ) {
+    /\.(png|svg|ico|woff2?)$/.test(url.pathname);
+
+  if (isStatic) {
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, copy));
+      caches.match(request).then((cached) => {
+        const fetchAndCache = fetch(request)
+          .then((res) => {
+            if (isCacheable(res)) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(request, copy));
+            }
             return res;
           })
-      )
+          .catch(() => cached);
+
+        return cached || fetchAndCache;
+      })
     );
   }
 });
