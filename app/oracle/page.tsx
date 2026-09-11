@@ -102,6 +102,7 @@ export default function OraclePage() {
   const [artifacts, setArtifacts] = useState<OracleArtifact[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [savingArtifact, setSavingArtifact] = useState<number | null>(null);
+  const [playingTtsIndex, setPlayingTtsIndex] = useState<number | null>(null);
   const micSupported = useSyncExternalStore(
     () => () => {},
     () =>
@@ -176,6 +177,8 @@ export default function OraclePage() {
     audioDoneRef.current = null;
     audioRef.current?.pause();
     audioRef.current = null;
+    audioPlayingRef.current = false;
+    setPlayingTtsIndex(null);
   };
 
   const enqueueSpeech = (text: string) => {
@@ -249,15 +252,19 @@ export default function OraclePage() {
     }
   };
 
-  const speak = async (text: string) => {
+  const speak = async (text: string, index: number) => {
     try {
       stopAudio();
+      setPlayingTtsIndex(index);
       const res = await fetch("/api/oracle/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setPlayingTtsIndex(null);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
@@ -265,10 +272,18 @@ export default function OraclePage() {
       audio.onended = () => {
         URL.revokeObjectURL(url);
         audioRef.current = null;
+        setPlayingTtsIndex(null);
         maybeAutoListen();
       };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        audioRef.current = null;
+        setPlayingTtsIndex(null);
+      };
       await audio.play();
-    } catch {}
+    } catch {
+      setPlayingTtsIndex(null);
+    }
   };
 
   const toggleVoice = () => {
@@ -1198,12 +1213,21 @@ export default function OraclePage() {
                     msg.role === "assistant" && (
                       <div className="flex flex-wrap gap-3">
                         <button
-                          onClick={() => speak(msg.content)}
-                          title="Ouvir resposta"
-                          className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-on-surface"
+                          onClick={() =>
+                            playingTtsIndex === i ? stopAudio() : speak(msg.content, i)
+                          }
+                          title={playingTtsIndex === i ? "Parar leitura" : "Ouvir resposta"}
+                          className={`flex items-center gap-1 font-caption text-caption transition-colors ${
+                            playingTtsIndex === i
+                              ? "text-primary hover:text-on-surface"
+                              : "text-outline hover:text-on-surface"
+                          }`}
                         >
-                          <Icon name="volume_up" className="text-sm" />
-                          Ouvir resposta
+                          <Icon
+                            name={playingTtsIndex === i ? "stop" : "volume_up"}
+                            className="text-sm"
+                          />
+                          {playingTtsIndex === i ? "Parar" : "Ouvir resposta"}
                         </button>
                         <button
                           onClick={() => void saveArtifact(msg, i)}
