@@ -8,7 +8,7 @@ import { z } from "zod";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const VOICE_MODEL =
   process.env.ORACLE_VOICE_MODEL || "openai/gpt-audio-mini";
-const VOICE_VOICE = process.env.ORACLE_VOICE_VOICE || "nova";
+const VOICE_VOICE = process.env.ORACLE_VOICE_VOICE || "alloy";
 const VOICE_FORMAT = process.env.ORACLE_VOICE_FORMAT || "mp3";
 const STT_MODEL = process.env.ORACLE_STT_MODEL || "openai/whisper-1";
 

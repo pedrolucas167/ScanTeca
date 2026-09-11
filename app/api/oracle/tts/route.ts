@@ -9,18 +9,20 @@ const ttsSchema = z.object({
 });
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const TTS_INSTRUCTIONS = process.env.ORACLE_TTS_INSTRUCTIONS || "";
+const TTS_INSTRUCTIONS =
+  process.env.ORACLE_TTS_INSTRUCTIONS ||
+  "Fale como J.A.R.V.I.S., o assistente do Homem de Ferro: calmo, sofisticado, levemente britânico, eficiente e leal.";
 const TTS_CANDIDATES: { model: string; voice: string }[] = [
   ...(process.env.ORACLE_TTS_MODEL
     ? [
         {
           model: process.env.ORACLE_TTS_MODEL,
-          voice: process.env.ORACLE_TTS_VOICE || "pf_dora",
+          voice: process.env.ORACLE_TTS_VOICE || "pm_alex",
         },
       ]
     : []),
-  { model: "hexgrad/kokoro-82m", voice: "pf_dora" },
   { model: "hexgrad/kokoro-82m", voice: "pm_alex" },
+  { model: "hexgrad/kokoro-82m", voice: "pf_dora" },
   { model: "mistralai/voxtral-mini-tts-2603", voice: "en_paul_neutral" },
 ];
 
