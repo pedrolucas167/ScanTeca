@@ -60,6 +60,7 @@ export interface Recommendation {
 export interface RecommendationProfile {
   affinity: AffinityNode[];
   feedbackCount: number;
+  recommendationFeedbackCount: number;
   calibration: number;
 }
 
@@ -369,6 +370,81 @@ function scoreByOverlap(
   return Math.min(0.99, score);
 }
 
+interface FeedbackProfile {
+  dismissed: Set<string>;
+  wanted: Set<string>;
+  dismissedWordCounts: Map<string, number>;
+  wantedWordCounts: Map<string, number>;
+}
+
+function feedbackKey(normalizedTitle: string, normalizedAuthor: string): string {
+  return `${normalizedTitle}::${normalizedAuthor}`;
+}
+
+function buildFeedbackProfile(
+  feedbackList: { kind: string; normalizedTitle: string; normalizedAuthor: string }[]
+): FeedbackProfile {
+  const dismissed = new Set<string>();
+  const wanted = new Set<string>();
+  const dismissedWordCounts = new Map<string, number>();
+  const wantedWordCounts = new Map<string, number>();
+
+  for (const f of feedbackList) {
+    const key = feedbackKey(f.normalizedTitle, f.normalizedAuthor);
+    if (f.kind === "DISMISSED") dismissed.add(key);
+    if (f.kind === "WANT") wanted.add(key);
+
+    const counts = f.kind === "DISMISSED" ? dismissedWordCounts : wantedWordCounts;
+    for (const word of f.normalizedTitle.split(" ")) {
+      if (word.length > 2) counts.set(word, (counts.get(word) || 0) + 1);
+    }
+    for (const word of f.normalizedAuthor.split(" ")) {
+      if (word.length > 2) counts.set(word, (counts.get(word) || 0) + 1);
+    }
+  }
+
+  return { dismissed, wanted, dismissedWordCounts, wantedWordCounts };
+}
+
+function isFeedbackDismissed(
+  title: string,
+  author: string,
+  feedback: FeedbackProfile
+): boolean {
+  const normalizedTitle = normalize(title).join(" ");
+  const normalizedAuthor = normalize(author).join(" ");
+  return feedback.dismissed.has(feedbackKey(normalizedTitle, normalizedAuthor));
+}
+
+function feedbackScoreAdjustment(
+  title: string,
+  author: string,
+  feedback: FeedbackProfile
+): number {
+  const normalizedTitle = normalize(title).join(" ");
+  const normalizedAuthor = normalize(author).join(" ");
+  const key = feedbackKey(normalizedTitle, normalizedAuthor);
+
+  if (feedback.dismissed.has(key) || feedback.wanted.has(key)) return -1;
+
+  const words = new Set([
+    ...normalizedTitle.split(" ").filter((w) => w.length > 2),
+    ...normalizedAuthor.split(" ").filter((w) => w.length > 2),
+  ]);
+
+  let boost = 0;
+  for (const word of words) {
+    if (feedback.wantedWordCounts.has(word)) {
+      boost += 0.02 * Math.min(3, feedback.wantedWordCounts.get(word) || 0);
+    }
+    if (feedback.dismissedWordCounts.has(word)) {
+      boost -= 0.015 * Math.min(3, feedback.dismissedWordCounts.get(word) || 0);
+    }
+  }
+
+  return Math.max(-0.5, Math.min(0.3, boost));
+}
+
 function buildRagQuote(
   candidateTitle: string,
   candidateAuthor: string,
@@ -548,11 +624,21 @@ export async function buildRecommendations(
     ORDER BY updated_at DESC
   `;
 
-  const [diaryCount, reviewCount, ratingCount] = await Promise.all([
+  const [diaryCount, reviewCount, ratingCount, feedbackList] = await Promise.all([
     prisma.diaryEntry.count({ where: { userId } }),
     prisma.review.count({ where: { userId } }),
     prisma.book.count({ where: { userId, rating: { not: null } } }),
+    prisma.recommendationFeedback.findMany({
+      where: { userId },
+      select: {
+        kind: true,
+        normalizedTitle: true,
+        normalizedAuthor: true,
+      },
+    }),
   ]);
+
+  const feedback = buildFeedbackProfile(feedbackList);
 
   const books: BookForClient[] = booksRaw.map((b) => ({
     id: b.id,
@@ -573,6 +659,7 @@ export async function buildRecommendations(
       profile: {
         affinity: [],
         feedbackCount: 0,
+        recommendationFeedbackCount: 0,
         calibration: 0,
       },
       books,
@@ -601,10 +688,17 @@ export async function buildRecommendations(
   }));
 
   const feedbackCount = diaryCount + reviewCount + ratingCount;
+  const recommendationFeedbackCount = feedbackList.length;
   const indexedCount = booksRaw.filter((b) => b.embeddingText && b.embeddingText !== "[]").length;
   const calibration = Math.min(
     99,
-    Math.round(30 + totalBooks * 2.5 + indexedCount * 1.5 + feedbackCount * 0.3)
+    Math.round(
+      30 +
+        totalBooks * 2.5 +
+        indexedCount * 1.5 +
+        feedbackCount * 0.3 +
+        recommendationFeedbackCount * 0.6
+    )
   );
 
   const topGenre = genreFreq[0]?.label || keywordFreq[0]?.label || "Literatura";
@@ -656,6 +750,8 @@ export async function buildRecommendations(
     );
     if (alreadyInLibrary) continue;
 
+    if (isFeedbackDismissed(title, author, feedback)) continue;
+
     const key = `${normalize(title).join(" ")}::${normalize(author).join(" ")}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -666,7 +762,12 @@ export async function buildRecommendations(
     return {
       primary: null,
       queue: [],
-      profile: { affinity, feedbackCount, calibration },
+      profile: {
+        affinity,
+        feedbackCount,
+        recommendationFeedbackCount,
+        calibration,
+      },
       books,
     };
   }
@@ -680,13 +781,14 @@ export async function buildRecommendations(
     const text = `${title}. ${author}. ${description}. ${(info.categories || []).join(" ")}`;
 
     const baseScore = scoreByOverlap(item, genreFreq, authorFreq, keywordFreq, booksRaw);
+    const adjustment = feedbackScoreAdjustment(title, author, feedback);
 
     return {
       item,
       title,
       author,
       text,
-      score: baseScore,
+      score: Math.min(0.99, Math.max(0, baseScore + adjustment)),
       tags: info.categories?.slice(0, 2).map((c) => c.split("/").pop() || c) || [],
     };
   });
@@ -766,7 +868,12 @@ export async function buildRecommendations(
   return {
     primary,
     queue,
-    profile: { affinity, feedbackCount, calibration },
+    profile: {
+      affinity,
+      feedbackCount,
+      recommendationFeedbackCount,
+      calibration,
+    },
     books,
   };
 }
