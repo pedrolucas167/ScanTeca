@@ -3,53 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, type CSSProperties } from "react";
-
-interface Book {
-  id: string;
-  title: string;
-  author: string;
-  coverUrl: string | null;
-  genre: string | null;
-  pages: number | null;
-  status: string;
-  synopsis: string | null;
-  createdAt: Date;
-}
-
-interface PrimaryRecommendation {
-  id: string;
-  title: string;
-  author: string;
-  cover: string;
-  edition: string;
-  pages: number;
-  spine: number;
-  compat: number;
-  predictedRating: number;
-  ragQuote: string;
-  similarity: number;
-  vectorId: string;
-}
-
-interface Recommendation {
-  id: string;
-  title: string;
-  author: string;
-  cover: string | null;
-  score: number;
-  quote: string;
-  rating: number;
-  tags: string[];
-}
-
-const COVER_A_QUEDA =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAN_vMv_EGRg2fRZyWtErY8kS4VUJMB1fXgZs4IK5g6MISmvGBDhP1uhT8_JtpEzYxDK7SljY4OM6tPMWXVm-85HwcRoWMUHriE7oWRNSZimvo8u_fb3UlXJNEqc7v7FLkxMpqepu3i8v6fZ647QgtmKhxN_HF9ztiN8UCfbmcV_Kcl47xhbTwS2waNV6A34hOqSqCiWoyrOZ7Rq9YL71pYEYR5vK0yn0qXigdoKi5d2CsHQie0VU8Y0g";
-const COVER_A_PESTE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuA9uxujiwU9Y4FuTSxnVxJdJ-UkdPgdHQoLLkbQ8zgVQ0vodpLdu-_u7V4MFNooHBEJPlAi2CP03MMZ9tXDBwK79Faau-eqHcTgpfLV264HNvHbaNxw-o9jjHShc20LAkUwOhpezOXArQ6mT_sMa8u6yS3lDpHN6ak41Kxw5h9QGOSxSABgkrg6xaJupqj3giX2lxsY_vQ1vpKlxUpTWEjoT_4jXVJjAdDGFwd8r5eB4jKWgESjK32FNg";
-const COVER_O_PROCESSO =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBX4JTQ-20UCxqTD_6673F-aA5kvIQCeVJGv3cgdzW0cCKAqDIt_CKo03HHoOkJ2jD0GRqdNYv4i5aHx8eVAioQTWGg4Cwepxy_ozfy08sxHBAV3WiiXuYRqZ0ioIHxOlc6JVF2hvrNmIqgM8jHMquzmNy7CmNe1mNnO_h_Lvg4L1-k_aD28krJIyuj2dRAqHsharwlacIy9BPMGSg6rBSq7MPlxaHkurcFe-PpwxV1v-d9eNjxHn24tw";
-const COVER_A_CIDADE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDsXKNMZCa-R8oBMJMmVcCG7RxgZuvwvN8yJfwEKekdhvaJIoqCoERk5nZyKY71q9MKhyQMwdzN_dENziJD1TWqFOstTBWo0FRwUDy-Oc-LK71aJeyTMExVx0Fg0PZsE1HUBeE3aPO8z3wybnEgWop205B6-cTXgCxW38flcpTyLZqtNmoVdSPl2I1PiOMwtbhqeOjH6GVShcho9UAGFkn1eIsWRenMZ1AHdE-jyp5-IAx8iSnkr7G8yQ";
+import {
+  type BookForClient as Book,
+  type RecommendationsPayload,
+} from "@/lib/recommendations";
 
 function Icon({
   name,
@@ -70,76 +27,6 @@ function Icon({
       {name}
     </span>
   );
-}
-
-function buildProfileMock() {
-  return {
-    affinity: [
-      { label: "Existencialismo", score: 0.98, color: "primary" as const },
-      {
-        label: "Labirintos & Confinamento",
-        score: 0.94,
-        color: "tertiary" as const,
-      },
-      { label: "Crítica Social", score: 0.89, color: "secondary" as const },
-      { label: "Ficção Filosófica", score: 0.82, color: "outline" as const },
-    ],
-    feedbackCount: 142,
-    calibration: 94,
-  };
-}
-
-function buildPrimaryMock(): PrimaryRecommendation {
-  return {
-    id: "primary-1",
-    title: "A Queda",
-    author: "Albert Camus",
-    cover: COVER_A_QUEDA,
-    edition: "Edição de Bolso",
-    pages: 192,
-    spine: 1.4,
-    compat: 96,
-    predictedRating: 4.8,
-    ragQuote:
-      "Conexão identificada: O absurdo moral e o isolamento cívico cruzam diretamente com as suas anotações em Kafka e Camus no seu Diário.",
-    similarity: 0.941,
-    vectorId: "Camus-Kafka-92",
-  };
-}
-
-function buildQueueMock(): Recommendation[] {
-  return [
-    {
-      id: "rec-peste",
-      title: "A Peste",
-      author: "Albert Camus",
-      cover: COVER_A_PESTE,
-      score: 0.96,
-      quote: "Pela afinidade com dilemas morais coletivos",
-      rating: 4.7,
-      tags: ["Existencialismo", "Crítica Social"],
-    },
-    {
-      id: "rec-processo",
-      title: "O Processo",
-      author: "Franz Kafka",
-      cover: COVER_O_PROCESSO,
-      score: 0.94,
-      quote: "Continuação natural de A Metamorfose",
-      rating: 4.9,
-      tags: ["Ficção Filosófica", "Confinamento"],
-    },
-    {
-      id: "rec-cidade",
-      title: "A Cidade e as Serras",
-      author: "Eça de Queirós",
-      cover: COVER_A_CIDADE,
-      score: 0.88,
-      quote: "Contraste estético sugerido pelo Oráculo",
-      rating: 4.4,
-      tags: ["Clássico", "Portugal"],
-    },
-  ];
 }
 
 const affinityClasses = {
@@ -165,10 +52,21 @@ const affinityClasses = {
   },
 };
 
-export default function DescobrirClient({ books }: { books: Book[] }) {
-  const profile = buildProfileMock();
-  const primary = buildPrimaryMock();
-  const queue = buildQueueMock();
+export default function DescobrirClient({
+  books,
+  recommendations,
+}: {
+  books: Book[];
+  recommendations: RecommendationsPayload | null;
+}) {
+  const profile = recommendations?.profile ?? {
+    affinity: [],
+    feedbackCount: 0,
+    calibration: 0,
+  };
+  const primary = recommendations?.primary ?? null;
+  const queue = recommendations?.queue ?? [];
+  const topAffinity = profile.affinity[0]?.label ?? "seus temas";
   const [primaryFeedback, setPrimaryFeedback] = useState<
     null | "want" | "dismissed"
   >(null);
@@ -221,7 +119,28 @@ export default function DescobrirClient({ books }: { books: Book[] }) {
       </div>
 
       {/* Primary recommendation */}
-      {primaryFeedback === "dismissed" ? (
+      {!primary ? (
+        <section className="relative overflow-hidden rounded-[2rem] border border-outline-variant/30 bg-surface-container-low p-8 text-center shadow-2xl">
+          <Icon
+            name="auto_awesome_mosaic"
+            className="mx-auto mb-3 text-4xl text-outline"
+          />
+          <h2 className="font-headline-md text-headline-md font-medium text-on-surface">
+            Ainda não temos recomendações
+          </h2>
+          <p className="mt-2 text-body-sm text-on-surface-variant">
+            Adicione mais livros ao acervo para ativar o grafo de afinidade e
+            gerar sugestões.
+          </p>
+          <Link
+            href="/manual-add"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-bright"
+          >
+            <Icon name="add" className="text-sm" />
+            Adicionar livro
+          </Link>
+        </section>
+      ) : primaryFeedback === "dismissed" ? (
         <section className="relative overflow-hidden rounded-[2rem] border border-outline-variant/30 bg-surface-container-low p-8 text-center shadow-2xl">
           <Icon
             name="hide_source"
@@ -319,8 +238,8 @@ export default function DescobrirClient({ books }: { books: Book[] }) {
               <div className="flex items-center gap-2 text-[13px] font-label-md text-primary">
                 <Icon name="hub" className="text-lg" fill />
                 <span className="font-semibold">
-                  Porque você gosta de temas sociais e leu{" "}
-                  <em className="not-italic text-on-surface">O Estrangeiro</em>
+                  Conexão com{" "}
+                  <em className="not-italic text-on-surface">{topAffinity}</em>
                 </span>
               </div>
               <p className="font-quote-md border-l-2 border-primary/60 pl-3 text-body-sm italic leading-relaxed text-on-surface/90">
@@ -458,7 +377,7 @@ export default function DescobrirClient({ books }: { books: Book[] }) {
             Próximas na Fila do Grafo
           </h3>
           <span className="cursor-pointer text-[12px] font-label-sm text-primary hover:underline">
-            Ver todas (18)
+            Ver todas ({queue.length})
           </span>
         </div>
         <div className="flex flex-col gap-2.5">
