@@ -1,4 +1,10 @@
-import { isTitleSimilar, isAuthorSimilar, normalize } from "./book-cover";
+import {
+  isTitleSimilar,
+  isAuthorSimilar,
+  normalize,
+  extractMainTitle,
+  normalizeAuthor,
+} from "./book-metadata";
 
 interface GoogleBooksVolume {
   totalItems: number;
@@ -126,34 +132,37 @@ async function findGoogleBooksSynopsisByTitleAuthor(
   ];
 
   for (const q of queries) {
-    const url = apiKey
-      ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10&key=${apiKey}`
-      : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10`;
+    // Tenta primeiro restringir a português; se não achar, busca em qualquer idioma.
+    for (const langSuffix of ["&langRestrict=pt", ""]) {
+      const url = apiKey
+        ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10${langSuffix}&key=${apiKey}`
+        : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10${langSuffix}`;
 
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
 
-      const data = (await res.json()) as GoogleBooksVolume;
-      if (!data.items || data.totalItems === 0) continue;
+        const data = (await res.json()) as GoogleBooksVolume;
+        if (!data.items || data.totalItems === 0) continue;
 
-      for (const item of data.items) {
-        const info = item.volumeInfo;
-        if (!info.description) continue;
+        for (const item of data.items) {
+          const info = item.volumeInfo;
+          if (!info.description) continue;
 
-        const foundTitle = (info.title || "").toLowerCase();
-        const foundAuthors = info.authors || [];
+          const foundTitle = (info.title || "").toLowerCase();
+          const foundAuthors = info.authors || [];
 
-        if (
-          isTitleSimilar(queryTitle, foundTitle) &&
-          (!queryAuthor ||
-            foundAuthors.some((a) => isAuthorSimilar(queryAuthor, a)))
-        ) {
-          return cleanSynopsis(info.description);
+          if (
+            isTitleSimilar(queryTitle, foundTitle) &&
+            (!queryAuthor ||
+              foundAuthors.some((a) => isAuthorSimilar(queryAuthor, a)))
+          ) {
+            return cleanSynopsis(info.description);
+          }
         }
+      } catch (err) {
+        console.error("[findSynopsis] Google Books search error:", err);
       }
-    } catch (err) {
-      console.error("[findSynopsis] Google Books search error:", err);
     }
   }
 
@@ -231,16 +240,12 @@ async function findWikipediaSynopsis(
   const candidates = [`${searchTitle} ${author || ""}`.trim(), searchTitle];
 
   for (const candidate of candidates) {
-    const urls = [
-      `https://pt.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+    // Prioriza Wikipédia em português para manter o acervo consistente.
+    for (const lang of ["pt", "en"]) {
+      const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
         candidate
-      )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`,
-      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
-        candidate
-      )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`,
-    ];
+      )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`;
 
-    for (const url of urls) {
       try {
         const res = await fetch(url);
         if (!res.ok) continue;
@@ -257,7 +262,7 @@ async function findWikipediaSynopsis(
           )
             continue;
           const cleaned = cleanSynopsis(extract);
-          if (cleaned) return cleaned;
+          if (cleaned && looksLikeBookSynopsis(cleaned)) return cleaned;
         }
       } catch (err) {
         console.error("[findSynopsis] Wikipedia error:", err);
@@ -278,6 +283,8 @@ export async function findSynopsis({
   isbn?: string;
 }): Promise<string | null> {
   const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : "";
+  const mainTitle = extractMainTitle(title) || title || "";
+  const normalAuthor = normalizeAuthor(author) || author || "";
 
   if (cleanedIsbn) {
     const olSynopsis = await findOpenLibrarySynopsisByIsbn(cleanedIsbn);
@@ -287,22 +294,37 @@ export async function findSynopsis({
     if (gbSynopsis) return gbSynopsis;
   }
 
-  if (!title) return null;
+  if (!mainTitle) return null;
 
   const gbSearchSynopsis = await findGoogleBooksSynopsisByTitleAuthor(
-    title,
-    author
+    mainTitle,
+    normalAuthor
   );
   if (gbSearchSynopsis) return gbSearchSynopsis;
 
   const olSearchSynopsis = await findOpenLibrarySynopsisByTitleAuthor(
-    title,
-    author
+    mainTitle,
+    normalAuthor
   );
   if (olSearchSynopsis) return olSearchSynopsis;
 
-  const wikiSynopsis = await findWikipediaSynopsis(title, author);
+  const wikiSynopsis = await findWikipediaSynopsis(mainTitle, normalAuthor);
   if (wikiSynopsis) return wikiSynopsis;
 
   return null;
+}
+
+function looksLikeBookSynopsis(text: string): boolean {
+  const lower = text.toLowerCase();
+  // Rejeita páginas de desambiguação e artigos genéricos.
+  if (
+    lower.includes("may refer to") ||
+    lower.includes("pode referir-se a") ||
+    lower.includes("desambiguação") ||
+    lower.startsWith("this article") ||
+    lower.startsWith("este artigo")
+  ) {
+    return false;
+  }
+  return text.length >= 40;
 }

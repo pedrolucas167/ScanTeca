@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import BookPreviewSheet, { type BookDraft } from "./BookPreviewSheet";
 
 interface SearchResult {
   googleId: string;
@@ -37,13 +38,6 @@ function Icon({
   );
 }
 
-const statusMap: Record<string, string> = {
-  "Na Fila": "TO_READ",
-  "Lendo": "READING",
-  "Lido": "READ",
-  "Consulta": "WISHLIST",
-};
-
 export default function BookSearch() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -52,7 +46,9 @@ export default function BookSearch() {
   const [message, setMessage] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [searched, setSearched] = useState(false);
-  const [statusChip, setStatusChip] = useState("Na Fila");
+  const [previewBook, setPreviewBook] = useState<BookDraft | null>(null);
+  const [previewGoogleId, setPreviewGoogleId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -142,8 +138,24 @@ export default function BookSearch() {
     performSearch(q);
   };
 
-  const handleAdd = async (book: SearchResult) => {
-    setLoading(true);
+  const handleAdd = (book: SearchResult) => {
+    setPreviewBook({
+      title: book.title,
+      author: book.author,
+      publishedDate: book.publishedDate,
+      synopsis: book.synopsis,
+      coverUrl: book.coverUrl,
+      genre: book.genre,
+      pages: book.pages,
+      isbn: book.isbn,
+      collection: "Minha Biblioteca",
+    });
+    setPreviewGoogleId(book.googleId);
+  };
+
+  const handleSave = async (status: string) => {
+    if (!previewBook) return;
+    setSaving(true);
     setMessage(null);
 
     try {
@@ -151,26 +163,33 @@ export default function BookSearch() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          isbn: book.isbn || "",
-          title: book.subtitle
-            ? `${book.title}: ${book.subtitle}`
-            : book.title,
-          author: book.author,
-          publishedDate: book.publishedDate,
-          synopsis: book.synopsis,
-          coverUrl: book.coverUrl,
-          genre: book.genre,
-          pages: book.pages,
-          status: statusMap[statusChip] || "TO_READ",
-          collection: "Minha Biblioteca",
+          isbn: previewBook.isbn,
+          title: previewBook.title,
+          author: previewBook.author,
+          publishedDate: previewBook.publishedDate,
+          synopsis: previewBook.synopsis,
+          coverUrl: previewBook.coverUrl,
+          genre: previewBook.genre,
+          pages: previewBook.pages,
+          status,
+          collection: previewBook.collection,
         }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setAddedIds((prev) => new Set(prev).add(book.googleId));
-        setMessage(`"${book.title}" adicionado ao catálogo!`);
+        if (data.message === "Livro já cadastrado" && data.book?.id) {
+          setPreviewBook(null);
+          router.push(`/books/${data.book.id}`);
+          return;
+        }
+        if (previewGoogleId) {
+          setAddedIds((prev) => new Set(prev).add(previewGoogleId));
+        }
+        setMessage(`"${previewBook.title}" adicionado ao catálogo!`);
+        setPreviewBook(null);
+        setPreviewGoogleId(null);
         setTimeout(() => setMessage(null), 3000);
       } else {
         setMessage(data.error || "Erro ao adicionar livro");
@@ -178,7 +197,7 @@ export default function BookSearch() {
     } catch {
       setMessage("Erro de rede ao adicionar");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -188,31 +207,6 @@ export default function BookSearch() {
         Pesquise por título, autor ou ISBN e adicione com um clique. Gênero e
         páginas são preenchidos automaticamente quando disponíveis.
       </p>
-
-      <div className="mb-4 flex flex-col gap-1.5">
-        <label className="font-caption text-caption text-on-surface-variant">
-          Estado de Leitura ao Adicionar
-        </label>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {["Na Fila", "Lendo", "Lido", "Consulta"].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusChip(s)}
-              className={`flex items-center gap-1 rounded-full border px-3 py-1 font-label-sm text-label-sm transition-colors ${
-                statusChip === s
-                  ? "border-primary bg-primary-container text-on-primary-container shadow-[0_0_12px_rgba(91,80,230,0.35)]"
-                  : "border-outline-variant/30 bg-surface-container text-on-surface-variant hover:border-outline-variant"
-              }`}
-            >
-              {statusChip === s && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              )}
-              <span>{s}</span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       <form onSubmit={handleSearch} className="mb-4 flex gap-2">
         <div className="relative flex-1">
@@ -367,6 +361,18 @@ export default function BookSearch() {
             Ir para o catálogo →
           </button>
         </div>
+      )}
+
+      {previewBook && (
+        <BookPreviewSheet
+          book={previewBook}
+          loading={saving}
+          onConfirm={handleSave}
+          onCancel={() => {
+            setPreviewBook(null);
+            setPreviewGoogleId(null);
+          }}
+        />
       )}
     </div>
   );

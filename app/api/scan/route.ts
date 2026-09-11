@@ -2,17 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { findBookCover } from "@/lib/book-cover";
-import { findSynopsis } from "@/lib/synopsis";
+import { findSynopsis, cleanSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { getDefaultCollection } from "@/lib/default-collection";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import {
+  cleanIsbn,
+  cleanTitle,
+  normalizeAuthor,
+  normalizeGenre,
+  upgradeCoverUrl,
+  isUnknownTitle,
+  isUnknownAuthor,
+  findExistingBookByTitleAuthor,
+} from "@/lib/book-metadata";
 import { z } from "zod";
 
 const scanSchema = z.object({
   isbn: z.string("ISBN é obrigatório").min(1, "ISBN é obrigatório"),
   status: z.enum(["READ", "READING", "TO_READ", "WISHLIST"]).optional(),
+  preview: z.boolean().optional().default(false),
 });
 
 interface GoogleBooksVolume {
@@ -73,13 +84,13 @@ export async function POST(request: NextRequest) {
 
     const parsed = await readJson(request, scanSchema);
     if (!parsed.ok) return parsed.response;
-    const { isbn, status } = parsed.data;
+    const { isbn, status, preview } = parsed.data;
 
-    const cleaned = isbn.replace(/[^0-9X]/gi, "");
+    const cleanedIsbn = cleanIsbn(isbn);
 
-    if (cleaned.length !== 10 && cleaned.length !== 13) {
+    if (!cleanedIsbn) {
       return NextResponse.json(
-        { error: `ISBN inválido: ${cleaned} (deve ter 10 ou 13 dígitos)` },
+        { error: `ISBN inválido: ${isbn} (deve ter 10 ou 13 dígitos)` },
         { status: 400 }
       );
     }
@@ -87,23 +98,28 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.book.findUnique({
       where: {
         isbn_userId: {
-          isbn: cleaned,
+          isbn: cleanedIsbn,
           userId,
         },
       },
+      include: { collection: { select: { name: true } } },
     });
 
     if (existing) {
       return NextResponse.json(
-        { book: existing, message: "Livro já cadastrado" },
+        {
+          book: { ...existing, collection: existing.collection.name },
+          existing: true,
+          message: "Livro já cadastrado",
+        },
         { status: 200 }
       );
     }
 
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
     const googleUrl = apiKey
-      ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}&key=${apiKey}`
-      : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleaned}`;
+      ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}&key=${apiKey}`
+      : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}`;
 
     let bookData: {
       title: string;
@@ -118,11 +134,11 @@ export async function POST(request: NextRequest) {
     // Try Open Library first (more reliable for ISBN lookups)
     try {
       const olRes = await fetch(
-        `https://openlibrary.org/api/books?bibkeys=ISBN:${cleaned}&format=json&jscmd=data`
+        `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanedIsbn}&format=json&jscmd=data`
       );
       if (olRes.ok) {
         const olData = (await olRes.json()) as OpenLibraryResponse;
-        const key = `ISBN:${cleaned}`;
+        const key = `ISBN:${cleanedIsbn}`;
         const olBook = olData[key];
         if (olBook) {
           let synopsis: string | null = null;
@@ -148,12 +164,12 @@ export async function POST(request: NextRequest) {
           }
 
           bookData = {
-            title: olBook.title ?? "Título desconhecido",
-            author: olBook.authors?.map((a) => a.name).join(", ") ?? "Autor desconhecido",
+            title: cleanTitle(olBook.title) ?? "Título desconhecido",
+            author: normalizeAuthor(olBook.authors?.map((a) => a.name).join(", ")) ?? "Autor desconhecido",
             publishedDate: olBook.publish_date ?? null,
             synopsis,
-            coverUrl: olBook.cover?.medium ?? olBook.cover?.small ?? null,
-            genre: olBook.subjects?.[0]?.name ?? null,
+            coverUrl: upgradeCoverUrl(olBook.cover?.medium ?? olBook.cover?.small),
+            genre: normalizeGenre(olBook.subjects?.[0]?.name),
             pages: olBook.number_of_pages ?? null,
           };
         }
@@ -162,7 +178,7 @@ export async function POST(request: NextRequest) {
       console.error("Open Library API error:", err);
     }
 
-    if (bookData && (bookData.author === "Autor desconhecido" || !bookData.author)) {
+    if (bookData && isUnknownAuthor(bookData.author)) {
       try {
         const searchRes = await fetch(
           `https://openlibrary.org/search.json?q=${encodeURIComponent(bookData.title)}&limit=5`
@@ -174,14 +190,17 @@ export async function POST(request: NextRequest) {
           const docs = searchData?.docs || [];
           for (const doc of docs) {
             if (doc?.author_name?.length) {
-              bookData.author = doc.author_name.join(", ");
-              console.log("[scan] author found via Open Library search:", bookData.author);
-              break;
+              const found = normalizeAuthor(doc.author_name.join(", "));
+              if (found) {
+                bookData.author = found;
+                console.log("[scan] author found via Open Library search:", bookData.author);
+                break;
+              }
             }
           }
         }
 
-        if (bookData.author === "Autor desconhecido" || !bookData.author) {
+        if (isUnknownAuthor(bookData.author)) {
           const googleSearchUrl = apiKey
             ? `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`intitle:${bookData.title}`)}&maxResults=5&key=${apiKey}`
             : `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`intitle:${bookData.title}`)}&maxResults=5`;
@@ -192,9 +211,12 @@ export async function POST(request: NextRequest) {
             if (googleData.items && googleData.totalItems > 0) {
               for (const item of googleData.items) {
                 if (item.volumeInfo.authors?.length) {
-                  bookData.author = item.volumeInfo.authors.join(", ");
-                  console.log("[scan] author found via Google Books search:", bookData.author);
-                  break;
+                  const found = normalizeAuthor(item.volumeInfo.authors.join(", "));
+                  if (found) {
+                    bookData.author = found;
+                    console.log("[scan] author found via Google Books search:", bookData.author);
+                    break;
+                  }
                 }
               }
             }
@@ -213,12 +235,12 @@ export async function POST(request: NextRequest) {
           if (data.items && data.totalItems > 0) {
             const info = data.items[0].volumeInfo;
             bookData = {
-              title: info.title ?? "Título desconhecido",
-              author: info.authors?.join(", ") ?? "Autor desconhecido",
+              title: cleanTitle(info.title) ?? "Título desconhecido",
+              author: normalizeAuthor(info.authors?.join(", ")) ?? "Autor desconhecido",
               publishedDate: info.publishedDate ?? null,
-              synopsis: info.description ?? null,
-              coverUrl: info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null,
-              genre: info.categories?.[0] ?? null,
+              synopsis: info.description ? cleanSynopsis(info.description) : null,
+              coverUrl: upgradeCoverUrl(info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail),
+              genre: normalizeGenre(info.categories?.[0]),
               pages: info.pageCount ?? null,
             };
           }
@@ -230,7 +252,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!bookData) {
+    if (!bookData || isUnknownTitle(bookData.title)) {
       return NextResponse.json(
         { error: "Nenhum livro encontrado para este ISBN" },
         { status: 404 }
@@ -245,7 +267,7 @@ export async function POST(request: NextRequest) {
           if (data.items && data.totalItems > 0) {
             const info = data.items[0].volumeInfo;
             if (!bookData.genre && info.categories?.[0]) {
-              bookData.genre = info.categories[0];
+              bookData.genre = normalizeGenre(info.categories[0]);
             }
             if (!bookData.pages && info.pageCount) {
               bookData.pages = info.pageCount;
@@ -257,20 +279,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!bookData.coverUrl) {
-      const extraCover = await findBookCover({
-        title: bookData.title,
-        author: bookData.author,
-        isbn: cleaned,
-      });
-      if (extraCover) bookData.coverUrl = extraCover;
+    // Sempre busca uma capa validada. Se a fonte primária já tiver uma,
+    // fazemos o upgrade, mas confiamos mais na validação do findBookCover
+    // quando a capa original falta.
+    const foundCover = await findBookCover({
+      title: bookData.title,
+      author: bookData.author,
+      isbn: cleanedIsbn,
+    });
+    if (foundCover) {
+      bookData.coverUrl = foundCover;
+    } else if (bookData.coverUrl) {
+      bookData.coverUrl = upgradeCoverUrl(bookData.coverUrl);
     }
 
     if (!bookData.synopsis) {
       const extraSynopsis = await findSynopsis({
         title: bookData.title,
         author: bookData.author,
-        isbn: cleaned,
+        isbn: cleanedIsbn,
       });
       if (extraSynopsis) bookData.synopsis = extraSynopsis;
     }
@@ -279,7 +306,7 @@ export async function POST(request: NextRequest) {
     const originalYear = await findOriginalPublishYear({
       title: bookData.title,
       author: bookData.author,
-      isbn: cleaned,
+      isbn: cleanedIsbn,
     });
     if (originalYear) {
       const currentYear = extractYear(bookData.publishedDate);
@@ -288,11 +315,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Última chance de evitar duplicata por título+autor (ISBN diferente ou manual).
+    const existingSimilar = await findExistingBookByTitleAuthor(userId, bookData.title, bookData.author);
+    if (existingSimilar) {
+      return NextResponse.json(
+        {
+          book: { ...existingSimilar, collection: existingSimilar.collection.name },
+          existing: true,
+          message: "Livro já cadastrado",
+        },
+        { status: 200 }
+      );
+    }
+
     const collection = await getDefaultCollection(userId);
+
+    // Modo preview: devolve os dados limpos para o usuário revisar antes de salvar.
+    if (preview) {
+      return NextResponse.json(
+        {
+          book: {
+            isbn: cleanedIsbn,
+            title: bookData.title,
+            author: bookData.author,
+            publishedDate: bookData.publishedDate,
+            synopsis: bookData.synopsis,
+            coverUrl: bookData.coverUrl,
+            genre: bookData.genre,
+            pages: bookData.pages,
+            status: status || "TO_READ",
+            collection: collection.name,
+          },
+          existing: false,
+          message: "Livro encontrado",
+        },
+        { status: 200 }
+      );
+    }
 
     const book = await prisma.book.create({
       data: {
-        isbn: cleaned,
+        isbn: cleanedIsbn,
         title: bookData.title,
         author: bookData.author,
         publishedDate: bookData.publishedDate,

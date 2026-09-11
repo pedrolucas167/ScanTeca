@@ -3,11 +3,20 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { BookStatus } from "@prisma/client";
 import { findBookCover } from "@/lib/book-cover";
-import { findSynopsis } from "@/lib/synopsis";
+import { findSynopsis, cleanSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { resolveCollection } from "@/lib/default-collection";
 import { readJson, bookStatusSchema, optionalNumber } from "@/lib/validation";
+import {
+  cleanIsbn,
+  cleanTitle,
+  normalizeAuthor,
+  normalizeGenre,
+  upgradeCoverUrl,
+  findExistingBookByTitleAuthor,
+  isUnknownTitle,
+} from "@/lib/book-metadata";
 import { z } from "zod";
 
 const withCollection = { collection: { select: { name: true } } } as const;
@@ -51,49 +60,88 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response;
     const { isbn, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = parsed.data;
 
-    const cleanedIsbn = isbn ? isbn.replace(/[^0-9X]/gi, "") : null;
+    const cleanedIsbn = cleanIsbn(isbn);
 
-    if (cleanedIsbn && cleanedIsbn.length !== 10 && cleanedIsbn.length !== 13) {
+    if (isbn && isbn.trim() && !cleanedIsbn) {
       return NextResponse.json(
         { error: "ISBN deve ter 10 ou 13 dígitos" },
         { status: 400 }
       );
     }
 
-    const existing = cleanedIsbn
-      ? await prisma.book.findUnique({
-          where: {
-            isbn_userId: {
-              isbn: cleanedIsbn,
-              userId,
-            },
-          },
-          include: withCollection,
-        })
-      : null;
+    const cleanedTitle = cleanTitle(title);
+    const normalizedAuthor = normalizeAuthor(author);
 
-    if (existing) {
+    if (!cleanedTitle || isUnknownTitle(cleanedTitle)) {
       return NextResponse.json(
-        { book: serializeBook(existing), message: "Livro já cadastrado" },
+        { error: "Título é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    // 1. Duplicata por ISBN
+    if (cleanedIsbn) {
+      const existing = await prisma.book.findUnique({
+        where: {
+          isbn_userId: {
+            isbn: cleanedIsbn,
+            userId,
+          },
+        },
+        include: withCollection,
+      });
+      if (existing) {
+        return NextResponse.json(
+          { book: serializeBook(existing), message: "Livro já cadastrado" },
+          { status: 200 }
+        );
+      }
+    }
+
+    // 2. Duplicata por título + autor
+    const existingSimilar = await findExistingBookByTitleAuthor(
+      userId,
+      cleanedTitle,
+      normalizedAuthor
+    );
+    if (existingSimilar) {
+      return NextResponse.json(
+        {
+          book: { ...existingSimilar, collection: existingSimilar.collection.name },
+          message: "Livro já cadastrado",
+        },
         { status: 200 }
       );
     }
 
-    const authorParam = author ?? undefined;
+    const authorParam = normalizedAuthor ?? undefined;
 
-    const effectiveCoverUrl = coverUrl ||
-      (await findBookCover({ title, author: authorParam, isbn: cleanedIsbn || undefined }));
-    const effectiveSynopsis =
-      synopsis ||
-      (await findSynopsis({
-        title,
+    // Busca capa: se o usuário forneceu uma URL, fazemos o upgrade; caso contrário,
+    // buscamos uma capa confiável a partir de ISBN/título/autor.
+    let effectiveCoverUrl: string | null = upgradeCoverUrl(coverUrl);
+    if (!effectiveCoverUrl) {
+      effectiveCoverUrl = await findBookCover({
+        title: cleanedTitle,
         author: authorParam,
         isbn: cleanedIsbn || undefined,
-      }));
+      });
+    }
+
+    // Sinopse: limpa a fornecida ou busca.
+    let effectiveSynopsis: string | null = cleanSynopsis(synopsis);
+    if (!effectiveSynopsis) {
+      effectiveSynopsis = await findSynopsis({
+        title: cleanedTitle,
+        author: authorParam,
+        isbn: cleanedIsbn || undefined,
+      });
+    }
+
+    const effectiveGenre = normalizeGenre(genre);
 
     let effectivePublishedDate: string | null = publishedDate || null;
     const originalYear = await findOriginalPublishYear({
-      title,
+      title: cleanedTitle,
       author: authorParam,
       isbn: cleanedIsbn || undefined,
     });
@@ -109,8 +157,8 @@ export async function POST(request: NextRequest) {
     const book = await prisma.book.create({
       data: {
         isbn: cleanedIsbn || `MANUAL-${crypto.randomUUID()}`,
-        title,
-        author: author || "Autor desconhecido",
+        title: cleanedTitle,
+        author: normalizedAuthor || "Autor desconhecido",
         publishedDate: effectivePublishedDate,
         synopsis: effectiveSynopsis,
         coverUrl: effectiveCoverUrl || null,
@@ -118,7 +166,7 @@ export async function POST(request: NextRequest) {
         collectionId: bookCollection.id,
         notes: notes || null,
         rating: rating ?? null,
-        genre: genre || null,
+        genre: effectiveGenre,
         pages: pages || null,
         customOrder: customOrder ?? null,
         userId,
@@ -179,20 +227,25 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    let effectiveCoverUrl = coverUrl;
+    const newTitle = title !== undefined ? cleanTitle(title) ?? existing.title : existing.title;
+    const newAuthor = author !== undefined ? (normalizeAuthor(author) || author || "Autor desconhecido") : existing.author;
+
+    let effectiveCoverUrl: string | null = null;
     if (coverUrl === "" || coverUrl === undefined) {
       effectiveCoverUrl = await findBookCover({
-        title: existing.title,
-        author: existing.author,
+        title: newTitle,
+        author: newAuthor,
         isbn: existing.isbn,
       });
+    } else {
+      effectiveCoverUrl = upgradeCoverUrl(coverUrl);
     }
 
     const data: Record<string, unknown> = {};
-    if (title !== undefined) data.title = title;
-    if (author !== undefined) data.author = author || "Autor desconhecido";
+    if (title !== undefined) data.title = newTitle;
+    if (author !== undefined) data.author = newAuthor;
     if (publishedDate !== undefined) data.publishedDate = publishedDate || null;
-    if (synopsis !== undefined) data.synopsis = synopsis || null;
+    if (synopsis !== undefined) data.synopsis = cleanSynopsis(synopsis) || null;
     if (coverUrl !== undefined) data.coverUrl = effectiveCoverUrl || null;
     if (status !== undefined) {
       data.status = status;
