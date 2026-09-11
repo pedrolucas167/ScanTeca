@@ -109,6 +109,79 @@ function QuickFilterChip({
   );
 }
 
+const SHELF_BASE_HEIGHT = 176;
+const SHELF_MIN_WIDTH = 68;
+const SHELF_MAX_WIDTH = 116;
+
+function BookShelfCover({
+  book,
+  spineCmValue,
+}: {
+  book: Book;
+  spineCmValue: number;
+}) {
+  const [width, setWidth] = useState(() =>
+    Math.min(
+      SHELF_MAX_WIDTH,
+      Math.max(SHELF_MIN_WIDTH, Math.round(SHELF_BASE_HEIGHT * 0.72))
+    )
+  );
+
+  return (
+    <Link
+      href={`/books/${book.id}`}
+      className="group flex flex-shrink-0 flex-col items-center"
+      style={{ width }}
+    >
+      <div
+        className="relative w-full overflow-hidden rounded-t-sm border border-outline-variant/30 bg-surface-container-high book-spine-tangible transition-transform duration-200 group-hover:-translate-y-2"
+        style={{ height: SHELF_BASE_HEIGHT }}
+      >
+        {book.coverUrl ? (
+          <Image
+            src={book.coverUrl}
+            alt={`Capa de ${book.title}`}
+            fill
+            className="object-cover object-top"
+            sizes={`${SHELF_MAX_WIDTH}px`}
+            onLoadingComplete={(img) => {
+              const ratio = img.naturalWidth / (img.naturalHeight || 1);
+              const naturalWidth = Math.round(SHELF_BASE_HEIGHT * ratio);
+              setWidth(
+                Math.min(
+                  SHELF_MAX_WIDTH,
+                  Math.max(SHELF_MIN_WIDTH, naturalWidth)
+                )
+              );
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-outline">
+            <Icon name="menu_book" className="text-2xl" />
+            <span className="mt-1 line-clamp-3 text-[9px] font-medium">
+              {book.title}
+            </span>
+          </div>
+        )}
+        <span
+          className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${statusClasses[book.status]}`}
+        >
+          {statusLabels[book.status]}
+        </span>
+      </div>
+      <div className="mt-2 w-full text-center">
+        <p className="truncate font-label-sm text-label-sm font-medium text-on-surface">
+          {book.title}
+        </p>
+        <p className="truncate font-caption text-[10px] text-outline">
+          {book.author.split(" ").pop() || book.author} •{" "}
+          {spineCmValue.toFixed(1).replace(".", ",")}cm
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 export default function Catalog({
   books,
   libraryName: initialLibraryName,
@@ -1169,50 +1242,13 @@ export default function Catalog({
             <div className="relative overflow-hidden rounded-lg border border-white/5 bg-surface-container-lowest/80 p-space-md pb-0">
               <div className="pointer-events-none absolute left-1/2 top-0 h-16 w-3/4 -translate-x-1/2 bg-gradient-to-b from-primary/10 to-transparent blur-xl" />
               <div className="flex min-h-[220px] items-end gap-2 overflow-x-auto px-2 pb-3">
-                {shelfBooks.map((book) => {
-                  const cm = spineCm(book.pages);
-                  const width = Math.min(116, Math.max(68, 62 + Math.min(cm, 4) * 12));
-                  const height = Math.min(200, 160 + Math.min(30, (book.pages ?? 200) / 20));
-                  return (
-                    <Link
-                      key={book.id}
-                      href={`/books/${book.id}`}
-                      className="group flex flex-shrink-0 flex-col items-center"
-                      style={{ width }}
-                    >
-                      <div
-                        className="relative w-full overflow-hidden rounded-t-sm border border-outline-variant/30 bg-surface-container-high book-spine-tangible transition-transform duration-200 group-hover:-translate-y-2"
-                        style={{ height }}
-                      >
-                        {book.coverUrl ? (
-                          <Image
-                            src={book.coverUrl}
-                            alt={`Capa de ${book.title}`}
-                            fill
-                            className="object-contain p-1"
-                            sizes="116px"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-outline">
-                            <Icon name="menu_book" className="text-2xl" />
-                            <span className="mt-1 line-clamp-3 text-[9px] font-medium">{book.title}</span>
-                          </div>
-                        )}
-                        <span
-                          className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${statusClasses[book.status]}`}
-                        >
-                          {statusLabels[book.status]}
-                        </span>
-                      </div>
-                      <div className="mt-2 w-full text-center">
-                        <p className="truncate font-label-sm text-label-sm font-medium text-on-surface">{book.title}</p>
-                        <p className="truncate font-caption text-[10px] text-outline">
-                          {book.author.split(" ").pop() || book.author} • {cm.toFixed(1).replace(".", ",")}cm
-                        </p>
-                      </div>
-                    </Link>
-                  );
-                })}
+                {shelfBooks.map((book) => (
+                  <BookShelfCover
+                    key={book.id}
+                    book={book}
+                    spineCmValue={spineCm(book.pages)}
+                  />
+                ))}
               </div>
               <div className="wood-shelf-gradient relative z-20 h-4 w-full rounded-sm border-t border-white/10" />
               <div className="h-2 w-full bg-surface-container-lowest shadow-inner" />
