@@ -9,13 +9,20 @@ const ttsSchema = z.object({
 });
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const TTS_VOICE = process.env.ORACLE_TTS_VOICE || "nova";
 const TTS_INSTRUCTIONS = process.env.ORACLE_TTS_INSTRUCTIONS || "";
-const TTS_MODELS = [
-  process.env.ORACLE_TTS_MODEL,
-  "openai/tts-1-hd",
-  "openai/tts-1",
-].filter(Boolean) as string[];
+const TTS_CANDIDATES: { model: string; voice: string }[] = [
+  ...(process.env.ORACLE_TTS_MODEL
+    ? [
+        {
+          model: process.env.ORACLE_TTS_MODEL,
+          voice: process.env.ORACLE_TTS_VOICE || "pf_dora",
+        },
+      ]
+    : []),
+  { model: "hexgrad/kokoro-82m", voice: "pf_dora" },
+  { model: "hexgrad/kokoro-82m", voice: "pm_alex" },
+  { model: "mistralai/voxtral-mini-tts-2603", voice: "en_paul_neutral" },
+];
 
 /** POST /api/oracle/tts — texto → voz via endpoint de speech do OpenRouter. */
 export async function POST(request: NextRequest) {
@@ -51,7 +58,7 @@ export async function POST(request: NextRequest) {
     let lastError = "";
     let responseBody: ReadableStream<Uint8Array> | null = null;
 
-    for (const model of TTS_MODELS) {
+    for (const candidate of TTS_CANDIDATES) {
       const res = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
         method: "POST",
         headers: {
@@ -62,9 +69,9 @@ export async function POST(request: NextRequest) {
           "X-Title": "Scanteca Oráculo",
         },
         body: JSON.stringify({
-          model,
+          model: candidate.model,
           input: trimmedText,
-          voice: TTS_VOICE,
+          voice: candidate.voice,
           response_format: "mp3",
           ...(TTS_INSTRUCTIONS
             ? {
@@ -83,7 +90,13 @@ export async function POST(request: NextRequest) {
         break;
       }
       lastError = await res.text();
-      console.error("[oracle] TTS error:", res.status, model, lastError);
+      console.error(
+        "[oracle] TTS error:",
+        res.status,
+        candidate.model,
+        candidate.voice,
+        lastError
+      );
     }
 
     if (!responseBody) {
