@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 const updateSessionSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
@@ -30,6 +31,14 @@ export async function GET(_: NextRequest, context: Context) {
 export async function PATCH(request: NextRequest, context: Context) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+
+  const rateLimit = await rateLimitGuard(request, {
+    route: "oracle/sessions",
+    userId,
+    ...rateLimits["oracle/sessions"],
+  });
+  if (rateLimit) return rateLimit;
+
   const { id } = await context.params;
   const parsed = await readJson(request, updateSessionSchema);
   if (!parsed.ok) return parsed.response;
@@ -42,9 +51,17 @@ export async function PATCH(request: NextRequest, context: Context) {
   return Response.json({ ok: true });
 }
 
-export async function DELETE(_: NextRequest, context: Context) {
+export async function DELETE(request: NextRequest, context: Context) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+
+  const rateLimit = await rateLimitGuard(request, {
+    route: "oracle/sessions",
+    userId,
+    ...rateLimits["oracle/sessions"],
+  });
+  if (rateLimit) return rateLimit;
+
   const { id } = await context.params;
 
   const result = await prisma.oracleSession.deleteMany({ where: { id, userId } });

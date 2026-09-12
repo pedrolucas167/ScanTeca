@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import {
   LEGACY_DEFAULT_COLLECTION,
   resolveCollection,
@@ -65,6 +66,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "library-settings",
+      userId,
+      ...rateLimits["library-settings"],
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, settingsSchema);
     if (!parsed.ok) return parsed.response;

@@ -8,6 +8,7 @@ import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { resolveCollection } from "@/lib/default-collection";
 import { readJson, bookStatusSchema, optionalNumber } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import {
   cleanIsbn,
   cleanTitle,
@@ -55,6 +56,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "books",
+      userId,
+      ...rateLimits.books,
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, bookCreateSchema);
     if (!parsed.ok) return parsed.response;
@@ -212,6 +220,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
+    const rateLimit = await rateLimitGuard(request, {
+      route: "books",
+      userId,
+      ...rateLimits.books,
+    });
+    if (rateLimit) return rateLimit;
+
     const parsed = await readJson(request, bookUpdateSchema);
     if (!parsed.ok) return parsed.response;
     const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder, sessionNote } = parsed.data;
@@ -357,6 +372,13 @@ export async function DELETE(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "books",
+      userId,
+      ...rateLimits.books,
+    });
+    if (rateLimit) return rateLimit;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

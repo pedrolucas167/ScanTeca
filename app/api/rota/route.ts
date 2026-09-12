@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { NextRequest } from "next/server";
 
 interface SourceEntry {
@@ -15,6 +16,13 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return Response.json({ error: "Não autenticado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "rota",
+      userId,
+      ...rateLimits.rota,
+    });
+    if (rateLimit) return rateLimit;
 
     // 1. Oracle sources: get the last assistant message that has sources
     const lastAssistantMsg = await prisma.oracleMessage.findFirst({

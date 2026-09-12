@@ -13,6 +13,7 @@ import {
   normalizeGenre,
 } from "@/lib/book-metadata";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const enrichSchema = z.object({ bookId: z.string().nullish() });
@@ -134,6 +135,13 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "books/enrich",
+      userId,
+      ...rateLimits["books/enrich"],
+    });
+    if (rateLimit) return rateLimit;
 
     const parsed = await readJson(request, enrichSchema);
     if (!parsed.ok) return parsed.response;
