@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +46,10 @@ export async function POST(request: NextRequest) {
         `;
         updated++;
       }
+    }
+
+    if (updated > 0) {
+      await invalidateRecommendationsCache(userId);
     }
 
     return NextResponse.json({

@@ -14,6 +14,7 @@ import {
 } from "@/lib/book-metadata";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 import { z } from "zod";
 
 const enrichSchema = z.object({ bookId: z.string().nullish() });
@@ -245,6 +246,10 @@ export async function POST(request: NextRequest) {
     }
 
     const enriched = results.filter((r) => r.updated.length > 0);
+
+    if (enriched.length > 0) {
+      await invalidateRecommendationsCache(userId);
+    }
 
     return NextResponse.json({
       total: books.length,

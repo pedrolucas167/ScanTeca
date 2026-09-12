@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { normalize } from "@/lib/book-metadata";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard } from "@/lib/rate-limit";
+import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 import { z } from "zod";
 
 const feedbackSchema = z.object({
@@ -71,6 +72,8 @@ export async function POST(request: NextRequest) {
       update: { kind, source, updatedAt: new Date() },
     });
 
+    await invalidateRecommendationsCache(userId);
+
     return NextResponse.json({ feedback });
   } catch (error) {
     console.error("[recommendations/feedback] POST error:", error);
@@ -109,6 +112,8 @@ export async function DELETE(request: NextRequest) {
         normalizedAuthor,
       },
     });
+
+    await invalidateRecommendationsCache(userId);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
