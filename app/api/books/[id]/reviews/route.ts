@@ -15,20 +15,40 @@ const reviewSchema = z.object({
 });
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "books/reviews",
+      userId,
+      ...rateLimits["books/reviews"],
+    });
+    if (rateLimit) return rateLimit;
+
     const { id } = await params;
+
+    const book = await prisma.book.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+
+    if (!book) {
+      return NextResponse.json(
+        { error: "Livro não encontrado" },
+        { status: 404 }
+      );
+    }
 
     const reviews = await prisma.review.findMany({
       where: { bookId: id },
       orderBy: { createdAt: "desc" },
-      include: {
-        book: {
-          select: { userId: true },
-        },
-      },
     });
 
     return NextResponse.json({ reviews });
@@ -64,8 +84,8 @@ export async function POST(
     if (!parsed.ok) return parsed.response;
     const { content, rating, userName } = parsed.data;
 
-    const book = await prisma.book.findUnique({
-      where: { id },
+    const book = await prisma.book.findFirst({
+      where: { id, userId },
     });
 
     if (!book) {
