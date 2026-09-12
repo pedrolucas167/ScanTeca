@@ -188,7 +188,7 @@ export default function DescobrirClient({
             gerar sugestões.
           </p>
           <Link
-            href="/manual-add"
+            href="/search-add"
             className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-bright"
           >
             <Icon name="add" className="text-sm" />

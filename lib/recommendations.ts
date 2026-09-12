@@ -621,7 +621,7 @@ export async function buildRecommendations(
            "coverUrl", pages, embedding::text as "embeddingText"
     FROM "Book"
     WHERE "userId" = ${userId}
-    ORDER BY updated_at DESC
+    ORDER BY "updatedAt" DESC
   `;
 
   const [diaryCount, reviewCount, ratingCount, feedbackList] = await Promise.all([
