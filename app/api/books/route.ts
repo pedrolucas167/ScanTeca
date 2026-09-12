@@ -9,6 +9,7 @@ import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { resolveCollection } from "@/lib/default-collection";
 import { readJson, bookStatusSchema, optionalNumber } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 import {
   cleanIsbn,
   cleanTitle,
@@ -199,6 +200,8 @@ export async function POST(request: NextRequest) {
       `;
     }
 
+    await invalidateRecommendationsCache(userId);
+
     return NextResponse.json(
       { book: serializeBook(book), message: "Livro adicionado com sucesso" },
       { status: 201 }
@@ -326,6 +329,19 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
+    const semanticChange =
+      title !== undefined ||
+      author !== undefined ||
+      synopsis !== undefined ||
+      genre !== undefined ||
+      notes !== undefined ||
+      rating !== undefined ||
+      status !== undefined;
+
+    if (semanticChange) {
+      await invalidateRecommendationsCache(userId);
+    }
+
     if (
       title !== undefined ||
       author !== undefined ||
@@ -404,6 +420,8 @@ export async function DELETE(request: NextRequest) {
     await prisma.book.delete({
       where: { id },
     });
+
+    await invalidateRecommendationsCache(userId);
 
     return NextResponse.json(
       { message: "Livro removido com sucesso" },

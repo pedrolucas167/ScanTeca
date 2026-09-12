@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { getRedis } from "./redis";
 
 export interface RateLimitConfig {
   userLimit: number;
@@ -130,40 +131,10 @@ function getStore(): RateLimitStore {
     return globalStore ?? new MemoryRateLimitStore();
   }
 
-  const redis = createRedisClient();
+  const redis = getRedis();
   globalStore = redis ? new RedisRateLimitStore(redis) : new MemoryRateLimitStore();
   storeInitialized = true;
   return globalStore;
-}
-
-function createRedisClient(): Redis | null {
-  const url =
-    process.env.UPSTASH_REDIS_REST_URL ||
-    process.env.KV_REST_API_URL ||
-    process.env.KV_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ||
-    process.env.KV_REST_API_TOKEN;
-
-  if (!url || !token) {
-    if (process.env.NODE_ENV === "production") {
-      // Em serverless cada instância tem seu próprio Map — o fallback em
-      // memória NÃO limita de verdade. Falha visível em vez de silenciosa.
-      console.error(
-        "[rate-limit] Redis não configurado em produção. " +
-          "Configure UPSTASH_REDIS_REST_URL e UPSTASH_REDIS_REST_TOKEN " +
-          "(ou KV_REST_API_URL/KV_REST_API_TOKEN)."
-      );
-    }
-    return null;
-  }
-
-  try {
-    return new Redis({ url, token });
-  } catch (err) {
-    console.error("[rate-limit] Falha ao criar cliente Redis:", err);
-    return null;
-  }
 }
 
 function getClientIP(request: NextRequest): string {

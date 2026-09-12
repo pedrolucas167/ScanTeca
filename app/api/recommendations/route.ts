@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { buildRecommendations } from "@/lib/recommendations";
+import {
+  getCachedRecommendations,
+  setCachedRecommendations,
+} from "@/lib/recommendations-cache";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
@@ -17,8 +21,18 @@ export async function GET(request: NextRequest) {
     });
     if (rateLimit) return rateLimit;
 
+    const cached = await getCachedRecommendations(userId);
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: { "X-Cache": "HIT" },
+      });
+    }
+
     const data = await buildRecommendations(userId);
-    return NextResponse.json(data);
+    await setCachedRecommendations(userId, data);
+    return NextResponse.json(data, {
+      headers: { "X-Cache": "MISS" },
+    });
   } catch (error) {
     console.error("Erro em GET /api/recommendations:", error);
     return NextResponse.json(
