@@ -19,8 +19,8 @@ export const rateLimits: Record<string, RateLimitConfig> = {
   "search-cover-wikipedia": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   "search-author": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   "generate-synopsis": { userLimit: 20, ipLimit: 60, windowMs: 60_000 },
-  // PATCH é chamado em lote ao reordenar o catálogo — limite folgado.
-  books: { userLimit: 120, ipLimit: 300, windowMs: 60_000 },
+  books: { userLimit: 60, ipLimit: 180, windowMs: 60_000 },
+  "books/reorder": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
   "books/reviews": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   // Chamadas externas por livro (Google Books + OpenRouter) — bem restrito.
   "books/enrich": { userLimit: 5, ipLimit: 15, windowMs: 60_000 },

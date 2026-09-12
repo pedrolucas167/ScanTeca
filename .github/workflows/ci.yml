@@ -20,6 +20,8 @@ jobs:
 
       - run: npm run lint
 
+      - run: npm test
+
       - run: npm run build
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/scanteca

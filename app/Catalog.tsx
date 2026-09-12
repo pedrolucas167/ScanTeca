@@ -758,15 +758,14 @@ export default function Catalog({
     setSortBy("custom");
     setDraggedId(null);
     try {
-      await Promise.all(
-        updated.map((b) =>
-          fetch("/api/books", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: b.id, customOrder: b.customOrder }),
-          })
-        )
-      );
+      const res = await fetch("/api/books/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: updated.map((b) => ({ id: b.id, customOrder: b.customOrder })),
+        }),
+      });
+      if (!res.ok) throw new Error();
       setMessage("Ordem personalizada salva");
       setTimeout(() => setMessage(null), 3000);
     } catch {
