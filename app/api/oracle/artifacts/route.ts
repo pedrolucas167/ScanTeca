@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 const artifactSchema = z.object({
   sessionId: z.string().cuid().nullable().optional(),
@@ -27,6 +28,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+
+  const rateLimit = await rateLimitGuard(request, {
+    route: "oracle/artifacts",
+    userId,
+    ...rateLimits["oracle/artifacts"],
+  });
+  if (rateLimit) return rateLimit;
+
   const parsed = await readJson(request, artifactSchema);
   if (!parsed.ok) return parsed.response;
 

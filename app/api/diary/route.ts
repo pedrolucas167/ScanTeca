@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), bookId: z.string().cuid() }),
@@ -42,6 +43,14 @@ async function validatePage(userId: string, bookId: string, page: number | null 
 export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+
+  const rateLimit = await rateLimitGuard(request, {
+    route: "diary",
+    userId,
+    ...rateLimits.diary,
+  });
+  if (rateLimit) return rateLimit;
+
   const parsed = await readJson(request, schema);
   if (!parsed.ok) return parsed.response;
   const input = parsed.data;

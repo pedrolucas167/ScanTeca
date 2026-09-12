@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 interface AuditRow {
   id: string;
@@ -10,12 +11,19 @@ interface AuditRow {
   hasSynopsis: boolean;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "rag-audit",
+      userId,
+      ...rateLimits["rag-audit"],
+    });
+    if (rateLimit) return rateLimit;
 
     const books = await prisma.$queryRaw<AuditRow[]>`
       SELECT id, title, author,

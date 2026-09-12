@@ -10,12 +10,28 @@ export interface RateLimitConfig {
 export const rateLimits: Record<string, RateLimitConfig> = {
   oracle: { userLimit: 15, ipLimit: 60, windowMs: 60_000 },
   "oracle/tts": { userLimit: 20, ipLimit: 60, windowMs: 60_000 },
+  "oracle/sessions": { userLimit: 60, ipLimit: 120, windowMs: 60_000 },
+  "oracle/artifacts": { userLimit: 60, ipLimit: 120, windowMs: 60_000 },
   scan: { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
   "search-books": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   "search-cover": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   "search-cover-wikipedia": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   "search-author": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   "generate-synopsis": { userLimit: 20, ipLimit: 60, windowMs: 60_000 },
+  // PATCH é chamado em lote ao reordenar o catálogo — limite folgado.
+  books: { userLimit: 120, ipLimit: 300, windowMs: 60_000 },
+  "books/reviews": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
+  // Chamadas externas por livro (Google Books + OpenRouter) — bem restrito.
+  "books/enrich": { userLimit: 5, ipLimit: 15, windowMs: 60_000 },
+  "embeddings/backfill": { userLimit: 5, ipLimit: 15, windowMs: 60_000 },
+  diary: { userLimit: 60, ipLimit: 120, windowMs: 60_000 },
+  "library-settings": { userLimit: 30, ipLimit: 60, windowMs: 60_000 },
+  // LLM + embeddings por request — caro.
+  recommendations: { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
+  rota: { userLimit: 30, ipLimit: 60, windowMs: 60_000 },
+  "rag-audit": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
+  // Anônimo (web-vitals): só o ipLimit é aplicado.
+  vitals: { userLimit: 120, ipLimit: 120, windowMs: 60_000 },
 };
 
 interface RateLimitOutcome {
@@ -65,6 +81,16 @@ class MemoryRateLimitStore implements RateLimitStore {
   }
 }
 
+// INCR + PEXPIRE num único script Lua: atômico. Sem isso, duas requests
+// concorrentes podiam incrementar antes do expire e a chave ficava sem TTL.
+const RATE_LIMIT_LUA = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+return {count, redis.call("PTTL", KEYS[1])}
+`;
+
 class RedisRateLimitStore implements RateLimitStore {
   constructor(private readonly redis: Redis) {}
 
@@ -74,14 +100,11 @@ class RedisRateLimitStore implements RateLimitStore {
     maxRequests: number
   ): Promise<RateLimitOutcome> {
     const redisKey = `rate:${key}`;
-    const [count, ttl] = await Promise.all([
-      this.redis.incr(redisKey),
-      this.redis.pttl(redisKey),
-    ]);
-
-    if (ttl < 0) {
-      await this.redis.pexpire(redisKey, windowMs);
-    }
+    const [count, ttl] = await this.redis.eval<[number], [number, number]>(
+      RATE_LIMIT_LUA,
+      [redisKey],
+      [windowMs]
+    );
 
     const now = Date.now();
     const ttlMs = ttl >= 0 ? ttl : windowMs;
@@ -123,6 +146,15 @@ function createRedisClient(): Redis | null {
     process.env.KV_REST_API_TOKEN;
 
   if (!url || !token) {
+    if (process.env.NODE_ENV === "production") {
+      // Em serverless cada instância tem seu próprio Map — o fallback em
+      // memória NÃO limita de verdade. Falha visível em vez de silenciosa.
+      console.error(
+        "[rate-limit] Redis não configurado em produção. " +
+          "Configure UPSTASH_REDIS_REST_URL e UPSTASH_REDIS_REST_TOKEN " +
+          "(ou KV_REST_API_URL/KV_REST_API_TOKEN)."
+      );
+    }
     return null;
   }
 

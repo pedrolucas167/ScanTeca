@@ -1,14 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
+import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
+
+    const rateLimit = await rateLimitGuard(request, {
+      route: "embeddings/backfill",
+      userId,
+      ...rateLimits["embeddings/backfill"],
+    });
+    if (rateLimit) return rateLimit;
 
     const books = await prisma.$queryRaw<
       { id: string; title: string; author: string; synopsis: string | null; genre: string | null; notes: string | null; rating: number | null }[]
