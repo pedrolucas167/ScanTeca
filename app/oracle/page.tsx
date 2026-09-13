@@ -172,8 +172,9 @@ export default function OraclePage() {
   // o SSR não conhece sessionStorage.
   useEffect(() => {
     const draft = sessionStorage.getItem("oracle:draft");
-    if (draft) setInput((prev) => prev || draft);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!draft) return;
+    const t = setTimeout(() => setInput((prev) => prev || draft), 0);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {

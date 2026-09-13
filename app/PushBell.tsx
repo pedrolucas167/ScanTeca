@@ -19,22 +19,34 @@ export default function PushBell() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (
-      !("serviceWorker" in navigator) ||
-      !("PushManager" in window) ||
-      !("Notification" in window)
-    ) {
-      setState("unsupported");
-      return;
-    }
-    if (Notification.permission === "denied") {
-      setState("denied");
-      return;
-    }
-    navigator.serviceWorker.ready
-      .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setState(sub ? "on" : "off"))
-      .catch(() => setState("off"));
+    let cancelled = false;
+    (async () => {
+      // Cede a thread: setState fora do corpo síncrono do efeito.
+      await Promise.resolve();
+      if (cancelled) return;
+      if (
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window) ||
+        !("Notification" in window)
+      ) {
+        setState("unsupported");
+        return;
+      }
+      if (Notification.permission === "denied") {
+        setState("denied");
+        return;
+      }
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!cancelled) setState(sub ? "on" : "off");
+      } catch {
+        if (!cancelled) setState("off");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const toggle = async () => {
