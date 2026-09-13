@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embeddings";
+import { searchGoogleBooks } from "@/lib/recommendations";
 import { normalize } from "@/lib/book-cover";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
@@ -14,6 +15,8 @@ const oracleSchema = z.object({
   mode: z.enum(ORACLE_MODES).default("EXPLORE"),
   sessionId: z.string().cuid().nullish(),
   temperature: z.coerce.number().min(0).max(2).default(1),
+  scope: z.enum(["library", "all"]).default("library"),
+  regenerate: z.boolean().optional(),
   audio: z
     .object({
       data: z.string().nullish(),
@@ -186,7 +189,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = await readJson(request, oracleSchema);
     if (!parsed.ok) return parsed.response;
-    const { audio, mode, sessionId: requestedSessionId, temperature } = parsed.data;
+    const { audio, mode, sessionId: requestedSessionId, temperature, scope, regenerate } = parsed.data;
 
     let question = parsed.data.question?.trim() ?? "";
 
@@ -248,6 +251,19 @@ export async function POST(request: NextRequest) {
       sessionId = session.id;
     }
 
+    // Regenerate: apaga a última resposta do assistente antes de montar o
+    // histórico — a pergunta do usuário já existe e não é recriada.
+    if (regenerate) {
+      const lastAssistant = await prisma.oracleMessage.findFirst({
+        where: { userId, sessionId, role: "assistant" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (lastAssistant) {
+        await prisma.oracleMessage.delete({ where: { id: lastAssistant.id } });
+      }
+    }
+
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     weekAgo.setHours(0, 0, 0, 0);
@@ -259,9 +275,11 @@ export async function POST(request: NextRequest) {
         take: HISTORY_LIMIT,
       }),
       prisma.librarySetting.findUnique({ where: { userId } }),
-      prisma.oracleMessage.create({
-        data: { userId, sessionId, role: "user", content: trimmed },
-      }),
+      regenerate
+        ? Promise.resolve(null)
+        : prisma.oracleMessage.create({
+            data: { userId, sessionId, role: "user", content: trimmed },
+          }),
       prisma.book.findMany({
         where: { userId, status: "READING" },
         select: {
@@ -331,6 +349,36 @@ export async function POST(request: NextRequest) {
     const meta = await prisma.$queryRaw<
       { id: string; title: string; author: string; genre: string | null }[]
     >`SELECT id, title, author, genre FROM "Book" WHERE "userId" = ${userId}`;
+
+    // Escopo ampliado: busca livros fora do acervo no Google Books.
+    interface ExternalBook {
+      title: string;
+      author: string;
+      description: string | null;
+      genre: string | null;
+    }
+    let externalBooks: ExternalBook[] = [];
+    if (scope === "all") {
+      try {
+        const ownedTitles = new Set(
+          meta.map((m) => normalize(m.title).join(" "))
+        );
+        const items = await searchGoogleBooks(retrievalQuery);
+        externalBooks = items
+          .map((i) => ({
+            title: i.volumeInfo.title?.trim() ?? "",
+            author: i.volumeInfo.authors?.join(", ") || "Autor desconhecido",
+            description: i.volumeInfo.description ?? null,
+            genre: i.volumeInfo.categories?.[0] ?? null,
+          }))
+          .filter(
+            (b) => b.title && !ownedTitles.has(normalize(b.title).join(" "))
+          )
+          .slice(0, 4);
+      } catch (err) {
+        console.error("[oracle] external search error:", err);
+      }
+    }
 
     const hitBookIds = new Set<string>();
     const hitAuthors = new Set<string>();
@@ -462,6 +510,18 @@ export async function POST(request: NextRequest) {
           .join("\n")}`
       : "";
 
+    const externalContext =
+      externalBooks.length > 0
+        ? `\n\nSugestões fora do acervo (o leitor NÃO possui estes livros):\n${externalBooks
+            .map(
+              (b, i) =>
+                `${contextBooks.length + i + 1}. "${b.title}" — ${b.author} [FORA DO ACERVO]` +
+                (b.genre ? ` [${b.genre}]` : "") +
+                (b.description ? `\n   Sinopse: ${b.description.slice(0, 300)}` : "")
+            )
+            .join("\n\n")}`
+        : "";
+
     const profile = setting?.oracleProfile?.trim();
     const modeInstructions: Record<
       typeof ORACLE_MODES[number],
@@ -479,6 +539,7 @@ export async function POST(request: NextRequest) {
 
 Modo atual: ${mode}.
 Instrução específica: ${modeInstructions[mode]}
+${scope === "all" ? "\nEscopo ampliado: você pode sugerir livros fora do acervo — eles aparecem marcados como [FORA DO ACERVO] no contexto. Deixe claro ao leitor quando uma sugestão não está na estante dele." : ""}
 ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
 
     const messages = [
@@ -489,7 +550,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
       })),
       {
         role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}\n\nPergunta do usuário: ${trimmed}`,
+        content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}\n\nPergunta do usuário: ${trimmed}`,
       },
     ];
 
@@ -528,7 +589,17 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         let buffer = "";
         let fullText = "";
 
-        const sources = contextBooks.map((b) => {
+        const sources: {
+          id: string;
+          title: string;
+          author: string;
+          status: string;
+          genre: string | null;
+          relevance: number | null;
+          matchedBy: string;
+          evidence: string | null;
+          external?: boolean;
+        }[] = contextBooks.map((b) => {
           const distance = Number(b.distance);
           const vectorMatch = distance > 0 && distance < DISTANCE_THRESHOLD;
           const relevance = vectorMatch
@@ -554,6 +625,19 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             evidence: b.synopsis?.slice(0, 180) ?? null,
           };
         });
+        for (const [i, b] of externalBooks.entries()) {
+          sources.push({
+            id: `ext-${i}`,
+            title: b.title,
+            author: b.author,
+            status: "EXTERNAL",
+            genre: b.genre,
+            relevance: null,
+            matchedBy: "catálogo externo",
+            evidence: b.description?.slice(0, 180) ?? null,
+            external: true,
+          });
+        }
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ sessionId })}\n\n`)
         );
