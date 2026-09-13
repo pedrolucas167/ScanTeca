@@ -16,6 +16,7 @@ import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
+import PushOptIn from "./PushOptIn";
 import AdminLink from "./AdminLink";
 import MobileNav from "./MobileNav";
 import RoutePrefetch from "./RoutePrefetch";
@@ -263,6 +264,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </p>
             </div>
           </footer>
+          <Show when="signed-in">
+            <PushOptIn />
+          </Show>
         </ClerkProvider>
         <PwaRegister />
         <RoutePrefetch />
