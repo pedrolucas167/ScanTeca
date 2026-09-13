@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import Markdown from "./Markdown";
 
 interface Source {
   id: string;
@@ -9,9 +10,10 @@ interface Source {
   author: string;
   status?: string;
   genre?: string | null;
-  relevance?: number;
+  relevance?: number | null;
   matchedBy?: string;
   evidence?: string | null;
+  external?: boolean;
 }
 
 interface Message {
@@ -110,6 +112,17 @@ export default function OraclePage() {
   const [artifacts, setArtifacts] = useState<OracleArtifact[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [savingArtifact, setSavingArtifact] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [scope, setScope] = useState<"library" | "all">("library");
+  const [showJumpDown, setShowJumpDown] = useState(false);
+  const [failedSend, setFailedSend] = useState<
+    | { kind: "text"; question: string; streamed: boolean }
+    | { kind: "audio"; blob: Blob; voice: boolean }
+    | null
+  >(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [sessionTitleDraft, setSessionTitleDraft] = useState("");
+  const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<string | null>(null);
   const [playingTtsIndex, setPlayingTtsIndex] = useState<number | null>(null);
   const micSupported = useSyncExternalStore(
     () => () => {},
@@ -118,8 +131,8 @@ export default function OraclePage() {
       !!navigator.mediaDevices?.getUserMedia,
     () => false
   );
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -132,10 +145,51 @@ export default function OraclePage() {
   const micBusyRef = useRef(false);
   const streamDoneRef = useRef(true);
   const voiceChatDataRef = useRef<string[]>([]);
+  const pendingCharsRef = useRef("");
+  const revealTimerRef = useRef<number | null>(null);
+  const revealDoneRef = useRef<(() => void) | null>(null);
+  const stickToBottomRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
+  const receivedAnyRef = useRef(false);
+
+  // Só segue o fim da conversa se o usuário já estiver perto do fundo —
+  // se ele subiu para ler, o stream não arrasta a tela de volta.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const nearBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 160;
+      stickToBottomRef.current = nearBottom;
+      setShowJumpDown(!nearBottom);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Rascunho persiste entre navegações; limpa sozinho ao enviar (input volta a "").
+  // A restauração acontece após a montagem para não quebrar a hidratação —
+  // o SSR não conhece sessionStorage.
+  useEffect(() => {
+    const draft = sessionStorage.getItem("oracle:draft");
+    if (!draft) return;
+    const t = setTimeout(() => setInput((prev) => prev || draft), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (input) sessionStorage.setItem("oracle:draft", input);
+    else sessionStorage.removeItem("oracle:draft");
+  }, [input]);
+
+  useEffect(() => {
+    if (!stickToBottomRef.current) return;
+    // Durante o stream o scroll é instantâneo (smooth a cada chunk viraria jank).
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: loading ? "auto" : "smooth",
+    });
+  }, [messages, loading]);
 
   useEffect(() => {
     playbackRateRef.current = playbackRate;
@@ -267,6 +321,64 @@ export default function OraclePage() {
     }
   };
 
+  // Reveal cadenciado: o stream chega em bursts de rede; o texto aparece em
+  // ritmo constante (estilo ChatGPT) em vez de blocos irregulares.
+  const pumpReveal = () => {
+    if (revealTimerRef.current !== null) return;
+    revealTimerRef.current = window.setInterval(() => {
+      const pending = pendingCharsRef.current;
+      if (!pending) {
+        if (streamDoneRef.current) {
+          window.clearInterval(revealTimerRef.current!);
+          revealTimerRef.current = null;
+          revealDoneRef.current?.();
+          revealDoneRef.current = null;
+        }
+        return;
+      }
+      // Drena proporcional ao backlog: stream rápido não fica para trás.
+      // Com prefers-reduced-motion o texto aparece de uma vez, sem typewriter.
+      const n = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? pending.length
+        : Math.min(pending.length, Math.max(2, Math.ceil(pending.length / 40)));
+      const slice = pending.slice(0, n);
+      pendingCharsRef.current = pending.slice(n);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last) {
+          updated[updated.length - 1] = {
+            ...last,
+            content: last.content + slice,
+          };
+        }
+        return updated;
+      });
+    }, 24);
+  };
+
+  const queueReveal = (text: string) => {
+    receivedAnyRef.current = true;
+    pendingCharsRef.current += text;
+    pumpReveal();
+  };
+
+  const drainReveal = () =>
+    new Promise<void>((resolve) => {
+      if (!pendingCharsRef.current) return resolve();
+      revealDoneRef.current = resolve;
+    });
+
+  const stopReveal = () => {
+    if (revealTimerRef.current !== null) {
+      window.clearInterval(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+    pendingCharsRef.current = "";
+    revealDoneRef.current?.();
+    revealDoneRef.current = null;
+  };
+
   const speak = async (text: string, index: number) => {
     try {
       stopAudio();
@@ -372,14 +484,7 @@ export default function OraclePage() {
           if (json.text) {
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
-            setMessages((prev) => {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
-                content: updated[updated.length - 1].content + json.text,
-              };
-              return updated;
-            });
+            queueReveal(json.text);
           }
         } catch {}
       }
@@ -388,27 +493,51 @@ export default function OraclePage() {
     return fullText;
   };
 
-  const sendMessage = async (question: string) => {
+  const sendMessage = async (
+    question: string,
+    opts?: { regenerate?: boolean }
+  ) => {
     if (!question || loadingRef.current) return;
     loadingRef.current = true;
     streamDoneRef.current = false;
+    receivedAnyRef.current = false;
+    setFailedSend(null);
 
     stopAudio();
+    stopReveal();
+    stickToBottomRef.current = true;
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     setError(null);
     setLoading(true);
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: question },
-      { role: "assistant", content: "" },
-    ]);
+    // No regenerate a pergunta já está na tela — só entra o placeholder da resposta.
+    setMessages((prev) =>
+      opts?.regenerate
+        ? [...prev, { role: "assistant", content: "" }]
+        : [
+            ...prev,
+            { role: "user", content: question },
+            { role: "assistant", content: "" },
+          ]
+    );
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const res = await fetch("/api/oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, mode, sessionId, temperature }),
+        body: JSON.stringify({
+          question,
+          mode,
+          sessionId,
+          temperature,
+          scope,
+          regenerate: opts?.regenerate,
+        }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -417,10 +546,23 @@ export default function OraclePage() {
       }
 
       await readOracleStream(res);
+      // Marca o fim do stream antes de drenar: o pump precisa saber que não
+      // chega mais texto para resolver o drain.
+      streamDoneRef.current = true;
+      await drainReveal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro de rede");
-      setMessages((prev) => prev.slice(0, -1));
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // Usuário parou a geração — mantém o que já foi revelado.
+        streamDoneRef.current = true;
+        await drainReveal();
+      } else {
+        stopReveal();
+        setError(err instanceof Error ? err.message : "Erro de rede");
+        setMessages((prev) => prev.slice(0, -1));
+        setFailedSend({ kind: "text", question, streamed: receivedAnyRef.current });
+      }
     } finally {
+      abortRef.current = null;
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
@@ -433,8 +575,12 @@ export default function OraclePage() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     streamDoneRef.current = false;
+    receivedAnyRef.current = false;
+    setFailedSend(null);
 
     stopAudio();
+    stopReveal();
+    stickToBottomRef.current = true;
     setError(null);
     setLoading(true);
     setMessages((prev) => [
@@ -453,10 +599,14 @@ export default function OraclePage() {
       const base64 = dataUrl.split(",")[1];
       const format = blob.type.split("/")[1]?.split(";")[0] || "webm";
 
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const res = await fetch("/api/oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId, temperature }),
+        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId, temperature, scope }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -465,10 +615,20 @@ export default function OraclePage() {
       }
 
       await readOracleStream(res);
+      streamDoneRef.current = true;
+      await drainReveal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro de rede");
-      setMessages((prev) => prev.slice(0, -2));
+      if (err instanceof DOMException && err.name === "AbortError") {
+        streamDoneRef.current = true;
+        await drainReveal();
+      } else {
+        stopReveal();
+        setError(err instanceof Error ? err.message : "Erro de rede");
+        setMessages((prev) => prev.slice(0, -2));
+        setFailedSend({ kind: "audio", blob, voice: false });
+      }
     } finally {
+      abortRef.current = null;
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
@@ -566,27 +726,12 @@ export default function OraclePage() {
             voiceChatDataRef.current.push(json.audio.data);
             if (json.audio.transcript) {
               fullText += json.audio.transcript;
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...updated[updated.length - 1],
-                  content:
-                    updated[updated.length - 1].content + json.audio.transcript,
-                };
-                return updated;
-              });
+              queueReveal(json.audio.transcript);
             }
           }
           if (json.text) {
             fullText += json.text;
-            setMessages((prev) => {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
-                content: updated[updated.length - 1].content + json.text,
-              };
-              return updated;
-            });
+            queueReveal(json.text);
           }
         } catch {}
       }
@@ -603,8 +748,12 @@ export default function OraclePage() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     streamDoneRef.current = false;
+    receivedAnyRef.current = false;
+    setFailedSend(null);
 
     stopAudio();
+    stopReveal();
+    stickToBottomRef.current = true;
     setError(null);
     setLoading(true);
     voiceChatDataRef.current = [];
@@ -624,10 +773,14 @@ export default function OraclePage() {
       const base64 = dataUrl.split(",")[1];
       const format = blob.type.split("/")[1]?.split(";")[0] || "webm";
 
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const res = await fetch("/api/oracle/voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId, temperature }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -636,10 +789,20 @@ export default function OraclePage() {
       }
 
       await readVoiceStream(res);
+      streamDoneRef.current = true;
+      await drainReveal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro de rede");
-      setMessages((prev) => prev.slice(0, -2));
+      if (err instanceof DOMException && err.name === "AbortError") {
+        streamDoneRef.current = true;
+        await drainReveal();
+      } else {
+        stopReveal();
+        setError(err instanceof Error ? err.message : "Erro de rede");
+        setMessages((prev) => prev.slice(0, -2));
+        setFailedSend({ kind: "audio", blob, voice: true });
+      }
     } finally {
+      abortRef.current = null;
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
@@ -650,6 +813,79 @@ export default function OraclePage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(input.trim());
+  };
+
+  const copyResponse = async (text: string, i: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      return;
+    }
+    setCopiedIndex(i);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const regenerateResponse = () => {
+    if (loadingRef.current) return;
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (!lastUser) return;
+    setMessages((prev) =>
+      prev[prev.length - 1]?.role === "assistant" ? prev.slice(0, -1) : prev
+    );
+    void sendMessage(lastUser.content, { regenerate: true });
+  };
+
+  const stopGeneration = () => {
+    abortRef.current?.abort();
+  };
+
+  const retryFailedSend = () => {
+    const failed = failedSend;
+    if (!failed || loadingRef.current) return;
+    setFailedSend(null);
+    setError(null);
+    if (failed.kind === "audio") {
+      void (failed.voice ? sendVoice(failed.blob) : sendAudio(failed.blob));
+      return;
+    }
+    if (failed.streamed) {
+      // A pergunta já está na tela e no servidor — só regenera a resposta.
+      void sendMessage(failed.question, { regenerate: true });
+    } else {
+      // Nada chegou: remove a pergunta órfã e reenvia do zero.
+      setMessages((prev) =>
+        prev[prev.length - 1]?.role === "user" ? prev.slice(0, -1) : prev
+      );
+      void sendMessage(failed.question);
+    }
+  };
+
+  const renameSession = async (id: string) => {
+    const title = sessionTitleDraft.trim();
+    setEditingSessionId(null);
+    if (!title) return;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, title } : s))
+    );
+    await fetch(`/api/oracle/sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    }).catch(() => {});
+  };
+
+  const deleteSession = async (id: string) => {
+    setConfirmDeleteSessionId(null);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (sessionId === id) {
+      stopAudio();
+      stopReveal();
+      setSessionId(null);
+      setMessages([]);
+      setSelectedCompare([]);
+      setError(null);
+    }
+    await fetch(`/api/oracle/sessions/${id}`, { method: "DELETE" }).catch(() => {});
   };
 
   const handleMic = async () => {
@@ -693,8 +929,10 @@ export default function OraclePage() {
 
   const handleClear = async () => {
     stopAudio();
+    stopReveal();
     setMessages([]);
     setError(null);
+    setFailedSend(null);
     await fetch("/api/oracle", { method: "DELETE" }).catch(() => {});
   };
 
@@ -764,17 +1002,22 @@ export default function OraclePage() {
 
   const startNewSession = () => {
     stopAudio();
+    stopReveal();
     setSessionId(null);
     setMessages([]);
     setSelectedCompare([]);
     setError(null);
+    setFailedSend(null);
     setShowLibrary(false);
     inputRef.current?.focus();
   };
 
   const loadSession = async (session: OracleSession) => {
     if (loadingRef.current) return;
+    stopReveal();
+    stickToBottomRef.current = true;
     setError(null);
+    setFailedSend(null);
     try {
       const response = await fetch(`/api/oracle/sessions/${session.id}`);
       if (!response.ok) throw new Error("Não foi possível abrir a conversa");
@@ -828,9 +1071,9 @@ export default function OraclePage() {
     suggestions.length > 0 ? suggestions : DEFAULT_SUGGESTIONS;
 
   return (
-    <div className="flex flex-1 flex-col bg-surface text-on-surface">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-surface text-on-surface">
       {/* Header */}
-      <header className="sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+      <header className="z-40 flex w-full shrink-0 items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
         <div className="flex items-center gap-space-xs">
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20">
             <Icon name="auto_awesome" className="text-xl text-primary" />
@@ -943,10 +1186,73 @@ export default function OraclePage() {
                 {sessions.length === 0 ? (
                   <p className="rounded-xl border border-outline-variant/30 p-3 font-body-sm text-on-surface-variant">Nenhuma conversa salva ainda.</p>
                 ) : sessions.map((session) => (
-                  <button key={session.id} onClick={() => void loadSession(session)} className={`w-full rounded-xl border p-3 text-left transition-colors ${sessionId === session.id ? "border-primary bg-primary-container/10" : "border-outline-variant/30 bg-surface-container-low hover:border-primary/50"}`}>
-                    <span className="block truncate font-label-md font-semibold text-on-surface">{session.title}</span>
-                    <span className="mt-1 block font-caption text-caption text-outline">{session._count?.messages ?? 0} mensagens · {new Date(session.updatedAt).toLocaleDateString("pt-BR")}</span>
-                  </button>
+                  <div key={session.id} className={`w-full rounded-xl border p-3 transition-colors ${sessionId === session.id ? "border-primary bg-primary-container/10" : "border-outline-variant/30 bg-surface-container-low hover:border-primary/50"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      {editingSessionId === session.id ? (
+                        <input
+                          autoFocus
+                          value={sessionTitleDraft}
+                          onChange={(e) => setSessionTitleDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void renameSession(session.id);
+                            if (e.key === "Escape") setEditingSessionId(null);
+                          }}
+                          onBlur={() => void renameSession(session.id)}
+                          className="min-w-0 flex-1 rounded-md border border-primary/40 bg-surface px-2 py-0.5 font-label-md font-semibold text-on-surface focus:outline-none"
+                        />
+                      ) : (
+                        <button onClick={() => void loadSession(session)} className="min-w-0 flex-1 text-left">
+                          <span className="block truncate font-label-md font-semibold text-on-surface">{session.title}</span>
+                        </button>
+                      )}
+                      <div className="flex flex-shrink-0 items-center gap-0.5">
+                        <button
+                          onClick={() => {
+                            setEditingSessionId(session.id);
+                            setSessionTitleDraft(session.title);
+                            setConfirmDeleteSessionId(null);
+                          }}
+                          title="Renomear conversa"
+                          className="rounded-full p-1 text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                        >
+                          <Icon name="edit" className="text-sm" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setConfirmDeleteSessionId((prev) =>
+                              prev === session.id ? null : session.id
+                            )
+                          }
+                          title="Excluir conversa"
+                          className={`rounded-full p-1 transition-colors ${confirmDeleteSessionId === session.id ? "text-error" : "text-outline hover:bg-surface-container-high hover:text-error"}`}
+                        >
+                          <Icon name="delete" className="text-sm" />
+                        </button>
+                      </div>
+                    </div>
+                    <button onClick={() => void loadSession(session)} className="mt-1 block w-full text-left">
+                      <span className="font-caption text-caption text-outline">{session._count?.messages ?? 0} mensagens · {new Date(session.updatedAt).toLocaleDateString("pt-BR")}</span>
+                    </button>
+                    {confirmDeleteSessionId === session.id && (
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-error-container/20 px-2.5 py-1.5">
+                        <span className="font-caption text-caption text-error">Excluir esta conversa?</span>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => setConfirmDeleteSessionId(null)}
+                            className="rounded-full px-2.5 py-1 font-caption text-caption text-on-surface-variant hover:bg-surface-container-high"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => void deleteSession(session.id)}
+                            className="rounded-full bg-error px-2.5 py-1 font-caption text-caption font-semibold text-white hover:bg-error/80"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </section>
@@ -1024,9 +1330,14 @@ export default function OraclePage() {
         </div>
       )}
 
-      {/* Main */}
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-56 pt-4">
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Modo do Oráculo">
+      {/* Main — container de scroll da conversa */}
+      <main
+        ref={scrollRef}
+        className="min-h-0 w-full flex-1 overflow-y-auto"
+      >
+        <div className="mx-auto w-full max-w-lg px-4 pb-6 pt-4 md:max-w-2xl lg:max-w-3xl">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Modo do Oráculo">
           {ORACLE_MODES.map((item) => (
             <button
               key={item.id}
@@ -1044,7 +1355,7 @@ export default function OraclePage() {
           ))}
         </div>
 
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest/60 p-2">
+        <div className="flex items-center gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest/60 p-2 md:w-60 md:shrink-0">
           <Icon name="thermostat" className="text-on-surface-variant" />
           <span className="font-caption text-caption text-on-surface-variant">
             Temperatura
@@ -1062,6 +1373,7 @@ export default function OraclePage() {
           <span className="min-w-[2.5ch] text-right font-caption text-caption text-primary">
             {temperature.toFixed(1)}
           </span>
+        </div>
         </div>
 
         {/* Welcome card */}
@@ -1103,7 +1415,7 @@ export default function OraclePage() {
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className="mb-6">
+          <div key={i} className="msg-in group mb-6">
             {msg.role === "user" ? (
               <div className="flex flex-col items-end gap-1 pl-8">
                 <div className="rounded-2xl rounded-tr-xs border border-white/10 bg-primary-container px-space-md py-space-sm shadow-md">
@@ -1138,15 +1450,32 @@ export default function OraclePage() {
                   )}
                 </div>
                 <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm">
-                  <p className="whitespace-pre-wrap font-body-md text-body-md leading-relaxed text-on-surface">
-                    {msg.content}
-                    {loading && i === messages.length - 1 && (
-                      <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
-                    )}
-                  </p>
+                  {loading && i === messages.length - 1 && !msg.content ? (
+                    <div
+                      className="flex items-center gap-1.5 py-1"
+                      aria-label="Oráculo digitando"
+                    >
+                      <span className="typing-dot h-1.5 w-1.5 rounded-full bg-primary" />
+                      <span
+                        className="typing-dot h-1.5 w-1.5 rounded-full bg-primary"
+                        style={{ animationDelay: "0.15s" }}
+                      />
+                      <span
+                        className="typing-dot h-1.5 w-1.5 rounded-full bg-primary"
+                        style={{ animationDelay: "0.3s" }}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <Markdown content={msg.content} />
+                      {loading && i === messages.length - 1 && (
+                        <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
+                      )}
+                    </div>
+                  )}
 
                   {msg.sources && msg.sources.length > 0 && (
-                    <div className="space-y-2.5">
+                    <div className="grid gap-2.5 sm:grid-cols-2">
                       {msg.sources.map((source) => {
                         const selected = selectedCompare.some((item) => item.id === source.id);
                         const busy = actionBookId === source.id;
@@ -1159,13 +1488,21 @@ export default function OraclePage() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
-                                <span className="font-caption text-caption font-semibold uppercase tracking-wider text-primary">Fonte do acervo</span>
-                                <Link href={`/books/${source.id}`} className="group mt-1 flex items-center gap-1">
-                                  <h3 className="truncate font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
+                                <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
+                                  {source.external ? "Fora do acervo" : "Fonte do acervo"}
+                                </span>
+                                {source.external ? (
+                                  <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
                                     {source.title}
                                   </h3>
-                                  <Icon name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
-                                </Link>
+                                ) : (
+                                  <Link href={`/books/${source.id}`} className="group mt-1 flex items-center gap-1">
+                                    <h3 className="truncate font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
+                                      {source.title}
+                                    </h3>
+                                    <Icon name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
+                                  </Link>
+                                )}
                                 <p className="font-body-sm text-body-sm text-on-surface-variant">{source.author}</p>
                                 {(source.matchedBy || source.relevance !== undefined) && (
                                   <p className="mt-1 font-caption text-caption text-outline">
@@ -1179,11 +1516,20 @@ export default function OraclePage() {
                                   </p>
                                 )}
                               </div>
-                              <span className="rounded-full border border-primary/30 bg-primary-container/20 px-2 py-0.5 text-[11px] text-primary">
-                                {source.status === "READING" ? "Lendo" : source.status === "TO_READ" ? "A ler" : source.status === "READ" ? "Lido" : "Acervo"}
+                              <span className={`rounded-full border px-2 py-0.5 text-[11px] ${source.external ? "border-tertiary/30 bg-tertiary-container/20 text-tertiary" : "border-primary/30 bg-primary-container/20 text-primary"}`}>
+                                {source.external ? "Externo" : source.status === "READING" ? "Lendo" : source.status === "TO_READ" ? "A ler" : source.status === "READ" ? "Lido" : "Acervo"}
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5">
+                              {source.external ? (
+                                <Link
+                                  href="/search-add"
+                                  className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
+                                >
+                                  <Icon name="add" className="text-xs" /> Adicionar ao acervo
+                                </Link>
+                              ) : (
+                                <>
                               <Link
                                 href={`/books/${source.id}`}
                                 className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50"
@@ -1215,17 +1561,21 @@ export default function OraclePage() {
                                 <Icon name={selected ? "check" : "compare_arrows"} className="text-xs" />
                                 {selected ? "Selecionado" : "Comparar"}
                               </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
                       })}
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-1 sm:col-span-2">
+                        {msg.sources.some((s) => !s.external) && (
                         <Link
-                          href={`/rota?books=${encodeURIComponent(msg.sources.map((source) => source.id).join(","))}`}
+                          href={`/rota?books=${encodeURIComponent(msg.sources.filter((s) => !s.external).map((source) => source.id).join(","))}`}
                           className="inline-flex items-center gap-1.5 rounded-full bg-primary-container px-3 py-1.5 font-label-sm text-label-sm font-semibold text-on-primary-container"
                         >
                           <Icon name="route" className="text-sm" /> Criar rota com estes livros
                         </Link>
+                        )}
                         {selectedCompare.length === 2 && (
                           <button
                             onClick={compareSelected}
@@ -1241,7 +1591,7 @@ export default function OraclePage() {
                   {msg.content &&
                     !(loading && i === messages.length - 1) &&
                     msg.role === "assistant" && (
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-3 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                         <button
                           onClick={() =>
                             playingTtsIndex === i ? stopAudio() : speak(msg.content, i)
@@ -1267,6 +1617,25 @@ export default function OraclePage() {
                           <Icon name="bookmark_add" className="text-sm" />
                           {savingArtifact === i ? "Salvando..." : "Salvar resultado"}
                         </button>
+                        <button
+                          onClick={() => void copyResponse(msg.content, i)}
+                          title="Copiar resposta"
+                          className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary"
+                        >
+                          <Icon name={copiedIndex === i ? "check" : "content_copy"} className="text-sm" />
+                          {copiedIndex === i ? "Copiado" : "Copiar"}
+                        </button>
+                        {i === messages.length - 1 && (
+                          <button
+                            onClick={regenerateResponse}
+                            disabled={loading}
+                            title="Regenerar resposta"
+                            className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary disabled:opacity-50"
+                          >
+                            <Icon name="refresh" className="text-sm" />
+                            Regenerar
+                          </button>
+                        )}
                       </div>
                     )}
                 </div>
@@ -1276,19 +1645,50 @@ export default function OraclePage() {
         ))}
 
         {error && (
-          <div className="mb-4 rounded-lg bg-error-container/20 p-3 font-body-sm text-body-sm text-error">
-            {error}
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-error-container/20 p-3 font-body-sm text-body-sm text-error">
+            <span>{error}</span>
+            {failedSend && (
+              <button
+                onClick={retryFailedSend}
+                className="flex flex-shrink-0 items-center gap-1 rounded-full border border-error/40 px-3 py-1 font-caption text-caption font-semibold transition-colors hover:bg-error-container/40"
+              >
+                <Icon name="refresh" className="text-sm" />
+                Tentar novamente
+              </button>
+            )}
           </div>
         )}
-
-        <div ref={bottomRef} />
+        </div>
       </main>
 
-      {/* Fixed bottom */}
-      <div className="pointer-events-none fixed bottom-0 left-0 z-40 w-full bg-gradient-to-t from-surface via-surface/95 to-transparent pt-4">
-        <div className="pointer-events-auto mx-auto flex w-full max-w-lg flex-col gap-2.5 px-4 pb-4">
+      {/* Input bar — em fluxo no fim da coluna, nunca sobrepõe o footer */}
+      <div className="w-full shrink-0 border-t border-outline-variant/20 bg-surface/95 pt-2 backdrop-blur-md">
+        <div className="relative mx-auto flex w-full max-w-lg flex-col gap-2.5 px-4 pb-4 md:max-w-2xl lg:max-w-3xl">
+          {showJumpDown && (
+            <button
+              type="button"
+              onClick={() => {
+                stickToBottomRef.current = true;
+                setShowJumpDown(false);
+                scrollRef.current?.scrollTo({
+                  top: scrollRef.current.scrollHeight,
+                  behavior: "smooth",
+                });
+              }}
+              title="Voltar ao fim da conversa"
+              className="absolute -top-12 left-1/2 z-20 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-outline-variant/40 bg-surface-container-high/95 text-on-surface shadow-lg backdrop-blur-md transition-all hover:border-primary/50 hover:text-primary active:scale-90"
+            >
+              <Icon name="keyboard_arrow_down" className="text-lg" />
+            </button>
+          )}
           {messages.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+            <div
+              className={`flex items-center gap-2 overflow-x-auto scroll-smooth py-1 pr-6 no-scrollbar transition-all duration-300 [mask-image:linear-gradient(to_right,black_0%,black_calc(100%-2rem),transparent_100%)] ${
+                loading
+                  ? "pointer-events-none -translate-y-1 opacity-0"
+                  : "translate-y-0 opacity-100"
+              }`}
+            >
               {activeSuggestions.map((suggestion) => (
                 <button
                   key={suggestion}
@@ -1307,25 +1707,44 @@ export default function OraclePage() {
 
           <form
             onSubmit={handleSubmit}
-            className="relative flex items-center gap-1.5 rounded-full border border-outline-variant/50 bg-surface-container/95 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+            className="relative flex items-end gap-1.5 rounded-[28px] border border-outline-variant/50 bg-surface-container/95 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
           >
-            <span className="flex flex-shrink-0 items-center gap-1 rounded-full border border-outline-variant/30 bg-surface-container-high py-1 pl-2.5 pr-2 text-[11px] font-medium text-on-surface-variant">
-              <Icon name="local_library" className="text-xs text-primary" />
-              <span className="hidden sm:inline">Estante</span>
+            <button
+              type="button"
+              onClick={() => setScope((s) => (s === "library" ? "all" : "library"))}
+              title={scope === "library" ? "Buscando só no seu acervo — toque para incluir livros externos" : "Buscando no acervo + catálogo externo"}
+              className={`flex flex-shrink-0 items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-[11px] font-medium transition-colors ${
+                scope === "all"
+                  ? "border-tertiary/50 bg-tertiary-container/20 text-tertiary"
+                  : "border-outline-variant/30 bg-surface-container-high text-on-surface-variant"
+              }`}
+            >
+              <Icon name={scope === "all" ? "public" : "local_library"} className={`text-xs ${scope === "all" ? "text-tertiary" : "text-primary"}`} />
+              <span className="hidden sm:inline">{scope === "all" ? "Estante + Mundo" : "Estante"}</span>
               <Icon name="unfold_more" className="text-[10px]" />
-            </span>
-            <input
+            </button>
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage(input.trim());
+                }
+              }}
               placeholder={
                 recording
                   ? "Gravando... toque no microfone para enviar"
                   : "Pergunte ao seu acervo físico..."
               }
               disabled={loading}
-              className="flex-1 bg-transparent border-0 px-1 py-1 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 focus:outline-none focus:ring-0 disabled:opacity-60"
+              className="max-h-32 flex-1 resize-none self-center border-0 bg-transparent px-1 py-1.5 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 focus:outline-none focus:ring-0 disabled:opacity-60"
             />
             {micSupported && (
               <button
@@ -1342,13 +1761,24 @@ export default function OraclePage() {
                 <Icon name="mic" className="text-lg" />
               </button>
             )}
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-white shadow-[0_0_16px_rgba(91,80,230,0.5)] transition-all hover:bg-inverse-primary active:scale-95 disabled:opacity-50"
-            >
-              <Icon name="arrow_upward" className="text-lg" />
-            </button>
+            {loading ? (
+              <button
+                type="button"
+                onClick={stopGeneration}
+                title="Parar geração"
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-error-container text-error transition-all hover:brightness-110 active:scale-95"
+              >
+                <Icon name="stop" className="text-lg" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-white shadow-[0_0_16px_rgba(91,80,230,0.5)] transition-all hover:bg-inverse-primary active:scale-95 disabled:opacity-50"
+              >
+                <Icon name="arrow_upward" className="text-lg" />
+              </button>
+            )}
           </form>
         </div>
       </div>

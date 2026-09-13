@@ -86,7 +86,7 @@ interface RawBook {
   embeddingText: string | null;
 }
 
-interface GoogleBooksItem {
+export interface GoogleBooksItem {
   id: string;
   volumeInfo: {
     title?: string;
@@ -298,7 +298,7 @@ function googleBookEdition(item: GoogleBooksItem): string {
   return "Edição padrão";
 }
 
-async function searchGoogleBooks(query: string): Promise<GoogleBooksItem[]> {
+export async function searchGoogleBooks(query: string): Promise<GoogleBooksItem[]> {
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
   const q = encodeURIComponent(query);
   const makeUrl = (lang: string) =>

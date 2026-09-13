@@ -1,4 +1,4 @@
-const CACHE = "scanteca-v5";
+const CACHE = "scanteca-v6";
 const OFFLINE = "/offline.html";
 const PRECACHE = [
   OFFLINE,
@@ -89,4 +89,40 @@ self.addEventListener("fetch", (event) => {
       })
     );
   }
+});
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: "Scanteca", body: event.data.text() };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Scanteca", {
+      body: data.body || "",
+      icon: "/android-chrome-192x192.png",
+      badge: "/favicon.svg",
+      data: { url: data.url || "/" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((list) => {
+        for (const client of list) {
+          if ("focus" in client) {
+            client.navigate(url);
+            return client.focus();
+          }
+        }
+        return clients.openWindow(url);
+      })
+  );
 });
