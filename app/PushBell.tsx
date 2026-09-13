@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, BellRing } from "lucide-react";
-
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const normalized = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(normalized);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
+import {
+  PUSH_CHANGED_EVENT,
+  pushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/push-client";
 
 type State = "loading" | "unsupported" | "denied" | "off" | "on";
 
@@ -18,77 +15,53 @@ export default function PushBell() {
   const [state, setState] = useState<State>("loading");
   const [busy, setBusy] = useState(false);
 
+  const refresh = useCallback(async () => {
+    if (!pushSupported()) {
+      setState("unsupported");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setState("denied");
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setState(sub ? "on" : "off");
+    } catch {
+      setState("off");
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       // Cede a thread: setState fora do corpo síncrono do efeito.
       await Promise.resolve();
-      if (cancelled) return;
-      if (
-        !("serviceWorker" in navigator) ||
-        !("PushManager" in window) ||
-        !("Notification" in window)
-      ) {
-        setState("unsupported");
-        return;
-      }
-      if (Notification.permission === "denied") {
-        setState("denied");
-        return;
-      }
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!cancelled) setState(sub ? "on" : "off");
-      } catch {
-        if (!cancelled) setState("off");
-      }
+      if (!cancelled) await refresh();
     })();
+    // Sincroniza quando o PushOptIn (ou outro sino) muda a inscrição.
+    const onChanged = () => void refresh();
+    window.addEventListener(PUSH_CHANGED_EVENT, onChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener(PUSH_CHANGED_EVENT, onChanged);
     };
-  }, []);
+  }, [refresh]);
 
   const toggle = async () => {
     if (busy || state === "unsupported" || state === "denied") return;
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const existing = await reg.pushManager.getSubscription();
-
-      if (existing) {
-        await fetch("/api/push/subscribe", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: existing.endpoint }),
-        }).catch(() => {});
-        await existing.unsubscribe();
-        setState("off");
+      if (state === "on") {
+        const ok = await unsubscribeFromPush();
+        if (ok) setState("off");
         return;
       }
-
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setState(permission === "denied" ? "denied" : "off");
-        return;
-      }
-
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-        ) as BufferSource,
-      });
-
-      const res = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sub.toJSON()),
-      });
-      if (!res.ok) throw new Error("Falha ao salvar inscrição");
-      setState("on");
-    } catch {
-      setState("off");
+      const result = await subscribeToPush();
+      if (result === "subscribed") setState("on");
+      else if (result === "denied") setState("denied");
+      else setState("off");
     } finally {
       setBusy(false);
     }
