@@ -15,6 +15,8 @@ import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
+import PushBell from "./PushBell";
+import AdminLink from "./AdminLink";
 import MobileNav from "./MobileNav";
 import RoutePrefetch from "./RoutePrefetch";
 import WebVitals from "./WebVitals";
@@ -207,6 +209,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <AccentPicker />
                 <ThemeToggle />
                 <Show when="signed-in">
+                  <PushBell />
+                  <AdminLink />
                   <UserButton />
                 </Show>
                 <MobileNav />
