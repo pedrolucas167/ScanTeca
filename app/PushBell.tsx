@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import {
   PUSH_CHANGED_EVENT,
+  getSwRegistration,
   pushSupported,
   subscribeToPush,
   unsubscribeFromPush,
@@ -24,13 +25,11 @@ export default function PushBell() {
       setState("denied");
       return;
     }
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      setState(sub ? "on" : "off");
-    } catch {
-      setState("off");
-    }
+    const reg = await getSwRegistration();
+    const sub = reg
+      ? await reg.pushManager.getSubscription().catch(() => null)
+      : null;
+    setState(sub ? "on" : "off");
   }, []);
 
   useEffect(() => {

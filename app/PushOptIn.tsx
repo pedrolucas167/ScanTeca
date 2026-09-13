@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { BellRing, X } from "lucide-react";
-import { pushSupported, subscribeToPush } from "@/lib/push-client";
+import {
+  getSwRegistration,
+  pushSupported,
+  subscribeToPush,
+} from "@/lib/push-client";
 
 const DISMISS_KEY = "scanteca:push-optin-dismissed";
 // Repergunta depois de 7 dias se o usuário dispensar sem decidir.
@@ -31,13 +35,11 @@ export default function PushOptIn() {
       const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) || 0);
       if (dismissedAt && Date.now() - dismissedAt < DISMISS_TTL_MS) return;
 
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!cancelled && !sub) setVisible(true);
-      } catch {
-        // SW ainda não pronto — não mostra o card.
-      }
+      const reg = await getSwRegistration();
+      const sub = reg
+        ? await reg.pushManager.getSubscription().catch(() => null)
+        : null;
+      if (!cancelled && !sub) setVisible(true);
     })();
     return () => {
       cancelled = true;

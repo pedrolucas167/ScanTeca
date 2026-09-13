@@ -10,7 +10,7 @@ import {
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { unstable_cache } from "next/cache";
-import { BookOpen, Heart } from "lucide-react";
+import { BookOpen, Heart, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
@@ -168,6 +168,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
                   >
                     Manifesto
+                  </Link>
+                  <Link
+                    href="/oracle"
+                    className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Oráculo
                   </Link>
                 </div>
               </div>
