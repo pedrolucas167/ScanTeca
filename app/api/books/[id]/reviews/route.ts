@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { readJson, optionalNumber } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
@@ -11,8 +11,25 @@ const reviewSchema = z.object({
     .trim()
     .min(1, "Conteúdo da review é obrigatório"),
   rating: optionalNumber,
-  userName: z.string().nullish(),
 });
+
+// Reviews são públicas quando a biblioteca do dono está compartilhada.
+// Retorna o livro se o acesso é permitido, null caso contrário.
+async function findAccessibleBook(bookId: string, userId: string | null) {
+  const book = await prisma.book.findUnique({
+    where: { id: bookId },
+    select: { id: true, userId: true },
+  });
+  if (!book) return null;
+
+  if (userId === book.userId) return book;
+
+  const shared = await prisma.librarySetting.findFirst({
+    where: { userId: book.userId, shareEnabled: true },
+    select: { id: true },
+  });
+  return shared ? book : null;
+}
 
 export async function GET(
   request: NextRequest,
@@ -20,10 +37,6 @@ export async function GET(
 ) {
   try {
     const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
 
     const rateLimit = await rateLimitGuard(request, {
       route: "books/reviews",
@@ -34,10 +47,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const book = await prisma.book.findFirst({
-      where: { id, userId },
-      select: { id: true },
-    });
+    const book = await findAccessibleBook(id, userId);
 
     if (!book) {
       return NextResponse.json(
@@ -82,11 +92,9 @@ export async function POST(
     const { id } = await params;
     const parsed = await readJson(request, reviewSchema);
     if (!parsed.ok) return parsed.response;
-    const { content, rating, userName } = parsed.data;
+    const { content, rating } = parsed.data;
 
-    const book = await prisma.book.findFirst({
-      where: { id, userId },
-    });
+    const book = await findAccessibleBook(id, userId);
 
     if (!book) {
       return NextResponse.json(
@@ -95,13 +103,18 @@ export async function POST(
       );
     }
 
+    // Nome vem do Clerk server-side — não confia em valor enviado pelo cliente.
+    const user = await currentUser();
+    const displayName =
+      user?.fullName || user?.firstName || user?.username || null;
+
     const review = await prisma.review.create({
       data: {
         content,
         rating: rating ?? null,
         bookId: id,
         userId,
-        userName: userName?.trim() || null,
+        userName: displayName,
       },
     });
 

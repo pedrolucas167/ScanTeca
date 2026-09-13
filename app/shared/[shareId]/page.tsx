@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { BookOpen, Star } from "lucide-react";
+import { SharedBookReviews } from "./SharedBookReviews";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,19 @@ export default async function SharedCatalogPage({
   const books = await prisma.book.findMany({
     where: { userId: setting.userId },
     orderBy: { createdAt: "desc" },
-    include: { collection: { select: { name: true } } },
+    include: {
+      collection: { select: { name: true } },
+      reviews: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          content: true,
+          rating: true,
+          userName: true,
+          createdAt: true,
+        },
+      },
+    },
   });
 
   const readCount = books.filter((b) => b.status === "READ").length;
@@ -142,6 +155,11 @@ export default async function SharedCatalogPage({
                       {book.collection.name}
                     </span>
                   </div>
+
+                  <SharedBookReviews
+                    bookId={book.id}
+                    initialReviews={book.reviews}
+                  />
                 </div>
               </article>
             ))}
