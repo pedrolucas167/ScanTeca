@@ -116,8 +116,8 @@ export default function LandingPage() {
               href="/manifesto"
               className="flex items-center gap-2 rounded-full border border-outline-variant/50 bg-surface-container px-7 py-3.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container-high active:scale-[0.98]"
             >
-              <Icon name="play_circle" className="text-lg text-secondary" />
-              <span>Explorar Demonstração Interativa</span>
+              <Icon name="auto_stories" className="text-lg text-secondary" />
+              <span>Leia o Manifesto</span>
             </Link>
           </div>
         </div>

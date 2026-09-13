@@ -30,6 +30,32 @@ function notifyChanged() {
   window.dispatchEvent(new Event(PUSH_CHANGED_EVENT));
 }
 
+/**
+ * Registration atual sem esperar ativação. `serviceWorker.ready` pode
+ * pendurar para sempre se o SW falhar ao instalar — use-o só quando
+ * o SW ativo for estritamente necessário (subscribe).
+ */
+export async function getSwRegistration(): Promise<ServiceWorkerRegistration | null> {
+  try {
+    return (await navigator.serviceWorker.getRegistration()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** `ready` com timeout — subscribe precisa do SW ativo, mas não pode travar. */
+function swReady(timeoutMs = 8000): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Service worker não ativou a tempo")),
+        timeoutMs
+      )
+    ),
+  ]);
+}
+
 export type SubscribeResult = "subscribed" | "denied" | "dismissed" | "error";
 
 export async function subscribeToPush(): Promise<SubscribeResult> {
@@ -39,7 +65,7 @@ export async function subscribeToPush(): Promise<SubscribeResult> {
     if (permission === "denied") return "denied";
     if (permission !== "granted") return "dismissed";
 
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await swReady();
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(
@@ -64,7 +90,7 @@ export async function subscribeToPush(): Promise<SubscribeResult> {
 export async function unsubscribeFromPush(): Promise<boolean> {
   if (!pushSupported()) return false;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await swReady();
     const existing = await reg.pushManager.getSubscription();
     if (!existing) return true;
 
