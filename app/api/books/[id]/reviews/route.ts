@@ -3,6 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { readJson, optionalNumber } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { sendPush } from "@/lib/push";
 import { z } from "zod";
 
 const reviewSchema = z.object({
@@ -18,7 +19,7 @@ const reviewSchema = z.object({
 async function findAccessibleBook(bookId: string, userId: string | null) {
   const book = await prisma.book.findUnique({
     where: { id: bookId },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, title: true },
   });
   if (!book) return null;
 
@@ -117,6 +118,19 @@ export async function POST(
         userName: displayName,
       },
     });
+
+    // Push pro dono da biblioteca quando outro usuário comenta.
+    // Fire-and-forget: falha de push não pode quebrar o POST da review.
+    if (book.userId !== userId) {
+      sendPush(
+        {
+          title: "Nova review na sua estante",
+          body: `${displayName || "Alguém"} comentou em "${book.title}"`,
+          url: `/books/${id}`,
+        },
+        { userId: book.userId, category: "reviews" }
+      ).catch(() => {});
+    }
 
     return NextResponse.json({ review }, { status: 201 });
   } catch (error) {

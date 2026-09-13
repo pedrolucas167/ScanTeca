@@ -28,6 +28,8 @@ export const rateLimits: Record<string, RateLimitConfig> = {
   diary: { userLimit: 60, ipLimit: 120, windowMs: 60_000 },
   "library-settings": { userLimit: 30, ipLimit: 60, windowMs: 60_000 },
   "push/subscribe": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
+  "push/devices": { userLimit: 30, ipLimit: 60, windowMs: 60_000 },
+  "push/preferences": { userLimit: 30, ipLimit: 60, windowMs: 60_000 },
   "admin/broadcast": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
   // LLM + embeddings por request — caro.
   recommendations: { userLimit: 10, ipLimit: 30, windowMs: 60_000 },

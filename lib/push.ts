@@ -7,6 +7,9 @@ export interface PushPayload {
   url?: string;
 }
 
+/** Categorias de notificação — cada uma mapeia pra uma coluna em NotificationPreference. */
+export type PushCategory = "updates" | "reviews";
+
 let vapidReady = false;
 
 function ensureVapid(): boolean {
@@ -29,17 +32,33 @@ export function pushConfigured(): boolean {
 
 /**
  * Envia uma notificação para todas as inscrições (ou só as de um usuário).
- * Endpoints que expiraram (404/410) são removidos do banco.
+ * Respeita NotificationPreference: usuários que desligaram a categoria
+ * não recebem. Endpoints que expiraram (404/410) são removidos do banco.
  */
 export async function sendPush(
   payload: PushPayload,
-  userId?: string
+  options: { userId?: string; category?: PushCategory } = {}
 ): Promise<{ sent: number; failed: number; removed: number }> {
   if (!ensureVapid()) return { sent: 0, failed: 0, removed: 0 };
 
-  const subs = await prisma.pushSubscription.findMany({
+  const { userId, category } = options;
+
+  let subs = await prisma.pushSubscription.findMany({
     where: userId ? { userId } : undefined,
   });
+
+  // Opt-out por categoria: remove inscrições de quem desligou essa categoria.
+  if (category && subs.length > 0) {
+    const userIds = [...new Set(subs.map((s) => s.userId))];
+    const optedOut = await prisma.notificationPreference.findMany({
+      where: { userId: { in: userIds }, [category]: false },
+      select: { userId: true },
+    });
+    if (optedOut.length > 0) {
+      const blocked = new Set(optedOut.map((p) => p.userId));
+      subs = subs.filter((s) => !blocked.has(s.userId));
+    }
+  }
 
   const body = JSON.stringify(payload);
   const dead: string[] = [];
@@ -76,4 +95,27 @@ export async function sendPush(
   }
 
   return { sent, failed, removed: dead.length };
+}
+
+/** Registra um broadcast no histórico (chamado pela rota admin). */
+export async function logBroadcast(
+  adminId: string,
+  payload: PushPayload,
+  result: { sent: number; failed: number; removed: number },
+  test: boolean
+): Promise<void> {
+  await prisma.broadcastLog
+    .create({
+      data: {
+        adminId,
+        title: payload.title,
+        body: payload.body,
+        url: payload.url ?? null,
+        test,
+        sent: result.sent,
+        failed: result.failed,
+        removed: result.removed,
+      },
+    })
+    .catch(() => {});
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 const subscribeSchema = z.object({
   endpoint: z.string().url().max(2000),
@@ -35,24 +36,32 @@ export async function POST(request: NextRequest) {
   const { endpoint, keys } = parsed.data;
   const userAgent = request.headers.get("user-agent");
 
-  // Upsert por endpoint: o mesmo dispositivo pode trocar de usuário ou
-  // renovar as chaves sem criar linhas duplicadas.
-  await prisma.pushSubscription.upsert({
-    where: { endpoint },
-    update: {
-      userId,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
-      userAgent,
-    },
-    create: {
-      userId,
-      endpoint,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
-      userAgent,
-    },
-  });
+  try {
+    // Upsert por endpoint: o mesmo dispositivo pode trocar de usuário ou
+    // renovar as chaves sem criar linhas duplicadas.
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: {
+        userId,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        userAgent,
+      },
+      create: {
+        userId,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        userAgent,
+      },
+    });
+  } catch (error) {
+    reportError("POST /api/push/subscribe", error, { userId });
+    return NextResponse.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
@@ -65,9 +74,17 @@ export async function DELETE(request: NextRequest) {
   const parsed = await readJson(request, unsubscribeSchema);
   if (!parsed.ok) return parsed.response;
 
-  await prisma.pushSubscription.deleteMany({
-    where: { endpoint: parsed.data.endpoint, userId },
-  });
+  try {
+    await prisma.pushSubscription.deleteMany({
+      where: { endpoint: parsed.data.endpoint, userId },
+    });
+  } catch (error) {
+    reportError("DELETE /api/push/subscribe", error, { userId });
+    return NextResponse.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
