@@ -10,7 +10,7 @@ import {
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { unstable_cache } from "next/cache";
-import { BookOpen, Heart, Sparkles } from "lucide-react";
+import { BookOpen, Heart, Settings, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
@@ -219,7 +219,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Show when="signed-in">
                   <PushBell />
                   <AdminLink />
-                  <UserButton />
+                  <UserButton>
+                    <UserButton.MenuItems>
+                      <UserButton.Link
+                        label="Configurações"
+                        href="/configuracoes"
+                        labelIcon={<Settings className="h-4 w-4" />}
+                      />
+                    </UserButton.MenuItems>
+                  </UserButton>
                 </Show>
                 <MobileNav />
               </div>
