@@ -15,6 +15,8 @@ const broadcastSchema = z.object({
     .max(500)
     .regex(/^\/|^https?:\/\//, "URL deve ser interna (/...) ou https")
     .optional(),
+  // Envia apenas para os dispositivos do próprio admin — validação sem spam.
+  test: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -41,6 +43,7 @@ export async function POST(request: NextRequest) {
   const parsed = await readJson(request, broadcastSchema);
   if (!parsed.ok) return parsed.response;
 
-  const result = await sendPush(parsed.data);
+  const { test, ...payload } = parsed.data;
+  const result = await sendPush(payload, test ? userId : undefined);
   return NextResponse.json({ ok: true, ...result });
 }

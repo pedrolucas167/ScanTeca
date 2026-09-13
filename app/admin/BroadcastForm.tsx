@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { FlaskConical, Send } from "lucide-react";
 
 export default function BroadcastForm() {
   const [title, setTitle] = useState("");
@@ -11,7 +11,7 @@ export default function BroadcastForm() {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent, test = false) => {
     e.preventDefault();
     if (sending) return;
     setSending(true);
@@ -25,18 +25,22 @@ export default function BroadcastForm() {
           title,
           body,
           ...(url.trim() ? { url: url.trim() } : {}),
+          ...(test ? { test: true } : {}),
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Falha ao enviar");
       setResult(
-        `Enviada para ${data.sent} dispositivo(s)` +
+        (test ? "Teste enviado" : "Enviada") +
+          ` para ${data.sent} dispositivo(s)` +
           (data.removed ? ` · ${data.removed} inscrição(ões) expirada(s) removida(s)` : "") +
           (data.failed ? ` · ${data.failed} falha(s)` : "")
       );
-      setTitle("");
-      setBody("");
-      setUrl("");
+      if (!test) {
+        setTitle("");
+        setBody("");
+        setUrl("");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro de rede");
     } finally {
@@ -112,14 +116,26 @@ export default function BroadcastForm() {
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={sending || !title.trim() || !body.trim()}
-        className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-      >
-        <Send className="h-4 w-4" />
-        {sending ? "Enviando..." : "Disparar para todos"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={sending || !title.trim() || !body.trim()}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+        >
+          <Send className="h-4 w-4" />
+          {sending ? "Enviando..." : "Disparar para todos"}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => submit(e, true)}
+          disabled={sending || !title.trim() || !body.trim()}
+          title="Envia apenas para os seus dispositivos"
+          className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        >
+          <FlaskConical className="h-4 w-4" />
+          Enviar teste pra mim
+        </button>
+      </div>
     </form>
   );
 }
