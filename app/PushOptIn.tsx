@@ -9,8 +9,24 @@ import {
 } from "@/lib/push-client";
 
 const DISMISS_KEY = "scanteca:push-optin-dismissed";
+const SESSIONS_KEY = "scanteca:session-count";
 // Repergunta depois de 7 dias se o usuário dispensar sem decidir.
 const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Só mostra o card a partir da 2ª sessão — converte melhor depois
+// que o usuário já viu valor no app.
+const MIN_SESSIONS = 2;
+
+function bumpSessionCount(): number {
+  const last = Number(sessionStorage.getItem("scanteca:session-active"));
+  if (last) {
+    // Já contamos essa aba/sessão.
+    return Number(localStorage.getItem(SESSIONS_KEY) || 1);
+  }
+  sessionStorage.setItem("scanteca:session-active", "1");
+  const count = Number(localStorage.getItem(SESSIONS_KEY) || 0) + 1;
+  localStorage.setItem(SESSIONS_KEY, String(count));
+  return count;
+}
 
 /**
  * Card de opt-in pós-login. Só aparece quando:
@@ -31,6 +47,7 @@ export default function PushOptIn() {
       await Promise.resolve();
       if (cancelled || !pushSupported()) return;
       if (Notification.permission !== "default") return;
+      if (bumpSessionCount() < MIN_SESSIONS) return;
 
       const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) || 0);
       if (dismissedAt && Date.now() - dismissedAt < DISMISS_TTL_MS) return;

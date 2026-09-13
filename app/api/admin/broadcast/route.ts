@@ -2,9 +2,10 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdmin } from "@/lib/admin";
-import { pushConfigured, sendPush } from "@/lib/push";
+import { logBroadcast, pushConfigured, sendPush } from "@/lib/push";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 const broadcastSchema = z.object({
   title: z.string().trim().min(1, "Título obrigatório").max(80),
@@ -15,6 +16,8 @@ const broadcastSchema = z.object({
     .max(500)
     .regex(/^\/|^https?:\/\//, "URL deve ser interna (/...) ou https")
     .optional(),
+  // Envia apenas para os dispositivos do próprio admin — validação sem spam.
+  test: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -41,6 +44,19 @@ export async function POST(request: NextRequest) {
   const parsed = await readJson(request, broadcastSchema);
   if (!parsed.ok) return parsed.response;
 
-  const result = await sendPush(parsed.data);
-  return NextResponse.json({ ok: true, ...result });
+  const { test, ...payload } = parsed.data;
+  try {
+    const result = await sendPush(payload, {
+      userId: test ? userId : undefined,
+      category: "updates",
+    });
+    await logBroadcast(userId, payload, result, test ?? false);
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    reportError("POST /api/admin/broadcast", error, { userId });
+    return NextResponse.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 }
+    );
+  }
 }

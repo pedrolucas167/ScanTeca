@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { PlusCircle, Search, Sparkles } from "lucide-react";
 
 export default function ManualAddPage() {
@@ -415,10 +416,13 @@ export default function ManualAddPage() {
               <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 Pré-visualização
               </p>
-              <img
+              <Image
                 src={preview}
                 alt="Pré-visualização da capa"
-                className="h-48 rounded-lg object-contain shadow-sm"
+                width={320}
+                height={192}
+                unoptimized
+                className="h-48 w-auto rounded-lg object-contain shadow-sm"
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
                 }}

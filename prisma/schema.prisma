@@ -205,6 +205,33 @@ model PushSubscription {
   @@index([userId])
 }
 
+// Preferências de notificação por usuário — opt-out por categoria.
+// Ausência de linha = tudo ligado (default).
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  reviews   Boolean  @default(true)
+  updates   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Histórico de broadcasts disparados pelo admin.
+model BroadcastLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  title     String
+  body      String
+  url       String?
+  test      Boolean  @default(false)
+  sent      Int      @default(0)
+  failed    Int      @default(0)
+  removed   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model RecommendationFeedback {
   id               String                    @id @default(cuid())
   userId           String
