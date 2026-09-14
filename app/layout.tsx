@@ -10,13 +10,14 @@ import {
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { unstable_cache } from "next/cache";
-import { BookOpen, Heart, Sparkles } from "lucide-react";
+import { BookOpen, Heart, Settings, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
 import PushOptIn from "./PushOptIn";
+import InstallPrompt from "./InstallPrompt";
 import AdminLink from "./AdminLink";
 import MobileNav from "./MobileNav";
 import RoutePrefetch from "./RoutePrefetch";
@@ -219,7 +220,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Show when="signed-in">
                   <PushBell />
                   <AdminLink />
-                  <UserButton />
+                  <UserButton>
+                    <UserButton.MenuItems>
+                      <UserButton.Link
+                        label="Configurações"
+                        href="/configuracoes"
+                        labelIcon={<Settings className="h-4 w-4" />}
+                      />
+                    </UserButton.MenuItems>
+                  </UserButton>
                 </Show>
                 <MobileNav />
               </div>
@@ -273,6 +282,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </footer>
           <Show when="signed-in">
             <PushOptIn />
+            <InstallPrompt />
           </Show>
         </ClerkProvider>
         <PwaRegister />
