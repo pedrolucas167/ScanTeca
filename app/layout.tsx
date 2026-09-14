@@ -17,6 +17,7 @@ import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
 import PushOptIn from "./PushOptIn";
+import InstallPrompt from "./InstallPrompt";
 import AdminLink from "./AdminLink";
 import MobileNav from "./MobileNav";
 import RoutePrefetch from "./RoutePrefetch";
@@ -281,6 +282,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </footer>
           <Show when="signed-in">
             <PushOptIn />
+            <InstallPrompt />
           </Show>
         </ClerkProvider>
         <PwaRegister />

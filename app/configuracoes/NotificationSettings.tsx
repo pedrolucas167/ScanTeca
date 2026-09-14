@@ -12,6 +12,7 @@ interface Device {
 interface Prefs {
   reviews: boolean;
   updates: boolean;
+  progress: boolean;
 }
 
 function parseUserAgent(ua: string | null): string {
@@ -129,6 +130,11 @@ export default function NotificationSettings() {
                 key: "reviews" as const,
                 label: "Reviews na sua biblioteca",
                 desc: "Quando alguém comenta em um livro da sua estante compartilhada.",
+              },
+              {
+                key: "progress" as const,
+                label: "Progresso de leitura",
+                desc: "Meta anual batida e lembretes quando você fica dias sem registrar páginas.",
               },
             ]
           ).map((item) => (

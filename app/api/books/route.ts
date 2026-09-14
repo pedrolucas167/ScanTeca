@@ -9,6 +9,7 @@ import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
 import { resolveCollection } from "@/lib/default-collection";
 import { readJson, bookStatusSchema, optionalNumber } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { notifyGoalIfReached } from "@/lib/push";
 import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 import {
   cleanIsbn,
@@ -292,6 +293,12 @@ export async function PATCH(request: NextRequest) {
       data,
       include: withCollection,
     });
+
+    // Push de meta anual: só quando o livro acabou de virar READ.
+    // Fire-and-forget — falha de push não pode quebrar o PATCH.
+    if (status === "READ" && existing.status !== "READ") {
+      notifyGoalIfReached(userId).catch(() => {});
+    }
 
     const newPage = currentPage ? Number(currentPage) : null;
     if (newPage !== null && newPage > (existing.currentPage ?? 0)) {

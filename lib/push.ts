@@ -8,7 +8,7 @@ export interface PushPayload {
 }
 
 /** Categorias de notificação — cada uma mapeia pra uma coluna em NotificationPreference. */
-export type PushCategory = "updates" | "reviews";
+export type PushCategory = "updates" | "reviews" | "progress";
 
 let vapidReady = false;
 
@@ -95,6 +95,42 @@ export async function sendPush(
   }
 
   return { sent, failed, removed: dead.length };
+}
+
+/**
+ * Dispara push se o usuário acabou de bater a meta anual.
+ * Chamado após marcar um livro como READ — só notifica quando o
+ * contador do ano fica exatamente igual à meta (uma vez só).
+ */
+export async function notifyGoalIfReached(userId: string): Promise<void> {
+  const year = new Date().getFullYear();
+  const yearStart = new Date(year, 0, 1);
+  const [readThisYear, setting] = await Promise.all([
+    prisma.book.count({
+      where: {
+        userId,
+        status: "READ",
+        OR: [
+          { finishedAt: { gte: yearStart } },
+          { finishedAt: null, createdAt: { gte: yearStart } },
+        ],
+      },
+    }),
+    prisma.librarySetting.findUnique({
+      where: { userId },
+      select: { yearlyGoal: true },
+    }),
+  ]);
+  const goal = setting?.yearlyGoal;
+  if (!goal || readThisYear !== goal) return;
+  await sendPush(
+    {
+      title: "Meta batida! 🎉",
+      body: `Você leu ${readThisYear} livros em ${year} — meta anual completa.`,
+      url: "/jornada",
+    },
+    { userId, category: "progress" }
+  );
 }
 
 /** Registra um broadcast no histórico (chamado pela rota admin). */
