@@ -17,10 +17,8 @@ export function isTitleSimilar(query: string, found: string): boolean {
     foundWords.some((fw) => fw === w || fw.startsWith(w) || w.startsWith(fw))
   );
 
-  // Títulos curtos (<=3 palavras significantes): cada palavra deve aparecer.
   if (queryWords.length <= 3) return common.length === queryWords.length;
 
-  // Títulos maiores (com subtítulo): aceita a maioria.
   return common.length >= Math.max(1, Math.ceil(queryWords.length * 0.5));
 }
 
@@ -99,14 +97,12 @@ export function extractMainTitle(fullTitle: string | null | undefined): string |
   const title = cleanTitle(fullTitle);
   if (!title) return null;
 
-  // Primeiro tenta `:` (subtítulo explícito mais confiável)
   const colon = title.indexOf(":");
   if (colon > 0) {
     const main = title.slice(0, colon).trim();
     if (main.length >= 3) return main;
   }
 
-  // Depois em/en-dashes separados por espaço (comum em edições)
   const dashMatch = title.match(/^(.+?)(?:\s+(?:–|—|-))\s+/);
   if (dashMatch) {
     const main = dashMatch[1].trim();
@@ -114,23 +110,6 @@ export function extractMainTitle(fullTitle: string | null | undefined): string |
   }
 
   return title;
-}
-
-/** Se um subtítulo for identificado, retorna ele separadamente. */
-export function extractSubtitle(fullTitle: string | null | undefined): string | null {
-  const title = cleanTitle(fullTitle);
-  if (!title) return null;
-
-  const colon = title.indexOf(":");
-  if (colon > 0 && colon < title.length - 1) {
-    const sub = title.slice(colon + 1).trim();
-    return sub || null;
-  }
-
-  const dashMatch = title.match(/^.+?(?:\s+(?:–|—|-))\s+(.+)$/);
-  if (dashMatch) return dashMatch[1].trim() || null;
-
-  return null;
 }
 
 /** Limpa e normaliza o nome do autor. */
@@ -149,7 +128,6 @@ export function normalizeAuthor(author: string | null | undefined): string | nul
     return null;
   }
 
-  // Remove funções editoriais no final: (Org.), (Editor), (Trad.), etc.
   const withoutRole = trimmed
     .replace(
       /\s*\([^)]*(?:org|editor|trad|coord|compil|adapt|ilust)[^)]*\)\s*$/i,
@@ -157,7 +135,6 @@ export function normalizeAuthor(author: string | null | undefined): string | nul
     )
     .trim();
 
-  // Inverte "Sobrenome, Nome" quando há exatamente uma vírgula
   const parts = withoutRole.split(",");
   if (parts.length === 2) {
     const [last, first] = parts.map((p) => p.trim());
@@ -175,8 +152,6 @@ export function normalizeGenre(genre: string | null | undefined): string | null 
 
   const lower = cleaned.toLowerCase();
 
-  // Categorias compostas do Google Books vêm como "Fiction / Literary".
-  // Pegamos o segmento mais específico (último) e tentamos mapear.
   const segments = lower.split("/").map((s) => s.trim());
   for (let i = segments.length - 1; i >= 0; i--) {
     const segment = segments[i];
@@ -189,7 +164,6 @@ export function normalizeGenre(genre: string | null | undefined): string | null 
     return ENGLISH_TO_PORTUGUESE_GENRE[lower];
   }
 
-  // Mantém o original capitalizado se não conseguir mapear.
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
@@ -198,15 +172,10 @@ export function cleanIsbn(isbn: string | null | undefined): string | null {
   if (!isbn) return null;
   const cleaned = isbn.replace(/[^0-9X]/gi, "").toUpperCase();
   if (cleaned.length !== 10 && cleaned.length !== 13) return null;
-  // ISBN-13 começa com 978 ou 979; ISBN-10 pode terminar com X.
   if (cleaned.length === 13 && !cleaned.startsWith("978") && !cleaned.startsWith("979")) {
     return null;
   }
   return cleaned;
-}
-
-export function isPlaceholderIsbn(isbn: string | null | undefined): boolean {
-  return !isbn || isbn.startsWith("MANUAL-") || isbn.startsWith("manual-");
 }
 
 export function isUnknownAuthor(author: string | null | undefined): boolean {
@@ -240,16 +209,9 @@ export function upgradeCoverUrl(url: string | null | undefined): string | null {
     u = u.replace(/([?&])zoom=1\b/, "$1zoom=0");
   }
   if (u.includes("covers.openlibrary.org")) {
-    // Prefer large covers over medium/small.
     u = u.replace(/-M\.jpg$/i, "-L.jpg").replace(/-S\.jpg$/i, "-L.jpg");
   }
   return u;
-}
-
-/** Heurística simples: remove "publisher", "published" e afins que confundem busca. */
-export function cleanQueryTitle(title: string | null | undefined): string | null {
-  const main = extractMainTitle(title);
-  return main;
 }
 
 /** Compara dois livros por título+autor para evitar duplicatas. */
@@ -266,7 +228,6 @@ export function isBookSimilar(
 
   if (!isTitleSimilar(aTitle, bTitle)) return false;
 
-  // Se um dos autores for desconhecido, aceita o match pelo título.
   if (isUnknownAuthor(aAuthor) || isUnknownAuthor(bAuthor)) return true;
 
   return isAuthorSimilar(aAuthor, bAuthor);

@@ -336,14 +336,6 @@ export async function POST(request: NextRequest) {
       (b) => Number(b.distance) < DISTANCE_THRESHOLD
     );
 
-    console.log(
-      "[oracle] Busca vetorial:",
-      similarBooks
-        .map((b) => `${b.title} (dist=${Number(b.distance).toFixed(4)})`)
-        .join(", "),
-      `→ ${relevantBooks.length} relevantes (< ${DISTANCE_THRESHOLD})`
-    );
-
     const qWords = new Set(normalize(retrievalQuery));
     const qText = normalize(retrievalQuery).join(" ");
     const meta = await prisma.$queryRaw<
@@ -450,9 +442,6 @@ export async function POST(request: NextRequest) {
           return score(b) - score(a);
         })
         .slice(0, MAX_CONTEXT_BOOKS);
-      console.log(
-        `[oracle] Híbrido: títulos=[${[...hitBookIds].join(", ")}] autores=[${[...hitAuthors].join(", ")}] gêneros=[${[...hitGenres].join(", ")}] → +${extra.length} livros`
-      );
     }
 
     const context =
