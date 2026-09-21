@@ -69,10 +69,7 @@ export async function findBookCover({
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
   const mainTitle = extractMainTitle(title) || title || "";
 
-  console.log("[findBookCover] title:", mainTitle, "author:", author, "isbn:", cleanedIsbn);
-
   if (isUnknownTitle(mainTitle) && !cleanedIsbn) {
-    console.log("[findBookCover] no usable title or isbn, giving up");
     return null;
   }
 
@@ -115,7 +112,6 @@ export async function findBookCover({
   }
 
   if (!mainTitle) {
-    console.log("[findBookCover] no title, giving up");
     return null;
   }
 
@@ -238,12 +234,10 @@ export async function findBookCover({
 
   for (const url of candidates) {
     if (await isValidImageUrl(url)) {
-      console.log("[findBookCover] valid cover found:", url);
       return url;
     }
   }
 
-  console.log("[findBookCover] no valid cover found");
   return null;
 }
 
@@ -259,7 +253,6 @@ async function isValidImageUrl(url: string): Promise<boolean> {
 
     const size = contentLength ? Number(contentLength) : null;
     if (size !== null && size < 1024) {
-      console.log("[findBookCover] rejecting small image:", url, "size:", size);
       return false;
     }
 
@@ -289,7 +282,6 @@ export async function findWikipediaCover(
       }
     }
 
-    // Try Portuguese Wikipedia too
     const ptWikiRes = await fetch(
       `https://pt.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(searchTitle)}&prop=pageimages&format=json&origin=*&pithumbsize=500&redirects=1`
     );
@@ -316,4 +308,3 @@ function encodeParams(title: string, author: string) {
   if (author) parts.push(`inauthor:${author}`);
   return parts.join("+");
 }
-

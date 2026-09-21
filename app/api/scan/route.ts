@@ -193,7 +193,6 @@ export async function POST(request: NextRequest) {
               const found = normalizeAuthor(doc.author_name.join(", "));
               if (found) {
                 bookData.author = found;
-                console.log("[scan] author found via Open Library search:", bookData.author);
                 break;
               }
             }
@@ -214,7 +213,6 @@ export async function POST(request: NextRequest) {
                   const found = normalizeAuthor(item.volumeInfo.authors.join(", "));
                   if (found) {
                     bookData.author = found;
-                    console.log("[scan] author found via Google Books search:", bookData.author);
                     break;
                   }
                 }
