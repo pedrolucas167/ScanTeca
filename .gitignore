@@ -45,6 +45,10 @@ yarn-error.log*
 AGENTS.md
 CLAUDE.md
 
+# Jev integration documentation (local only)
+JEV_INTEGRATION.md
+lib/jev-*.test.ts
+
 # vercel
 .vercel
 
