@@ -12,9 +12,9 @@
 export interface RoutingDecision {
   action: "search" | "chat" | "tool";
   confidence: number;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   tool?: string;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
   reason?: string;
 }
 
@@ -105,7 +105,7 @@ export async function jevRouteQuery(
 /**
  * Extract tool name and parameters from query
  */
-function extractTool(query: string): { name: string; params: Record<string, any> } {
+function extractTool(query: string): { name: string; params: Record<string, unknown> } {
   if (/criar rota|montar rota|planejar leitura/i.test(query)) {
     return {
       name: "create_route",
@@ -140,8 +140,8 @@ function extractTool(query: string): { name: string; params: Record<string, any>
  * Extract metadata filters from query (simple heuristics)
  * TODO: Replace with Jev NLP extraction
  */
-function extractFilters(query: string): Record<string, any> {
-  const filters: Record<string, any> = {};
+function extractFilters(query: string): Record<string, unknown> {
+  const filters: Record<string, unknown> = {};
   
   // Extract year (4 digits)
   const yearMatch = query.match(/\b(19|20)\d{2}\b/);
