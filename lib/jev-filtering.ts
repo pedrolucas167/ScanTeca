@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 /**
  * Jev Metadata Filtering
  * 
@@ -254,8 +256,8 @@ function extractCollection(query: string): string | null {
 /**
  * Convert filters to Prisma where clause
  */
-export function filtersToWhereClause(filters: MetadataFilters, userId: string): any {
-  const where: any = { userId };
+export function filtersToWhereClause(filters: MetadataFilters, userId: string): Prisma.BookWhereInput {
+  const where: Prisma.BookWhereInput = { userId };
 
   if (filters.genre) {
     if (Array.isArray(filters.genre)) {
@@ -273,7 +275,7 @@ export function filtersToWhereClause(filters: MetadataFilters, userId: string): 
     if (typeof filters.year === "number") {
       where.publishedDate = { startsWith: filters.year.toString() };
     } else {
-      const dateConditions: any[] = [];
+      const dateConditions: Prisma.BookWhereInput[] = [];
       if (filters.year.min !== undefined) {
         dateConditions.push({ publishedDate: { gte: `${filters.year.min}-01-01` } });
       }
@@ -291,13 +293,14 @@ export function filtersToWhereClause(filters: MetadataFilters, userId: string): 
   }
 
   if (filters.rating_min !== undefined || filters.rating_max !== undefined) {
-    where.rating = {};
+    const ratingFilter: Prisma.IntNullableFilter = {};
     if (filters.rating_min !== undefined) {
-      where.rating.gte = filters.rating_min;
+      ratingFilter.gte = filters.rating_min;
     }
     if (filters.rating_max !== undefined) {
-      where.rating.lte = filters.rating_max;
+      ratingFilter.lte = filters.rating_max;
     }
+    where.rating = ratingFilter;
   }
 
   if (filters.title_contains) {
