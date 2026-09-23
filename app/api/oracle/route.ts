@@ -6,6 +6,9 @@ import { searchGoogleBooks } from "@/lib/recommendations";
 import { normalize } from "@/lib/book-cover";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
+import { jevExtractFilters, filtersToWhereClause } from "@/lib/jev-filtering";
+import { jevRerank, mergeAndRerank } from "@/lib/jev-reranking";
 import { z } from "zod";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
@@ -104,6 +107,125 @@ Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros 
   } catch (err) {
     console.error("[oracle] profile update error:", err);
   }
+}
+
+async function directChatResponse(question: string, apiKey: string) {
+  try {
+    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "Scanteca Oráculo",
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        stream: true,
+        max_tokens: 300,
+        messages: [
+          {
+            role: "system",
+            content: "Você é o Oráculo de uma biblioteca pessoal. Responda de forma natural e amigável a saudações e conversas casuais. Seja breve e direto.",
+          },
+          {
+            role: "user",
+            content: question,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok || !res.body) {
+      return new Response(
+        JSON.stringify({ error: "Erro ao responder" }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = res.body!.getReader();
+        let buffer = "";
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const payload = trimmed.slice(5).trim();
+              if (payload === "[DONE]") continue;
+
+              try {
+                const json = JSON.parse(payload);
+                const delta = json.choices?.[0]?.delta?.content;
+                if (delta) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`));
+                }
+              } catch {}
+            }
+          }
+        } finally {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (error) {
+    console.error("[oracle] direct chat error:", error);
+    return new Response(
+      JSON.stringify({ error: "Erro ao responder" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+async function toolExecutionResponse(routing: any, userId: string) {
+  // TODO: Implement tool execution logic
+  // For now, return a message indicating the feature is coming soon
+  const toolMessages: Record<string, string> = {
+    create_route: "Para criar uma rota de leitura, use o recurso de Rotas na biblioteca. Selecione os livros e clique em 'Criar rota'.",
+    add_book: "Para adicionar um livro, use o scanner de ISBN ou cadastro manual na página de catálogo.",
+    update_status: "Para atualizar o status de leitura, abra o livro e selecione o status desejado.",
+    unknown: "Entendi que você quer executar uma ação. Essa funcionalidade estará disponível em breve.",
+  };
+
+  const message = toolMessages[routing.tool] || toolMessages.unknown;
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 async function contextualizeQuestion(
@@ -232,6 +354,19 @@ export async function POST(request: NextRequest) {
     }
 
     const trimmed = question;
+
+    // Jev Query Routing - decide se precisa de busca vetorial
+    const routing = await jevRouteQuery(trimmed);
+
+    // Direct chat response for greetings and casual conversation
+    if (shouldDirectChat(routing)) {
+      return directChatResponse(trimmed, apiKey);
+    }
+
+    // Tool execution for specific actions
+    if (shouldExecuteTool(routing)) {
+      return toolExecutionResponse(routing, userId);
+    }
     let sessionId = requestedSessionId ?? null;
     if (sessionId) {
       const ownsSession = await prisma.oracleSession.count({
@@ -336,11 +471,9 @@ export async function POST(request: NextRequest) {
       (b) => Number(b.distance) < DISTANCE_THRESHOLD
     );
 
-    const qWords = new Set(normalize(retrievalQuery));
-    const qText = normalize(retrievalQuery).join(" ");
-    const meta = await prisma.$queryRaw<
-      { id: string; title: string; author: string; genre: string | null }[]
-    >`SELECT id, title, author, genre FROM "Book" WHERE "userId" = ${userId}`;
+    // Jev Metadata Filtering - extract structured filters from query
+    const metadataFilters = await jevExtractFilters(retrievalQuery);
+    const whereClause = filtersToWhereClause(metadataFilters, userId);
 
     // Escopo ampliado: busca livros fora do acervo no Google Books.
     interface ExternalBook {
@@ -353,7 +486,10 @@ export async function POST(request: NextRequest) {
     if (scope === "all") {
       try {
         const ownedTitles = new Set(
-          meta.map((m) => normalize(m.title).join(" "))
+          (await prisma.book.findMany({
+            where: { userId },
+            select: { title: true },
+          })).map((b) => normalize(b.title).join(" "))
         );
         const items = await searchGoogleBooks(retrievalQuery);
         externalBooks = items
@@ -372,45 +508,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const hitBookIds = new Set<string>();
-    const hitAuthors = new Set<string>();
-    const hitGenres = new Set<string>();
-    for (const m of meta) {
-      const normalizedTitle = normalize(m.title).join(" ");
-      if (normalizedTitle.length >= 4 && qText.includes(normalizedTitle)) {
-        hitBookIds.add(m.id);
-      }
-      const authorWords = normalize(m.author).filter((w) => w.length >= 4);
-      const surname = authorWords[authorWords.length - 1];
-      if (
-        (surname && qWords.has(surname)) ||
-        (authorWords.length > 1 && authorWords.every((w) => qWords.has(w)))
-      ) {
-        hitAuthors.add(m.author);
-      }
-      if (m.genre) {
-        const g = normalize(m.genre).join(" ");
-        if (g && qText.includes(g)) hitGenres.add(m.genre);
-      }
-    }
-
+    // Use Jev filters to fetch additional books
+    const hasFilters = Object.keys(metadataFilters).length > 0;
+    
     let contextBooks = relevantBooks;
-    if (hitBookIds.size > 0 || hitAuthors.size > 0 || hitGenres.size > 0) {
-      const or: {
-        id?: { in: string[] };
-        author?: { in: string[] };
-        genre?: { in: string[] };
-      }[] = [];
-      if (hitBookIds.size > 0) or.push({ id: { in: [...hitBookIds] } });
-      if (hitAuthors.size > 0) or.push({ author: { in: [...hitAuthors] } });
-      if (hitGenres.size > 0) or.push({ genre: { in: [...hitGenres] } });
+    
+    if (hasFilters) {
       const metaRows = await prisma.book.findMany({
-        where: { userId, OR: or },
+        where: whereClause,
         take: 8,
       });
-      const seen = new Set(relevantBooks.map((b) => b.id));
-      const extra: SimilarBook[] = metaRows
-        .filter((b) => !seen.has(b.id))
+      
+      // Convert to BookCandidate format for Jev reranking
+      const semanticCandidates = relevantBooks.map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        publishedDate: b.publishedDate,
+        synopsis: b.synopsis,
+        genre: b.genre,
+        status: b.status,
+        rating: b.rating,
+        distance: Number(b.distance),
+      }));
+      
+      const metadataCandidates = metaRows
+        .filter((b) => !relevantBooks.some((rb) => rb.id === b.id))
         .map((b) => ({
           id: b.id,
           title: b.title,
@@ -420,28 +543,76 @@ export async function POST(request: NextRequest) {
           genre: b.genre,
           status: String(b.status),
           rating: b.rating,
-          distance: 0,
+          distance: undefined, // No semantic match for metadata-only results
         }));
-      contextBooks = [...relevantBooks, ...extra]
-        .sort((a, b) => {
-          const score = (book: SimilarBook) => {
-            const distance = Number(book.distance);
-            const semantic = distance > 0 ? (1 - distance) * 60 : 0;
-            const title = hitBookIds.has(book.id) ? 100 : 0;
-            const author = hitAuthors.has(book.author) ? 35 : 0;
-            const genre = book.genre && hitGenres.has(book.genre) ? 20 : 0;
-            const rating = (book.rating ?? 0) * 2;
-            const status =
-              mode === "JOURNEY" && book.status === "READING"
-                ? 25
-                : mode === "RECOMMEND" && book.status === "TO_READ"
-                  ? 15
-                  : 0;
-            return semantic + title + author + genre + rating + status;
+      
+      // Use Jev reranking to merge and score results
+      const reranked = await mergeAndRerank(
+        retrievalQuery,
+        semanticCandidates,
+        metadataCandidates,
+        { mode, threshold: 0.3, maxResults: MAX_CONTEXT_BOOKS }
+      );
+      
+      // Map reranked results back to SimilarBook format
+      const allCandidates = [...semanticCandidates, ...metadataCandidates];
+      const rerankedMap = new Map(reranked.map((r) => [r.id, r]));
+      
+      contextBooks = reranked
+        .map((r) => {
+          const candidate = allCandidates.find((c) => c.id === r.id);
+          if (!candidate) return null;
+          return {
+            id: candidate.id,
+            title: candidate.title,
+            author: candidate.author,
+            publishedDate: candidate.publishedDate,
+            synopsis: candidate.synopsis,
+            genre: candidate.genre,
+            status: candidate.status,
+            rating: candidate.rating,
+            distance: candidate.distance || 1,
           };
-          return score(b) - score(a);
         })
-        .slice(0, MAX_CONTEXT_BOOKS);
+        .filter((b): b is SimilarBook => b !== null);
+    } else {
+      // No filters, just use semantic results with Jev reranking
+      const candidates = relevantBooks.map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        publishedDate: b.publishedDate,
+        synopsis: b.synopsis,
+        genre: b.genre,
+        status: b.status,
+        rating: b.rating,
+        distance: Number(b.distance),
+      }));
+      
+      const reranked = await jevRerank(retrievalQuery, candidates, {
+        mode,
+        threshold: 0.3,
+        maxResults: MAX_CONTEXT_BOOKS,
+      });
+      
+      const rerankedMap = new Map(reranked.map((r) => [r.id, r]));
+      contextBooks = reranked
+        .map((r) => {
+          const candidate = candidates.find((c) => c.id === r.id);
+          if (!candidate) return null;
+          return {
+            id: candidate.id,
+            title: candidate.title,
+            author: candidate.author,
+            publishedDate: candidate.publishedDate,
+            synopsis: candidate.synopsis,
+            genre: candidate.genre,
+            status: candidate.status,
+            rating: candidate.rating,
+            distance: candidate.distance,
+          };
+        })
+        .filter((b): b is SimilarBook => b !== null);
     }
 
     const context =
@@ -596,13 +767,9 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             : 100;
           const matchedBy = vectorMatch
             ? "similaridade semântica"
-            : hitBookIds.has(b.id)
-              ? "título mencionado"
-              : hitAuthors.has(b.author)
-                ? "autor mencionado"
-                : b.genre && hitGenres.has(b.genre)
-                  ? "gênero mencionado"
-                  : "metadados do acervo";
+            : hasFilters
+              ? "filtros de metadados"
+              : "metadados do acervo";
           return {
             id: b.id,
             title: b.title,
