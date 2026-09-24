@@ -151,6 +151,7 @@ export default function OraclePage() {
   const stickToBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const receivedAnyRef = useRef(false);
+  const wasLoadingRef = useRef(false);
 
   // Só segue o fim da conversa se o usuário já estiver perto do fundo —
   // se ele subiu para ler, o stream não arrasta a tela de volta.
@@ -184,10 +185,13 @@ export default function OraclePage() {
 
   useEffect(() => {
     if (!stickToBottomRef.current) return;
-    // Durante o stream o scroll é instantâneo (smooth a cada chunk viraria jank).
+    const startedLoading = loading && !wasLoadingRef.current;
+    wasLoadingRef.current = loading;
+    // Desliza até a nova resposta uma vez; depois acompanha o stream sem
+    // interromper a animação a cada caractere revelado.
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
-      behavior: loading ? "auto" : "smooth",
+      behavior: startedLoading || !loading ? "smooth" : "auto",
     });
   }, [messages, loading]);
 
@@ -336,11 +340,12 @@ export default function OraclePage() {
         }
         return;
       }
-      // Drena proporcional ao backlog: stream rápido não fica para trás.
+      // Mantém uma cadência estável mesmo quando a rede entrega a resposta
+      // inteira em um único burst.
       // Com prefers-reduced-motion o texto aparece de uma vez, sem typewriter.
       const n = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? pending.length
-        : Math.min(pending.length, Math.max(2, Math.ceil(pending.length / 40)));
+        : Math.min(pending.length, Math.max(2, Math.min(6, Math.ceil(pending.length / 80))));
       const slice = pending.slice(0, n);
       pendingCharsRef.current = pending.slice(n);
       setMessages((prev) => {
@@ -1449,7 +1454,7 @@ export default function OraclePage() {
                     </span>
                   )}
                 </div>
-                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm">
+                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[box-shadow,border-color] duration-500">
                   {loading && i === messages.length - 1 && !msg.content ? (
                     <div
                       className="flex items-center gap-1.5 py-1"
@@ -1466,7 +1471,10 @@ export default function OraclePage() {
                       />
                     </div>
                   ) : (
-                    <div>
+                    <div
+                      aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
+                      className="transition-opacity duration-300"
+                    >
                       <Markdown content={msg.content} />
                       {loading && i === messages.length - 1 && (
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />

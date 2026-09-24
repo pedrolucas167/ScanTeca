@@ -6,7 +6,12 @@ import { searchGoogleBooks } from "@/lib/recommendations";
 import { normalize } from "@/lib/book-cover";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
-import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
+import {
+  jevRouteQuery,
+  shouldDirectChat,
+  shouldExecuteTool,
+  type RoutingDecision,
+} from "@/lib/jev-routing";
 import { jevExtractFilters, filtersToWhereClause } from "@/lib/jev-filtering";
 import { jevRerank, mergeAndRerank } from "@/lib/jev-reranking";
 import { z } from "zod";
@@ -49,7 +54,7 @@ const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.6;
 const MAX_CONTEXT_BOOKS = 6;
 const MAX_DIARY_ENTRIES = 8;
-const MAX_TOKENS_CHAT = 900;
+const MAX_TOKENS_CHAT = 1200;
 const MAX_TOKENS_PROFILE = 120;
 const MAX_TOKENS_REWRITE = 60;
 
@@ -198,7 +203,7 @@ async function directChatResponse(question: string, apiKey: string) {
   }
 }
 
-async function toolExecutionResponse(routing: any, userId: string) {
+async function toolExecutionResponse(routing: RoutingDecision) {
   // TODO: Implement tool execution logic
   // For now, return a message indicating the feature is coming soon
   const toolMessages: Record<string, string> = {
@@ -208,7 +213,7 @@ async function toolExecutionResponse(routing: any, userId: string) {
     unknown: "Entendi que você quer executar uma ação. Essa funcionalidade estará disponível em breve.",
   };
 
-  const message = toolMessages[routing.tool] || toolMessages.unknown;
+  const message = toolMessages[routing.tool ?? "unknown"] || toolMessages.unknown;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -365,7 +370,7 @@ export async function POST(request: NextRequest) {
 
     // Tool execution for specific actions
     if (shouldExecuteTool(routing)) {
-      return toolExecutionResponse(routing, userId);
+      return toolExecutionResponse(routing);
     }
     let sessionId = requestedSessionId ?? null;
     if (sessionId) {
