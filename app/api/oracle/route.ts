@@ -54,7 +54,7 @@ const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.6;
 const MAX_CONTEXT_BOOKS = 6;
 const MAX_DIARY_ENTRIES = 8;
-const MAX_TOKENS_CHAT = 900;
+const MAX_TOKENS_CHAT = 1200;
 const MAX_TOKENS_PROFILE = 120;
 const MAX_TOKENS_REWRITE = 60;
 
@@ -213,7 +213,7 @@ async function toolExecutionResponse(routing: RoutingDecision) {
     unknown: "Entendi que você quer executar uma ação. Essa funcionalidade estará disponível em breve.",
   };
 
-  const message = (routing.tool && toolMessages[routing.tool]) || toolMessages.unknown;
+  const message = toolMessages[routing.tool ?? "unknown"] || toolMessages.unknown;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
