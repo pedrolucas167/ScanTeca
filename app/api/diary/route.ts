@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -56,19 +57,54 @@ export async function POST(request: NextRequest) {
   const input = parsed.data;
 
   if (input.action === "start") {
-    const book = await prisma.book.findFirst({ where: { id: input.bookId, userId } });
-    if (!book) return Response.json({ error: "Livro não encontrado" }, { status: 404 });
-    await prisma.readingSession.updateMany({
-      where: { userId, endedAt: null },
-      data: { endedAt: new Date() },
-    });
-    const session = await prisma.readingSession.create({
-      data: { userId, bookId: book.id, startedPage: book.currentPage ?? 0, currentPage: book.currentPage ?? 0 },
-    });
-    if (book.status !== "READING") {
-      await prisma.book.update({ where: { id: book.id }, data: { status: "READING", startedAt: book.startedAt ?? new Date() } });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const session = await prisma.$transaction(async (tx) => {
+          const book = await tx.book.findFirst({
+            where: { id: input.bookId, userId },
+          });
+          if (!book) return null;
+
+          await tx.readingSession.updateMany({
+            where: { userId, endedAt: null },
+            data: { endedAt: new Date() },
+          });
+          const created = await tx.readingSession.create({
+            data: {
+              userId,
+              bookId: book.id,
+              startedPage: book.currentPage ?? 0,
+              currentPage: book.currentPage ?? 0,
+            },
+          });
+          if (book.status !== "READING") {
+            await tx.book.update({
+              where: { id: book.id },
+              data: {
+                status: "READING",
+                startedAt: book.startedAt ?? new Date(),
+              },
+            });
+          }
+          return created;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+        if (!session) {
+          return Response.json({ error: "Livro não encontrado" }, { status: 404 });
+        }
+        return Response.json({ session }, { status: 201 });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2034" &&
+          attempt < 2
+        ) {
+          continue;
+        }
+        throw error;
+      }
     }
-    return Response.json({ session }, { status: 201 });
+    throw new Error("Não foi possível iniciar a sessão");
   }
 
   if (input.action === "pause") {

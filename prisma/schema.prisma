@@ -155,12 +155,14 @@ model OracleMessage {
   role      String
   content   String
   sources   Json?
+  requestId String?
   sessionId String?
   session   OracleSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  createdAt DateTime       @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([sessionId])
+  @@unique([userId, requestId])
 }
 
 model OracleSession {

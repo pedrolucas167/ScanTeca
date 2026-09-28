@@ -529,6 +529,7 @@ export default function OraclePage() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const requestId = crypto.randomUUID();
 
     try {
       const res = await fetch("/api/oracle", {
@@ -541,6 +542,7 @@ export default function OraclePage() {
           temperature,
           scope,
           regenerate: opts?.regenerate,
+          requestId,
         }),
         signal: controller.signal,
       });
