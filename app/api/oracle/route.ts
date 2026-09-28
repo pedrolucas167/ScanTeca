@@ -51,8 +51,8 @@ interface SimilarBook {
 }
 
 const HISTORY_LIMIT = 8;
-const DISTANCE_THRESHOLD = 0.6;
-const MAX_CONTEXT_BOOKS = 6;
+const DISTANCE_THRESHOLD = 0.7;
+const MAX_CONTEXT_BOOKS = 4;
 const MAX_DIARY_ENTRIES = 8;
 const MAX_TOKENS_CHAT = 1200;
 const MAX_TOKENS_PROFILE = 120;
@@ -256,7 +256,14 @@ async function contextualizeQuestion(
         messages: [
           {
             role: "user",
-            content: `Reescreva a última pergunta do leitor como uma pergunta autossuficiente, incorporando títulos, autores e temas citados na conversa. Se já for autossuficiente, repita-a. Responda apenas com a pergunta reescrita.
+            content: `Reescreva a última pergunta do leitor como uma pergunta autossuficiente e específica para busca de livros.
+
+REGRAS:
+- Incorpore títulos, autores, gêneros, anos e temas citados na conversa
+- Se a pergunta usar pronomes ("ele", "esse", "aquele"), substitua pelo nome específico
+- Se a pergunta for vaga ("o que sobre X"), torne-a específica ("o que sobre o livro X mencionado anteriormente")
+- Se já for autossuficiente e específica, repita-a
+- Responda APENAS com a pergunta reescrita, sem explicações
 
 Conversa recente:
 ${history
@@ -556,7 +563,7 @@ export async function POST(request: NextRequest) {
         retrievalQuery,
         semanticCandidates,
         metadataCandidates,
-        { mode, threshold: 0.3, maxResults: MAX_CONTEXT_BOOKS }
+        { mode, threshold: 0.4, maxResults: MAX_CONTEXT_BOOKS }
       );
       
       // Map reranked results back to SimilarBook format
@@ -596,7 +603,7 @@ export async function POST(request: NextRequest) {
       
       const reranked = await jevRerank(retrievalQuery, candidates, {
         mode,
-        threshold: 0.3,
+        threshold: 0.4,
         maxResults: MAX_CONTEXT_BOOKS,
       });
       
@@ -701,6 +708,15 @@ export async function POST(request: NextRequest) {
       ASSISTANT: "Aja como um assistente pessoal atencioso e leve: responva dúvidas do dia a dia sobre leituras, organize lembretes, e converse com naturalidade sem soar como um bibliotecário formal.",
     };
     const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas.
+
+REGRAS CRÍTICAS PARA EVITAR ALUCINAÇÕES:
+- Use APENAS as informações fornecidas no contexto (livros listados, diário, progresso)
+- NÃO invente informações sobre livros que não estão no contexto
+- NÃO faça suposições sobre autores, datas, sinopses ou conteúdo não mencionado
+- Se não tiver informação suficiente para responder, diga honestamente que não sabe
+- NÃO cite livros que não aparecem na lista de "Livros relevantes do acervo"
+- Quando recomendar, baseie-se APENAS nos livros listados no contexto
+- Se a pergunta for sobre um livro não listado, diga que não tem informações sobre ele no acervo
 
 Modo atual: ${mode}.
 Instrução específica: ${modeInstructions[mode]}
