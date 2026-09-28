@@ -51,13 +51,6 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((res) => {
-          if (isCacheable(res)) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, copy));
-          }
-          return res;
-        })
         .catch(() =>
           caches
             .match(request)

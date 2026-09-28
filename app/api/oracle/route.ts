@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embeddings";
 import { searchGoogleBooks } from "@/lib/recommendations";
@@ -25,6 +26,7 @@ const oracleSchema = z.object({
   temperature: z.coerce.number().min(0).max(2).default(1),
   scope: z.enum(["library", "all"]).default("library"),
   regenerate: z.boolean().optional(),
+  requestId: z.string().uuid().nullish(),
   audio: z
     .object({
       data: z.string().nullish(),
@@ -323,7 +325,15 @@ export async function POST(request: NextRequest) {
 
     const parsed = await readJson(request, oracleSchema);
     if (!parsed.ok) return parsed.response;
-    const { audio, mode, sessionId: requestedSessionId, temperature, scope, regenerate } = parsed.data;
+    const {
+      audio,
+      mode,
+      sessionId: requestedSessionId,
+      temperature,
+      scope,
+      regenerate,
+      requestId,
+    } = parsed.data;
 
     let question = parsed.data.question?.trim() ?? "";
 
@@ -380,22 +390,45 @@ export async function POST(request: NextRequest) {
       return toolExecutionResponse(routing);
     }
     let sessionId = requestedSessionId ?? null;
-    if (sessionId) {
-      const ownsSession = await prisma.oracleSession.count({
-        where: { id: sessionId, userId },
-      });
-      if (!ownsSession) {
-        return Response.json({ error: "Conversa não encontrada" }, { status: 404 });
+    try {
+      sessionId = await prisma.$transaction(async (tx) => {
+        let currentSessionId = sessionId;
+        if (currentSessionId) {
+          const ownsSession = await tx.oracleSession.count({
+            where: { id: currentSessionId, userId },
+          });
+          if (!ownsSession) throw new Error("Conversa não encontrada");
+        } else {
+          const session = await tx.oracleSession.create({
+            data: { userId, title: trimmed.slice(0, 80), mode },
+          });
+          currentSessionId = session.id;
+        }
+
+        if (!regenerate) {
+          await tx.oracleMessage.create({
+            data: {
+              userId,
+              sessionId: currentSessionId,
+              role: "user",
+              content: trimmed,
+              requestId,
+            },
+          });
+        }
+        return currentSessionId;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Conversa não encontrada") {
+        return Response.json({ error: error.message }, { status: 404 });
       }
-    } else {
-      const session = await prisma.oracleSession.create({
-        data: {
-          userId,
-          title: trimmed.slice(0, 80),
-          mode,
-        },
-      });
-      sessionId = session.id;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return Response.json(
+          { error: "Esta pergunta já está sendo processada." },
+          { status: 409 }
+        );
+      }
+      throw error;
     }
 
     // Regenerate: apaga a última resposta do assistente antes de montar o
@@ -422,11 +455,7 @@ export async function POST(request: NextRequest) {
         take: HISTORY_LIMIT,
       }),
       prisma.librarySetting.findUnique({ where: { userId } }),
-      regenerate
-        ? Promise.resolve(null)
-        : prisma.oracleMessage.create({
-            data: { userId, sessionId, role: "user", content: trimmed },
-          }),
+      Promise.resolve(null),
       prisma.book.findMany({
         where: { userId, status: "READING" },
         select: {
