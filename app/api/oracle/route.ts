@@ -205,7 +205,12 @@ async function directChatResponse(question: string, apiKey: string) {
                 if (delta) {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`));
                 }
-              } catch {}
+              } catch (error) {
+                console.warn("[oracle] invalid direct-chat SSE payload:", {
+                  error,
+                  payload: payload.slice(0, 200),
+                });
+              }
             }
           }
         } finally {
@@ -1020,7 +1025,11 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
                 if (delta) {
                   fullText += delta;
                 }
-              } catch {
+              } catch (error) {
+                console.warn("[oracle] invalid SSE payload:", {
+                  error,
+                  payload: payload.slice(0, 200),
+                });
               }
             }
           }
@@ -1028,6 +1037,8 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           try {
             const allowedTitles = [
               ...contextBooks.map((book) => book.title),
+              ...relevantDiary.map((entry) => entry.bookTitle),
+              ...relevantReviews.map((review) => review.bookTitle),
               ...externalBooks.map((book) => book.title),
             ];
             const quality = validateOracleResponse(fullText, allowedTitles);
