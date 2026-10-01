@@ -16,6 +16,10 @@ import {
 import { jevExtractFilters, filtersToWhereClause } from "@/lib/jev-filtering";
 import { jevRerank, mergeAndRerank } from "@/lib/jev-reranking";
 import { z } from "zod";
+import {
+  isCorruptedHistoryMessage,
+  validateOracleResponse,
+} from "@/lib/oracle-quality";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
@@ -23,7 +27,7 @@ const oracleSchema = z.object({
   question: z.string().nullish(),
   mode: z.enum(ORACLE_MODES).default("EXPLORE"),
   sessionId: z.string().cuid().nullish(),
-  temperature: z.coerce.number().min(0).max(2).default(1),
+  temperature: z.coerce.number().min(0).max(2).default(0.3),
   scope: z.enum(["library", "all"]).default("library"),
   regenerate: z.boolean().optional(),
   requestId: z.string().uuid().nullish(),
@@ -37,7 +41,7 @@ const oracleSchema = z.object({
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const CHAT_MODEL =
-  process.env.ORACLE_CHAT_MODEL || "meta-llama/llama-3.1-8b-instruct";
+  process.env.ORACLE_CHAT_MODEL || "google/gemini-2.5-flash";
 const STT_MODEL = process.env.ORACLE_STT_MODEL || "openai/whisper-1";
 
 interface SimilarBook {
@@ -78,7 +82,7 @@ const DISTANCE_THRESHOLD = 0.7;
 const MAX_CONTEXT_BOOKS = 4;
 const MAX_DIARY_ENTRIES = 8;
 const MAX_RAG_MEMORIES = 6;
-const MAX_TOKENS_CHAT = 1200;
+const MAX_TOKENS_CHAT = Number(process.env.ORACLE_MAX_TOKENS || 800);
 const MAX_TOKENS_PROFILE = 120;
 const MAX_TOKENS_REWRITE = 60;
 
@@ -201,7 +205,12 @@ async function directChatResponse(question: string, apiKey: string) {
                 if (delta) {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`));
                 }
-              } catch {}
+              } catch (error) {
+                console.warn("[oracle] invalid direct-chat SSE payload:", {
+                  error,
+                  payload: payload.slice(0, 200),
+                });
+              }
             }
           }
         } finally {
@@ -533,6 +542,9 @@ export async function POST(request: NextRequest) {
     // The current question is already persisted above. It is sent separately
     // in the final prompt and must not be duplicated in the conversation.
     const conversationHistory = historyDesc.filter((message, index) => {
+      if (message.role === "assistant" && isCorruptedHistoryMessage(message.content)) {
+        return false;
+      }
       if (currentRequestMessageId) return message.id !== currentRequestMessageId;
       return !(index === 0 && message.role === "user" && message.content === trimmed);
     });
@@ -678,7 +690,9 @@ export async function POST(request: NextRequest) {
       const allCandidates = [...semanticCandidates, ...metadataCandidates];
       contextBooks = reranked.flatMap((r) => {
           const candidate = allCandidates.find((c) => c.id === r.id);
-          if (!candidate) return [];
+          // Metadata matches narrow retrieval but are not evidence by
+          // themselves unless the book also has a semantic match.
+          if (!candidate || candidate.distance === undefined) return [];
           return [{
             id: candidate.id,
             title: candidate.title,
@@ -781,8 +795,14 @@ export async function POST(request: NextRequest) {
 
     const relevantDiary = semanticDiary.filter((entry) => Number(entry.distance) < DISTANCE_THRESHOLD);
     const relevantReviews = semanticReviews.filter((review) => Number(review.distance) < DISTANCE_THRESHOLD);
-    const diarySection = relevantDiary.length || diaryEntries.length
-      ? `\n\nMemórias do diário de leitura:\n${[...relevantDiary, ...diaryEntries]
+    const diaryIntent = /\b(diário|anotações?|memórias?|registros?|reflexões?)\b/i.test(
+      retrievalQuery
+    );
+    const diaryContextEntries = diaryIntent
+      ? [...relevantDiary, ...diaryEntries]
+      : relevantDiary;
+    const diarySection = diaryContextEntries.length
+      ? `\n\nMemórias do diário de leitura:\n${diaryContextEntries
           .filter((entry, index, all) => all.findIndex((other) => ("id" in other ? other.id : "") === entry.id) === index)
           .slice(0, MAX_DIARY_ENTRIES)
           .map((entry) => {
@@ -798,12 +818,15 @@ export async function POST(request: NextRequest) {
           .join("\n")}`
       : "";
 
+    const progressIntent = /\b(lendo|leitura atual|em andamento|progresso|página|paginas|páginas)\b/i.test(
+      retrievalQuery
+    );
     const hasGrounding =
       contextBooks.length > 0 ||
       relevantDiary.length > 0 ||
-      diaryEntries.length > 0 ||
       relevantReviews.length > 0 ||
-      readingNow.length > 0 ||
+      (diaryIntent && diaryEntries.length > 0) ||
+      (progressIntent && readingNow.length > 0) ||
       externalBooks.length > 0;
     if (!hasGrounding) {
       return groundedFallbackResponse(sessionId);
@@ -908,6 +931,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           relevance: number | null;
           matchedBy: string;
           evidence: string | null;
+          sourceType?: "book" | "diary" | "review";
           external?: boolean;
         }[] = contextBooks.map((b) => {
           const distance = Number(b.distance);
@@ -931,6 +955,32 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             evidence: b.synopsis?.slice(0, 180) ?? null,
           };
         });
+        for (const memory of relevantDiary) {
+          sources.push({
+            id: memory.id,
+            title: memory.bookTitle,
+            author: memory.bookAuthor,
+            status: "MEMORY",
+            genre: null,
+            relevance: Math.round((1 - Number(memory.distance)) * 100),
+            matchedBy: "memória do diário",
+            evidence: memory.content.slice(0, 180),
+            sourceType: "diary",
+          });
+        }
+        for (const review of relevantReviews) {
+          sources.push({
+            id: review.id,
+            title: review.bookTitle,
+            author: review.bookAuthor,
+            status: "REVIEW",
+            genre: null,
+            relevance: Math.round((1 - Number(review.distance)) * 100),
+            matchedBy: "avaliação do leitor",
+            evidence: review.content.slice(0, 180),
+            sourceType: "review",
+          });
+        }
         for (const [i, b] of externalBooks.entries()) {
           sources.push({
             id: `ext-${i}`,
@@ -974,27 +1024,42 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
                 const delta = json.choices?.[0]?.delta?.content;
                 if (delta) {
                   fullText += delta;
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({ text: delta })}\n\n`
-                    )
-                  );
                 }
-              } catch {
+              } catch (error) {
+                console.warn("[oracle] invalid SSE payload:", {
+                  error,
+                  payload: payload.slice(0, 200),
+                });
               }
             }
           }
         } finally {
           try {
+            const allowedTitles = [
+              ...contextBooks.map((book) => book.title),
+              ...relevantDiary.map((entry) => entry.bookTitle),
+              ...relevantReviews.map((review) => review.bookTitle),
+              ...externalBooks.map((book) => book.title),
+            ];
+            const quality = validateOracleResponse(fullText, allowedTitles);
+            const outputText = quality.valid
+              ? fullText.trim()
+              : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
+            if (!quality.valid) {
+              console.warn("[oracle] response rejected:", quality.reason);
+            }
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
+            );
             const persist: Promise<unknown>[] = [];
-            if (fullText.trim()) {
+            if (quality.valid) {
               persist.push(
                 prisma.oracleMessage.create({
                   data: {
                     userId,
                     sessionId,
                     role: "assistant",
-                    content: fullText,
+                    content: outputText,
                     sources,
                   },
                 })
@@ -1006,7 +1071,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
                   userId,
                   setting?.oracleProfile,
                   trimmed,
-                  fullText,
+                  outputText,
                   apiKey
                 )
               );
