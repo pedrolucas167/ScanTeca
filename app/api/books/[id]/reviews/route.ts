@@ -5,6 +5,7 @@ import { readJson, optionalNumber } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { sendPush } from "@/lib/push";
 import { z } from "zod";
+import { generateEmbedding, reviewToEmbeddingText } from "@/lib/embeddings";
 
 const reviewSchema = z.object({
   content: z
@@ -19,7 +20,7 @@ const reviewSchema = z.object({
 async function findAccessibleBook(bookId: string, userId: string | null) {
   const book = await prisma.book.findUnique({
     where: { id: bookId },
-    select: { id: true, userId: true, title: true },
+    select: { id: true, userId: true, title: true, author: true },
   });
   if (!book) return null;
 
@@ -118,6 +119,17 @@ export async function POST(
         userName: displayName,
       },
     });
+    const embedding = await generateEmbedding(reviewToEmbeddingText({
+      content: review.content,
+      rating: review.rating,
+      book: { title: book.title, author: book.author },
+    }));
+    if (embedding) {
+      await prisma.$executeRaw`
+        UPDATE "Review" SET embedding = ${`[${embedding.join(",")}]`}::vector
+        WHERE id = ${review.id}
+      `;
+    }
 
     // Push pro dono da biblioteca quando outro usuário comenta.
     // Fire-and-forget: falha de push não pode quebrar o POST da review.

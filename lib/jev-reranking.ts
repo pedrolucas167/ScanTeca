@@ -39,7 +39,9 @@ export async function jevRerank(
   candidates: BookCandidate[],
   options: RerankingOptions = {}
 ): Promise<RerankedResult[]> {
-  const { mode = "EXPLORE", threshold = 0.3, maxResults = 6 } = options;
+  // Relevance is exposed as a percentage (0-100), so thresholds use the same
+  // scale. Keeping one unit avoids silently accepting almost every candidate.
+  const { mode = "EXPLORE", threshold = 40, maxResults = 6 } = options;
   
   if (candidates.length === 0) {
     return [];
@@ -81,9 +83,9 @@ function calculateRelevance(
   let score = 0;
   const reasons: string[] = [];
 
-  // 1. Semantic similarity (from vector distance)
+  // 1. Semantic similarity (from vector distance), normalized to 0-100.
   if (candidate.distance !== undefined) {
-    const semanticScore = Math.max(0, (1 - candidate.distance) * 100);
+    const semanticScore = Math.max(0, Math.min(1, 1 - candidate.distance)) * 100;
     score += semanticScore * 0.4; // 40% weight
     if (semanticScore > 70) {
       reasons.push("alta similaridade semântica");

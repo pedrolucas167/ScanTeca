@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
+import {
+  generateEmbedding,
+  bookToEmbeddingText,
+  diaryToEmbeddingText,
+  reviewToEmbeddingText,
+} from "@/lib/embeddings";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 
@@ -48,13 +53,54 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const diaryEntries = await prisma.$queryRaw<{
+      id: string; type: string; content: string; page: number | null;
+      tags: string[]; book: { title: string; author: string };
+    }[]>`
+      SELECT d.id, d.type::text AS type, d.content, d.page, d.tags,
+             json_build_object('title', b.title, 'author', b.author) AS book
+      FROM "DiaryEntry" d
+      JOIN "Book" b ON b.id = d."bookId"
+      WHERE d."userId" = ${userId} AND d."ragEnabled" = true
+        AND d.embedding IS NULL
+    `;
+    for (const entry of diaryEntries) {
+      const embedding = await generateEmbedding(diaryToEmbeddingText(entry));
+      if (!embedding) continue;
+      await prisma.$executeRaw`
+        UPDATE "DiaryEntry" SET embedding = ${`[${embedding.join(",")}]`}::vector
+        WHERE id = ${entry.id}
+      `;
+      updated++;
+    }
+
+    const reviews = await prisma.$queryRaw<{
+      id: string; content: string; rating: number | null;
+      book: { title: string; author: string };
+    }[]>`
+      SELECT r.id, r.content, r.rating,
+             json_build_object('title', b.title, 'author', b.author) AS book
+      FROM "Review" r
+      JOIN "Book" b ON b.id = r."bookId"
+      WHERE b."userId" = ${userId} AND r.embedding IS NULL
+    `;
+    for (const review of reviews) {
+      const embedding = await generateEmbedding(reviewToEmbeddingText(review));
+      if (!embedding) continue;
+      await prisma.$executeRaw`
+        UPDATE "Review" SET embedding = ${`[${embedding.join(",")}]`}::vector
+        WHERE id = ${review.id}
+      `;
+      updated++;
+    }
+
     if (updated > 0) {
       await invalidateRecommendationsCache(userId);
     }
 
     return NextResponse.json({
-      message: `${updated} de ${books.length} livros indexados`,
-      total: books.length,
+      message: `${updated} itens indexados`,
+      total: books.length + diaryEntries.length + reviews.length,
       updated,
     });
   } catch (error) {
