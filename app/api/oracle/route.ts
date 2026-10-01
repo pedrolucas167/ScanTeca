@@ -183,11 +183,33 @@ async function directChatResponse(question: string, apiKey: string) {
       async start(controller) {
         const reader = res.body!.getReader();
         let buffer = "";
+        const processPayload = (payload: string) => {
+          if (!payload || payload === "[DONE]") return;
+          try {
+            const json = JSON.parse(payload);
+            const delta = json.choices?.[0]?.delta?.content;
+            if (typeof delta === "string") {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`)
+              );
+            }
+          } catch (error) {
+            console.warn("[oracle] invalid direct-chat SSE payload:", {
+              error,
+              payload: payload.slice(0, 200),
+            });
+          }
+        };
 
         try {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              if (buffer.trim()) {
+                processPayload(buffer.trim().replace(/^data:\s*/, ""));
+              }
+              break;
+            }
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
@@ -197,20 +219,7 @@ async function directChatResponse(question: string, apiKey: string) {
               const trimmed = line.trim();
               if (!trimmed.startsWith("data:")) continue;
               const payload = trimmed.slice(5).trim();
-              if (payload === "[DONE]") continue;
-
-              try {
-                const json = JSON.parse(payload);
-                const delta = json.choices?.[0]?.delta?.content;
-                if (delta) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`));
-                }
-              } catch (error) {
-                console.warn("[oracle] invalid direct-chat SSE payload:", {
-                  error,
-                  payload: payload.slice(0, 200),
-                });
-              }
+              processPayload(payload);
             }
           }
         } finally {
@@ -921,6 +930,32 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         const reader = llmRes.body!.getReader();
         let buffer = "";
         let fullText = "";
+        const processPayload = (payload: string) => {
+          if (!payload || payload === "[DONE]") return;
+          try {
+            const json = JSON.parse(payload);
+            const content = json.choices?.[0]?.delta?.content;
+            if (typeof content === "string") {
+              fullText += content;
+            } else if (Array.isArray(content)) {
+              fullText += content
+                .filter(
+                  (part: unknown): part is { text: string } =>
+                    typeof part === "object" &&
+                    part !== null &&
+                    "text" in part &&
+                    typeof (part as { text?: unknown }).text === "string"
+                )
+                .map((part) => part.text)
+                .join("");
+            }
+          } catch (error) {
+            console.warn("[oracle] invalid SSE payload:", {
+              error,
+              payload: payload.slice(0, 200),
+            });
+          }
+        };
 
         const sources: {
           id: string;
@@ -1007,7 +1042,12 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         try {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              if (buffer.trim()) {
+                processPayload(buffer.trim().replace(/^data:\s*/, ""));
+              }
+              break;
+            }
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
@@ -1017,31 +1057,12 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
               const trimmed = line.trim();
               if (!trimmed.startsWith("data:")) continue;
               const payload = trimmed.slice(5).trim();
-              if (payload === "[DONE]") continue;
-
-              try {
-                const json = JSON.parse(payload);
-                const delta = json.choices?.[0]?.delta?.content;
-                if (delta) {
-                  fullText += delta;
-                }
-              } catch (error) {
-                console.warn("[oracle] invalid SSE payload:", {
-                  error,
-                  payload: payload.slice(0, 200),
-                });
-              }
+              processPayload(payload);
             }
           }
         } finally {
           try {
-            const allowedTitles = [
-              ...contextBooks.map((book) => book.title),
-              ...relevantDiary.map((entry) => entry.bookTitle),
-              ...relevantReviews.map((review) => review.bookTitle),
-              ...externalBooks.map((book) => book.title),
-            ];
-            const quality = validateOracleResponse(fullText, allowedTitles);
+            const quality = validateOracleResponse(fullText);
             const outputText = quality.valid
               ? fullText.trim()
               : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
