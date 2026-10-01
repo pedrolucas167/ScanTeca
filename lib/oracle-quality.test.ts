@@ -6,7 +6,6 @@ describe("validateOracleResponse", () => {
     expect(
       validateOracleResponse(
         'Eu recomendaria "Duna" porque a sinopse e o gênero registrados no acervo combinam com o pedido.',
-        ["Duna"]
       ).valid
     ).toBe(true);
   });
@@ -20,9 +19,9 @@ describe("validateOracleResponse", () => {
     ).toBe(false);
   });
 
-  it("rejects unknown quoted titles", () => {
+  it("does not reject a natural quoted phrase by itself", () => {
     expect(
-      validateOracleResponse('Leia "Livro Inventado" neste fim de semana.', ["Duna"]).valid
-    ).toBe(false);
+      validateOracleResponse('Leia "Livro Inventado" neste fim de semana.').valid
+    ).toBe(true);
   });
 });

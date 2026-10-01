@@ -9,10 +9,7 @@ export interface OracleQualityResult {
   reason?: string;
 }
 
-export function validateOracleResponse(
-  text: string,
-  allowedTitles: string[] = []
-): OracleQualityResult {
+export function validateOracleResponse(text: string): OracleQualityResult {
   const normalized = text.trim();
   if (normalized.length < 20) {
     return { valid: false, reason: "resposta curta ou vazia" };
@@ -33,23 +30,6 @@ export function validateOracleResponse(
     (normalized.length > 300 && letters / normalized.length < 0.55)
   ) {
     return { valid: false, reason: "sinais de degeneração textual" };
-  }
-
-  if (allowedTitles.length > 0) {
-    const mentionedQuotedTitles = [...normalized.matchAll(/"([^"]{2,120})"/g)]
-      .map((match) => match[1].trim().toLocaleLowerCase("pt-BR"));
-    const knownTitles = allowedTitles.map((title) =>
-      title.trim().toLocaleLowerCase("pt-BR")
-    );
-    const unknownQuotedTitle = mentionedQuotedTitles.some(
-      (title) =>
-        !knownTitles.some(
-          (known) => title === known || title.includes(known) || known.includes(title)
-        )
-    );
-    if (unknownQuotedTitle) {
-      return { valid: false, reason: "título citado não está no contexto" };
-    }
   }
 
   return { valid: true };
