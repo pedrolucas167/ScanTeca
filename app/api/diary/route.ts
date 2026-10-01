@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { diaryToEmbeddingText, generateEmbedding } from "@/lib/embeddings";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), bookId: z.string().cuid() }),
@@ -148,6 +149,19 @@ export async function POST(request: NextRequest) {
       data: { type: input.type, content: input.content, page: input.page, tags: input.tags },
       include: { book: { select: { title: true, author: true } } },
     });
+    const embedding = await generateEmbedding(diaryToEmbeddingText({
+      type: updated.type,
+      content: updated.content,
+      page: updated.page,
+      tags: updated.tags,
+      book: { title: updated.book.title, author: updated.book.author },
+    }));
+    if (embedding) {
+      await prisma.$executeRaw`
+        UPDATE "DiaryEntry" SET embedding = ${`[${embedding.join(",")}]`}::vector
+        WHERE id = ${updated.id}
+      `;
+    }
     return Response.json({ entry: updated });
   }
 
@@ -161,6 +175,20 @@ export async function POST(request: NextRequest) {
   if ("error" in pageCheck) return Response.json({ error: pageCheck.error }, { status: pageCheck.status });
   const entry = await prisma.diaryEntry.create({
     data: { userId, bookId: input.bookId, sessionId: input.sessionId, type: input.type, content: input.content, page: input.page, tags: input.tags },
+    include: { book: { select: { title: true, author: true } } },
   });
+  const embedding = await generateEmbedding(diaryToEmbeddingText({
+    type: entry.type,
+    content: entry.content,
+    page: entry.page,
+    tags: entry.tags,
+    book: entry.book,
+  }));
+  if (embedding) {
+    await prisma.$executeRaw`
+      UPDATE "DiaryEntry" SET embedding = ${`[${embedding.join(",")}]`}::vector
+      WHERE id = ${entry.id}
+    `;
+  }
   return Response.json({ entry }, { status: 201 });
 }

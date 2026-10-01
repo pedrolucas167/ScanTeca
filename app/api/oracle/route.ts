@@ -50,12 +50,34 @@ interface SimilarBook {
   status: string;
   rating: number | null;
   distance: number;
+  relevance?: number;
+}
+
+interface DiaryMemory {
+  id: string;
+  type: string;
+  content: string;
+  page: number | null;
+  tags: string[];
+  bookTitle: string;
+  bookAuthor: string;
+  distance: number;
+}
+
+interface ReviewMemory {
+  id: string;
+  content: string;
+  rating: number | null;
+  bookTitle: string;
+  bookAuthor: string;
+  distance: number;
 }
 
 const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.7;
 const MAX_CONTEXT_BOOKS = 4;
 const MAX_DIARY_ENTRIES = 8;
+const MAX_RAG_MEMORIES = 6;
 const MAX_TOKENS_CHAT = 1200;
 const MAX_TOKENS_PROFILE = 120;
 const MAX_TOKENS_REWRITE = 60;
@@ -188,7 +210,6 @@ async function directChatResponse(question: string, apiKey: string) {
         }
       },
     });
-
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",
@@ -220,6 +241,29 @@ async function toolExecutionResponse(routing: RoutingDecision) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
+function groundedFallbackResponse(sessionId: string | null) {
+  const encoder = new TextEncoder();
+  const message =
+    "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.";
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sessionId })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: [] })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
@@ -390,6 +434,7 @@ export async function POST(request: NextRequest) {
       return toolExecutionResponse(routing);
     }
     let sessionId = requestedSessionId ?? null;
+    let currentRequestMessageId: string | null = null;
     try {
       sessionId = await prisma.$transaction(async (tx) => {
         let currentSessionId = sessionId;
@@ -406,7 +451,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!regenerate) {
-          await tx.oracleMessage.create({
+          const message = await tx.oracleMessage.create({
             data: {
               userId,
               sessionId: currentSessionId,
@@ -415,6 +460,7 @@ export async function POST(request: NextRequest) {
               requestId,
             },
           });
+          currentRequestMessageId = message.id;
         }
         return currentSessionId;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -478,14 +524,22 @@ export async function POST(request: NextRequest) {
           type: true,
           content: true,
           page: true,
+          id: true,
           book: { select: { title: true, author: true } },
         },
       }),
     ]);
 
+    // The current question is already persisted above. It is sent separately
+    // in the final prompt and must not be duplicated in the conversation.
+    const conversationHistory = historyDesc.filter((message, index) => {
+      if (currentRequestMessageId) return message.id !== currentRequestMessageId;
+      return !(index === 0 && message.role === "user" && message.content === trimmed);
+    });
+
     const retrievalQuery = await contextualizeQuestion(
       trimmed,
-      historyDesc,
+      conversationHistory,
       apiKey
     );
     const questionEmbedding = await generateEmbedding(retrievalQuery);
@@ -498,7 +552,8 @@ export async function POST(request: NextRequest) {
     }
 
     const vector = `[${questionEmbedding.join(",")}]`;
-    const similarBooks = await prisma.$queryRaw<SimilarBook[]>`
+    const [similarBooks, semanticDiary, semanticReviews] = await Promise.all([
+      prisma.$queryRaw<SimilarBook[]>`
       SELECT id, title, author, "publishedDate", synopsis, genre,
              status::text as status, rating,
              embedding <=> ${vector}::vector AS distance
@@ -506,7 +561,31 @@ export async function POST(request: NextRequest) {
       WHERE "userId" = ${userId} AND embedding IS NOT NULL
       ORDER BY embedding <=> ${vector}::vector
       LIMIT 5
-    `;
+      `,
+      prisma.$queryRaw<DiaryMemory[]>`
+        SELECT d.id, d.type, d.content, d.page, d.tags,
+               b.title AS "bookTitle", b.author AS "bookAuthor",
+               d.embedding <=> ${vector}::vector AS distance
+        FROM "DiaryEntry" d
+        JOIN "Book" b ON b.id = d."bookId"
+        WHERE d."userId" = ${userId}
+          AND d."ragEnabled" = true
+          AND d.embedding IS NOT NULL
+        ORDER BY d.embedding <=> ${vector}::vector
+        LIMIT ${MAX_RAG_MEMORIES}
+      `,
+      prisma.$queryRaw<ReviewMemory[]>`
+        SELECT r.id, r.content, r.rating,
+               b.title AS "bookTitle", b.author AS "bookAuthor",
+               r.embedding <=> ${vector}::vector AS distance
+        FROM "Review" r
+        JOIN "Book" b ON b.id = r."bookId"
+        WHERE b."userId" = ${userId}
+          AND r.embedding IS NOT NULL
+        ORDER BY r.embedding <=> ${vector}::vector
+        LIMIT ${MAX_RAG_MEMORIES}
+      `,
+    ]);
 
     const relevantBooks = similarBooks.filter(
       (b) => Number(b.distance) < DISTANCE_THRESHOLD
@@ -592,18 +671,15 @@ export async function POST(request: NextRequest) {
         retrievalQuery,
         semanticCandidates,
         metadataCandidates,
-        { mode, threshold: 0.4, maxResults: MAX_CONTEXT_BOOKS }
+        { mode, threshold: 40, maxResults: MAX_CONTEXT_BOOKS }
       );
       
       // Map reranked results back to SimilarBook format
       const allCandidates = [...semanticCandidates, ...metadataCandidates];
-      const rerankedMap = new Map(reranked.map((r) => [r.id, r]));
-      
-      contextBooks = reranked
-        .map((r) => {
+      contextBooks = reranked.flatMap((r) => {
           const candidate = allCandidates.find((c) => c.id === r.id);
-          if (!candidate) return null;
-          return {
+          if (!candidate) return [];
+          return [{
             id: candidate.id,
             title: candidate.title,
             author: candidate.author,
@@ -612,10 +688,10 @@ export async function POST(request: NextRequest) {
             genre: candidate.genre,
             status: candidate.status,
             rating: candidate.rating,
-            distance: candidate.distance || 1,
-          };
-        })
-        .filter((b): b is SimilarBook => b !== null);
+            distance: candidate.distance ?? 1,
+            relevance: r.relevance,
+          }];
+        });
     } else {
       // No filters, just use semantic results with Jev reranking
       const candidates = relevantBooks.map((b) => ({
@@ -632,16 +708,14 @@ export async function POST(request: NextRequest) {
       
       const reranked = await jevRerank(retrievalQuery, candidates, {
         mode,
-        threshold: 0.4,
+        threshold: 40,
         maxResults: MAX_CONTEXT_BOOKS,
       });
       
-      const rerankedMap = new Map(reranked.map((r) => [r.id, r]));
-      contextBooks = reranked
-        .map((r) => {
+      contextBooks = reranked.flatMap((r) => {
           const candidate = candidates.find((c) => c.id === r.id);
-          if (!candidate) return null;
-          return {
+          if (!candidate) return [];
+          return [{
             id: candidate.id,
             title: candidate.title,
             author: candidate.author,
@@ -651,9 +725,9 @@ export async function POST(request: NextRequest) {
             status: candidate.status,
             rating: candidate.rating,
             distance: candidate.distance,
-          };
-        })
-        .filter((b): b is SimilarBook => b !== null);
+            relevance: r.relevance,
+          }];
+        });
     }
 
     const context =
@@ -705,11 +779,35 @@ export async function POST(request: NextRequest) {
         ? `\n\nAtividade recente do usuário: ${weekPages} páginas lidas nos últimos 7 dias, em ${weekDays} ${weekDays === 1 ? "dia" : "dias"} de leitura.`
         : "";
 
-    const diarySection = diaryEntries.length
-      ? `\n\nMemória recente do diário de leitura:\n${diaryEntries
-          .map((entry) => `- [${entry.type}] "${entry.book.title}"${entry.page ? `, pág. ${entry.page}` : ""}: ${entry.content.slice(0, 500)}`)
+    const relevantDiary = semanticDiary.filter((entry) => Number(entry.distance) < DISTANCE_THRESHOLD);
+    const relevantReviews = semanticReviews.filter((review) => Number(review.distance) < DISTANCE_THRESHOLD);
+    const diarySection = relevantDiary.length || diaryEntries.length
+      ? `\n\nMemórias do diário de leitura:\n${[...relevantDiary, ...diaryEntries]
+          .filter((entry, index, all) => all.findIndex((other) => ("id" in other ? other.id : "") === entry.id) === index)
+          .slice(0, MAX_DIARY_ENTRIES)
+          .map((entry) => {
+            const title = "bookTitle" in entry ? entry.bookTitle : entry.book.title;
+            const page = entry.page;
+            return `- [${entry.type}] "${title}"${page ? `, pág. ${page}` : ""}: ${entry.content.slice(0, 500)}`;
+          })
           .join("\n")}`
       : "";
+    const reviewSection = relevantReviews.length
+      ? `\n\nAvaliações relevantes:\n${relevantReviews
+          .map((review) => `- "${review.bookTitle}" — ${review.bookAuthor}${review.rating ? ` (${review.rating}/5)` : ""}: ${review.content.slice(0, 500)}`)
+          .join("\n")}`
+      : "";
+
+    const hasGrounding =
+      contextBooks.length > 0 ||
+      relevantDiary.length > 0 ||
+      diaryEntries.length > 0 ||
+      relevantReviews.length > 0 ||
+      readingNow.length > 0 ||
+      externalBooks.length > 0;
+    if (!hasGrounding) {
+      return groundedFallbackResponse(sessionId);
+    }
 
     const externalContext =
       externalBooks.length > 0
@@ -739,12 +837,14 @@ export async function POST(request: NextRequest) {
     const systemPrompt = `Você é o Oráculo de uma biblioteca pessoal — um bibliotecário erudito e apaixonado por literatura, com o tom de um curador de uma biblioteca clássica. Você CONHECE este leitor: use o perfil e o histórico da conversa para personalizar respostas, retomar assuntos anteriores e fazer recomendações cada vez mais afinadas.
 
 REGRAS CRÍTICAS PARA EVITAR ALUCINAÇÕES:
-- Use APENAS as informações fornecidas no contexto (livros listados, diário, progresso)
+- Use APENAS as informações fornecidas no contexto (livros listados, diário, progresso e catálogo externo marcado)
 - NÃO invente informações sobre livros que não estão no contexto
 - NÃO faça suposições sobre autores, datas, sinopses ou conteúdo não mencionado
 - Se não tiver informação suficiente para responder, diga honestamente que não sabe
-- NÃO cite livros que não aparecem na lista de "Livros relevantes do acervo"
-- Quando recomendar, baseie-se APENAS nos livros listados no contexto
+- NÃO cite como pertencentes ao acervo livros que não aparecem na lista de "Livros relevantes do acervo"
+- Quando recomendar dentro da biblioteca, baseie-se APENAS nos livros listados no contexto
+- Cada afirmação factual deve ser sustentada por uma fonte do contexto
+- Se a evidência for insuficiente, diga honestamente que não sabe; não preencha lacunas com conhecimento geral
 - Se a pergunta for sobre um livro não listado, diga que não tem informações sobre ele no acervo
 
 Modo atual: ${mode}.
@@ -754,13 +854,13 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
 
     const messages = [
       { role: "system" as const, content: systemPrompt },
-      ...historyDesc.reverse().map((m) => ({
+      ...conversationHistory.reverse().map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
       {
         role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}\n\nPergunta do usuário: ${trimmed}`,
+        content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}${reviewSection}\n\nPergunta do usuário: ${trimmed}`,
       },
     ];
 
@@ -812,9 +912,9 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         }[] = contextBooks.map((b) => {
           const distance = Number(b.distance);
           const vectorMatch = distance > 0 && distance < DISTANCE_THRESHOLD;
-          const relevance = vectorMatch
+          const relevance = b.relevance ?? (vectorMatch
             ? Math.max(0, Math.min(100, Math.round((1 - distance) * 100)))
-            : 100;
+            : null);
           const matchedBy = vectorMatch
             ? "similaridade semântica"
             : hasFilters
@@ -900,7 +1000,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
                 })
               );
             }
-            if (historyDesc.length >= 4) {
+            if (conversationHistory.length >= 4) {
               persist.push(
                 updateReaderProfile(
                   userId,

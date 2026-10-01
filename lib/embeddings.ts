@@ -59,3 +59,33 @@ export function bookToEmbeddingText(book: {
     .filter(Boolean)
     .join(" — ");
 }
+
+export function diaryToEmbeddingText(entry: {
+  type: string;
+  content: string;
+  page?: number | null;
+  tags?: string[];
+  book: { title: string; author: string };
+}): string {
+  return [
+    `Livro: ${entry.book.title}`,
+    `Autor: ${entry.book.author}`,
+    `Tipo: ${entry.type}`,
+    entry.page ? `Página: ${entry.page}` : "",
+    entry.tags?.length ? `Tags: ${entry.tags.join(", ")}` : "",
+    entry.content,
+  ].filter(Boolean).join(" — ");
+}
+
+export function reviewToEmbeddingText(review: {
+  content: string;
+  rating?: number | null;
+  book: { title: string; author: string };
+}): string {
+  return [
+    `Livro: ${review.book.title}`,
+    `Autor: ${review.book.author}`,
+    review.rating ? `Avaliação: ${review.rating}/5` : "",
+    review.content,
+  ].filter(Boolean).join(" — ");
+}
