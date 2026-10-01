@@ -13,6 +13,7 @@ interface Source {
   relevance?: number | null;
   matchedBy?: string;
   evidence?: string | null;
+  sourceType?: "book" | "diary" | "review";
   external?: boolean;
 }
 
@@ -106,7 +107,7 @@ export default function OraclePage() {
   const [selectedCompare, setSelectedCompare] = useState<Source[]>([]);
   const [actionBookId, setActionBookId] = useState<string | null>(null);
   const [mode, setMode] = useState<OracleMode>("EXPLORE");
-  const [temperature, setTemperature] = useState(1);
+  const [temperature, setTemperature] = useState(0.3);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<OracleSession[]>([]);
   const [artifacts, setArtifacts] = useState<OracleArtifact[]>([]);
@@ -1487,7 +1488,8 @@ export default function OraclePage() {
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="grid gap-2.5 sm:grid-cols-2">
                       {msg.sources.map((source) => {
-                        const selected = selectedCompare.some((item) => item.id === source.id);
+                        const isBookSource = !source.external && !source.sourceType;
+                        const selected = isBookSource && selectedCompare.some((item) => item.id === source.id);
                         const busy = actionBookId === source.id;
                         return (
                           <div
@@ -1499,20 +1501,26 @@ export default function OraclePage() {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
-                                  {source.external ? "Fora do acervo" : "Fonte do acervo"}
+                                  {source.external
+                                    ? "Fora do acervo"
+                                    : source.sourceType === "diary"
+                                      ? "Memória do diário"
+                                      : source.sourceType === "review"
+                                        ? "Avaliação do leitor"
+                                        : "Fonte do acervo"}
                                 </span>
                                 {source.external ? (
                                   <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
                                     {source.title}
                                   </h3>
-                                ) : (
+                                ) : isBookSource ? (
                                   <Link href={`/books/${source.id}`} className="group mt-1 flex items-center gap-1">
                                     <h3 className="truncate font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
                                       {source.title}
                                     </h3>
                                     <Icon name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
                                   </Link>
-                                )}
+                                  ) : null}
                                 <p className="font-body-sm text-body-sm text-on-surface-variant">{source.author}</p>
                                 {(source.matchedBy || source.relevance !== undefined) && (
                                   <p className="mt-1 font-caption text-caption text-outline">
@@ -1527,7 +1535,19 @@ export default function OraclePage() {
                                 )}
                               </div>
                               <span className={`rounded-full border px-2 py-0.5 text-[11px] ${source.external ? "border-tertiary/30 bg-tertiary-container/20 text-tertiary" : "border-primary/30 bg-primary-container/20 text-primary"}`}>
-                                {source.external ? "Externo" : source.status === "READING" ? "Lendo" : source.status === "TO_READ" ? "A ler" : source.status === "READ" ? "Lido" : "Acervo"}
+                                {source.external
+                                  ? "Externo"
+                                  : source.sourceType === "diary"
+                                    ? "Diário"
+                                    : source.sourceType === "review"
+                                      ? "Review"
+                                      : source.status === "READING"
+                                        ? "Lendo"
+                                        : source.status === "TO_READ"
+                                          ? "A ler"
+                                          : source.status === "READ"
+                                            ? "Lido"
+                                            : "Acervo"}
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1538,7 +1558,7 @@ export default function OraclePage() {
                                 >
                                   <Icon name="add" className="text-xs" /> Adicionar ao acervo
                                 </Link>
-                              ) : (
+                              ) : isBookSource ? (
                                 <>
                               <Link
                                 href={`/books/${source.id}`}
@@ -1572,15 +1592,15 @@ export default function OraclePage() {
                                 {selected ? "Selecionado" : "Comparar"}
                               </button>
                                 </>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         );
                       })}
                       <div className="flex flex-wrap gap-2 pt-1 sm:col-span-2">
-                        {msg.sources.some((s) => !s.external) && (
+                        {msg.sources.some((s) => !s.external && !s.sourceType) && (
                         <Link
-                          href={`/rota?books=${encodeURIComponent(msg.sources.filter((s) => !s.external).map((source) => source.id).join(","))}`}
+                          href={`/rota?books=${encodeURIComponent(msg.sources.filter((source) => !source.external && !source.sourceType).map((source) => source.id).join(","))}`}
                           className="inline-flex items-center gap-1.5 rounded-full bg-primary-container px-3 py-1.5 font-label-sm text-label-sm font-semibold text-on-primary-container"
                         >
                           <Icon name="route" className="text-sm" /> Criar rota com estes livros
