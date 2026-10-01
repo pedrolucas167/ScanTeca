@@ -685,7 +685,9 @@ export async function POST(request: NextRequest) {
       const allCandidates = [...semanticCandidates, ...metadataCandidates];
       contextBooks = reranked.flatMap((r) => {
           const candidate = allCandidates.find((c) => c.id === r.id);
-          if (!candidate) return [];
+          // Metadata matches narrow retrieval but are not evidence by
+          // themselves unless the book also has a semantic match.
+          if (!candidate || candidate.distance === undefined) return [];
           return [{
             id: candidate.id,
             title: candidate.title,
@@ -788,8 +790,14 @@ export async function POST(request: NextRequest) {
 
     const relevantDiary = semanticDiary.filter((entry) => Number(entry.distance) < DISTANCE_THRESHOLD);
     const relevantReviews = semanticReviews.filter((review) => Number(review.distance) < DISTANCE_THRESHOLD);
-    const diarySection = relevantDiary.length || diaryEntries.length
-      ? `\n\nMemórias do diário de leitura:\n${[...relevantDiary, ...diaryEntries]
+    const diaryIntent = /\b(diário|anotações?|memórias?|registros?|reflexões?)\b/i.test(
+      retrievalQuery
+    );
+    const diaryContextEntries = diaryIntent
+      ? [...relevantDiary, ...diaryEntries]
+      : relevantDiary;
+    const diarySection = diaryContextEntries.length
+      ? `\n\nMemórias do diário de leitura:\n${diaryContextEntries
           .filter((entry, index, all) => all.findIndex((other) => ("id" in other ? other.id : "") === entry.id) === index)
           .slice(0, MAX_DIARY_ENTRIES)
           .map((entry) => {
@@ -805,12 +813,15 @@ export async function POST(request: NextRequest) {
           .join("\n")}`
       : "";
 
+    const progressIntent = /\b(lendo|leitura atual|em andamento|progresso|página|paginas|páginas)\b/i.test(
+      retrievalQuery
+    );
     const hasGrounding =
       contextBooks.length > 0 ||
       relevantDiary.length > 0 ||
-      diaryEntries.length > 0 ||
       relevantReviews.length > 0 ||
-      readingNow.length > 0 ||
+      (diaryIntent && diaryEntries.length > 0) ||
+      (progressIntent && readingNow.length > 0) ||
       externalBooks.length > 0;
     if (!hasGrounding) {
       return groundedFallbackResponse(sessionId);
