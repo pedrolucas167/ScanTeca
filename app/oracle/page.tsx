@@ -86,6 +86,7 @@ export default function OraclePage() {
       : new URLSearchParams(window.location.search).get("question") ?? ""
   );
   const [loading, setLoading] = useState(false);
+  const [generationStage, setGenerationStage] = useState("Consultando sua estante...");
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -488,6 +489,7 @@ export default function OraclePage() {
             });
           }
           if (json.sources) {
+            setGenerationStage("Organizando evidências...");
             setMessages((prev) => {
               const updated = [...prev];
               updated[updated.length - 1] = {
@@ -498,6 +500,7 @@ export default function OraclePage() {
             });
           }
           if (json.text) {
+            setGenerationStage("Redigindo uma resposta...");
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
             queueReveal(json.text);
@@ -525,6 +528,7 @@ export default function OraclePage() {
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     setError(null);
+    setGenerationStage("Entendendo sua pergunta...");
     setLoading(true);
 
     // No regenerate a pergunta já está na tela — só entra o placeholder da resposta.
@@ -584,6 +588,7 @@ export default function OraclePage() {
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
+      setGenerationStage("Consultando sua estante...");
       inputRef.current?.focus();
       maybeAutoListen();
     }
@@ -600,6 +605,7 @@ export default function OraclePage() {
     stopReveal();
     stickToBottomRef.current = true;
     setError(null);
+    setGenerationStage("Transcrevendo áudio...");
     setLoading(true);
     setMessages((prev) => [
       ...prev,
@@ -650,6 +656,7 @@ export default function OraclePage() {
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
+      setGenerationStage("Consultando sua estante...");
       maybeAutoListen();
     }
   };
@@ -773,6 +780,7 @@ export default function OraclePage() {
     stopReveal();
     stickToBottomRef.current = true;
     setError(null);
+    setGenerationStage("Transcrevendo áudio...");
     setLoading(true);
     voiceChatDataRef.current = [];
     setMessages((prev) => [
@@ -824,6 +832,7 @@ export default function OraclePage() {
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
+      setGenerationStage("Consultando sua estante...");
       maybeAutoListen();
     }
   };
@@ -1091,7 +1100,8 @@ export default function OraclePage() {
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col bg-surface text-on-surface">
       {/* Header */}
-      <header className="z-40 flex w-full shrink-0 items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+      <header className="z-40 flex w-full shrink-0 flex-col border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-space-xs">
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20">
             <Icon name="auto_awesome" className="text-xl text-primary" />
@@ -1099,10 +1109,10 @@ export default function OraclePage() {
           <div>
             <div className="flex items-center gap-space-2xs">
               <h1 className="font-headline-md text-headline-md italic leading-none text-on-surface">
-                Oráculo
+                Oráculo de Bolso
               </h1>
               <span className="rounded bg-primary-container/20 px-1.5 py-0.5 font-caption text-caption font-semibold uppercase tracking-widest text-primary">
-                RAG
+                RAG v2
               </span>
             </div>
             <div className="mt-0.5 flex items-center gap-1.5">
@@ -1142,11 +1152,6 @@ export default function OraclePage() {
             <Icon name="psychology" className="text-sm text-primary" />
             <span className="hidden sm:inline">Minha memória</span>
           </button>
-          <span className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface transition-colors hover:border-primary/50">
-            <Icon name="shelves" className="text-sm text-tertiary" />
-            <span>Acervo Todo</span>
-            <Icon name="expand_more" className="text-xs text-outline" />
-          </span>
           <button
             onClick={() =>
               setPlaybackRate((prev) => {
@@ -1180,6 +1185,36 @@ export default function OraclePage() {
               <Icon name="delete" className="text-lg" />
             </button>
           )}
+        </div>
+        </div>
+        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-outline-variant/20 pt-2">
+          <span className="flex flex-shrink-0 items-center gap-1 px-0.5 font-caption text-caption uppercase tracking-wider text-outline">
+            <Icon name="filter_alt" className="text-xs" /> Escopo
+          </span>
+          <button
+            type="button"
+            onClick={() => setScope("library")}
+            aria-pressed={scope === "library"}
+            className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-label-sm text-label-sm transition-all active:scale-95 ${
+              scope === "library"
+                ? "border-primary bg-primary text-on-primary"
+                : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
+            }`}
+          >
+            <Icon name="library_books" className="text-xs" /> Todo o acervo
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("all")}
+            aria-pressed={scope === "all"}
+            className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-label-sm text-label-sm transition-all active:scale-95 ${
+              scope === "all"
+                ? "border-tertiary bg-tertiary-container/30 text-tertiary"
+                : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
+            }`}
+          >
+            <Icon name="public" className="text-xs" /> Acervo + mundo
+          </button>
         </div>
       </header>
 
@@ -1488,7 +1523,7 @@ export default function OraclePage() {
                       />
                     </div>
                     <span className="font-caption text-caption text-on-surface-variant">
-                      Consultando sua estante...
+                      {generationStage}
                     </span>
                   </div>
                 ) : (
