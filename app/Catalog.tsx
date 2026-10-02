@@ -116,9 +116,13 @@ const SHELF_MAX_WIDTH = 116;
 function BookShelfCover({
   book,
   spineCmValue,
+  onEdit,
+  onDelete,
 }: {
   book: Book;
   spineCmValue: number;
+  onEdit: (book: Book) => void;
+  onDelete: (book: Book) => void;
 }) {
   const [width, setWidth] = useState(() =>
     Math.min(
@@ -128,47 +132,48 @@ function BookShelfCover({
   );
 
   return (
-    <Link
-      href={`/books/${book.id}`}
-      className="group flex flex-shrink-0 flex-col items-center"
-      style={{ width }}
-    >
-      <div
-        className="relative w-full overflow-hidden rounded-t-sm border border-outline-variant/30 bg-surface-container-high book-spine-tangible transition-transform duration-200 group-hover:-translate-y-2"
-        style={{ height: SHELF_BASE_HEIGHT }}
+    <div className="group flex flex-shrink-0 flex-col items-center" style={{ width }}>
+      <Link
+        href={`/books/${book.id}`}
+        className="w-full"
       >
-        {book.coverUrl ? (
-          <Image
-            src={book.coverUrl}
-            alt={`Capa de ${book.title}`}
-            fill
-            className="object-cover object-top"
-            sizes={`${SHELF_MAX_WIDTH}px`}
-            onLoadingComplete={(img) => {
-              const ratio = img.naturalWidth / (img.naturalHeight || 1);
-              const naturalWidth = Math.round(SHELF_BASE_HEIGHT * ratio);
-              setWidth(
-                Math.min(
-                  SHELF_MAX_WIDTH,
-                  Math.max(SHELF_MIN_WIDTH, naturalWidth)
-                )
-              );
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-outline">
-            <Icon name="menu_book" className="text-2xl" />
-            <span className="mt-1 line-clamp-3 text-[9px] font-medium">
-              {book.title}
-            </span>
-          </div>
-        )}
-        <span
-          className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${statusClasses[book.status]}`}
+        <div
+          className="relative w-full overflow-hidden rounded-t-sm border border-outline-variant/30 bg-surface-container-high book-spine-tangible transition-transform duration-200 group-hover:-translate-y-2"
+          style={{ height: SHELF_BASE_HEIGHT }}
         >
-          {statusLabels[book.status]}
-        </span>
-      </div>
+          {book.coverUrl ? (
+            <Image
+              src={book.coverUrl}
+              alt={`Capa de ${book.title}`}
+              fill
+              className="object-cover object-top"
+              sizes={`${SHELF_MAX_WIDTH}px`}
+              onLoadingComplete={(img) => {
+                const ratio = img.naturalWidth / (img.naturalHeight || 1);
+                const naturalWidth = Math.round(SHELF_BASE_HEIGHT * ratio);
+                setWidth(
+                  Math.min(
+                    SHELF_MAX_WIDTH,
+                    Math.max(SHELF_MIN_WIDTH, naturalWidth)
+                  )
+                );
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-outline">
+              <Icon name="menu_book" className="text-2xl" />
+              <span className="mt-1 line-clamp-3 text-[9px] font-medium">
+                {book.title}
+              </span>
+            </div>
+          )}
+          <span
+            className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${statusClasses[book.status]}`}
+          >
+            {statusLabels[book.status]}
+          </span>
+        </div>
+      </Link>
       <div className="mt-2 w-full text-center">
         <p className="truncate font-label-sm text-label-sm font-medium text-on-surface">
           {book.title}
@@ -178,7 +183,21 @@ function BookShelfCover({
           {spineCmValue.toFixed(1).replace(".", ",")}cm
         </p>
       </div>
-    </Link>
+      <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(book); }}
+          className="flex-1 rounded bg-surface-container px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary-container hover:text-on-primary-container"
+        >
+          Editar
+        </button>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(book); }}
+          className="flex-1 rounded bg-surface-container px-2 py-1 text-[10px] font-medium text-error hover:bg-error-container hover:text-on-error-container"
+        >
+          Remover
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1246,6 +1265,8 @@ export default function Catalog({
                     key={book.id}
                     book={book}
                     spineCmValue={spineCm(book.pages)}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>
@@ -1309,9 +1330,8 @@ export default function Catalog({
                   const heightPx = Math.max(28, cm * 18);
                   const wide = book.pages && book.pages > 300;
                   return (
-                    <Link
+                    <div
                       key={book.id}
-                      href={`/books/${book.id}`}
                       className="group relative flex items-center justify-between overflow-hidden rounded-sm border border-white/10 px-3 shadow-md transition-transform hover:scale-[1.02]"
                       style={{
                         height: heightPx,
@@ -1319,6 +1339,10 @@ export default function Catalog({
                         backgroundColor: book.status === "READING" ? "#1c1d28" : "#232533",
                       }}
                     >
+                      <Link
+                        href={`/books/${book.id}`}
+                        className="absolute inset-0 z-10"
+                      />
                       <div className={`absolute inset-y-0 left-0 ${wide ? "w-2.5" : "w-1.5"} ${colorClass}`} />
                       <div className="relative z-10 flex items-center gap-2 pl-2">
                         <span className="truncate font-label-sm text-[11px] font-semibold text-on-surface">
@@ -1329,7 +1353,21 @@ export default function Catalog({
                       <span className="relative z-10 font-caption text-[10px] font-medium text-on-surface-variant">
                         {cm.toFixed(1).replace(".", ",")} cm
                       </span>
-                    </Link>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 z-20">
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(book); }}
+                          className="rounded bg-surface-container px-2 py-1 text-[9px] font-medium text-primary hover:bg-primary-container hover:text-on-primary-container"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(book); }}
+                          className="rounded bg-surface-container px-2 py-1 text-[9px] font-medium text-error hover:bg-error-container hover:text-on-error-container"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -1402,10 +1440,12 @@ export default function Catalog({
                 onDragStart={() => handleDragStart(book.id)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(book.id)}
-                onClick={() => router.push(`/books/${book.id}`)}
-                className={`group relative cursor-pointer ${draggedId === book.id ? "opacity-50" : ""}`}
+                className={`group relative ${draggedId === book.id ? "opacity-50" : ""}`}
               >
-                <div className="relative aspect-[2/3] overflow-hidden rounded-md border border-outline-variant/30 bg-surface-container shadow-md transition-transform group-hover:-translate-y-1 group-hover:shadow-xl">
+                <div
+                  onClick={() => router.push(`/books/${book.id}`)}
+                  className="relative aspect-[2/3] overflow-hidden rounded-md border border-outline-variant/30 bg-surface-container shadow-md transition-transform group-hover:-translate-y-1 group-hover:shadow-xl cursor-pointer"
+                >
                   {book.coverUrl ? (
                     <Image
                       src={book.coverUrl}
@@ -1426,6 +1466,20 @@ export default function Catalog({
                   </div>
                 </div>
                 <div className="mx-1 mt-1 h-1.5 rounded-b-sm bg-amber-900/20 dark:bg-amber-100/10" />
+                <div className="mt-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(book); }}
+                    className="flex-1 rounded bg-surface-container px-2 py-1.5 text-xs font-medium text-primary hover:bg-primary-container hover:text-on-primary-container"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(book); }}
+                    className="flex-1 rounded bg-surface-container px-2 py-1.5 text-xs font-medium text-error hover:bg-error-container hover:text-on-error-container"
+                  >
+                    Remover
+                  </button>
+                </div>
               </article>
             ))}
           </div>
