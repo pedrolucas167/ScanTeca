@@ -1457,11 +1457,11 @@ export default function OraclePage() {
                     </span>
                   )}
                 </div>
-                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[box-shadow,border-color] duration-500">
+                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && !msg.content ? (
+                  <div className="flex items-center gap-2 py-1" aria-label="Oráculo digitando">
                     <div
-                      className="flex items-center gap-1.5 py-1"
-                      aria-label="Oráculo digitando"
+                      className="flex items-center gap-1.5"
                     >
                       <span className="typing-dot h-1.5 w-1.5 rounded-full bg-primary" />
                       <span
@@ -1473,7 +1473,11 @@ export default function OraclePage() {
                         style={{ animationDelay: "0.3s" }}
                       />
                     </div>
-                  ) : (
+                    <span className="font-caption text-caption text-on-surface-variant">
+                      Consultando sua estante...
+                    </span>
+                  </div>
+                ) : (
                     <div
                       aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
                       className="transition-opacity duration-300"
@@ -1494,7 +1498,7 @@ export default function OraclePage() {
                         return (
                           <div
                             key={source.id}
-                            className={`rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-colors ${
+                            className={`rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-[background-color,box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-primary/50 hover:bg-surface-container-lowest hover:shadow-md hover:shadow-primary/5 ${
                               selected ? "border-primary" : "border-outline-variant/40"
                             }`}
                           >
@@ -1524,7 +1528,9 @@ export default function OraclePage() {
                                 <p className="font-body-sm text-body-sm text-on-surface-variant">{source.author}</p>
                                 {(source.matchedBy || source.relevance !== undefined) && (
                                   <p className="mt-1 font-caption text-caption text-outline">
-                                    {source.relevance !== undefined ? `${source.relevance}% relevante` : "Relevante"}
+                                    {source.relevance !== undefined && source.relevance !== null
+                                      ? `${Number(source.relevance).toFixed(2).replace(".", ",")}% relevante`
+                                      : "Relevante"}
                                     {source.matchedBy ? ` · ${source.matchedBy}` : ""}
                                   </p>
                                 )}
