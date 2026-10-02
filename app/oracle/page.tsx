@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useSyncExternalStore } from "react";
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
 
@@ -153,6 +153,16 @@ export default function OraclePage() {
   const abortRef = useRef<AbortController | null>(null);
   const receivedAnyRef = useRef(false);
   const wasLoadingRef = useRef(false);
+
+  const releaseAutoScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    stickToBottomRef.current = false;
+    // Cancela qualquer smooth scroll ainda em andamento para devolver o
+    // controle imediatamente ao gesto do usuário.
+    el.scrollTo({ top: el.scrollTop, behavior: "auto" });
+    setShowJumpDown(true);
+  }, []);
 
   // Só segue o fim da conversa se o usuário já estiver perto do fundo —
   // se ele subiu para ler, o stream não arrasta a tela de volta.
@@ -1341,6 +1351,10 @@ export default function OraclePage() {
       {/* Main — container de scroll da conversa */}
       <main
         ref={scrollRef}
+        onWheel={(event) => {
+          if (event.deltaY < 0) releaseAutoScroll();
+        }}
+        onTouchMove={releaseAutoScroll}
         className="min-h-0 w-full flex-1 overflow-y-auto"
       >
         <div className="mx-auto w-full max-w-lg px-4 pb-6 pt-4 md:max-w-2xl lg:max-w-3xl">
