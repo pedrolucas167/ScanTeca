@@ -115,6 +115,7 @@ export default function OraclePage() {
   const [showLibrary, setShowLibrary] = useState(false);
   const [savingArtifact, setSavingArtifact] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedSourceId, setCopiedSourceId] = useState<string | null>(null);
   const [scope, setScope] = useState<"library" | "all">("library");
   const [showJumpDown, setShowJumpDown] = useState(false);
   const [failedSend, setFailedSend] = useState<
@@ -852,6 +853,19 @@ export default function OraclePage() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const copyEvidence = async (source: Source) => {
+    if (!source.evidence) return;
+    try {
+      await navigator.clipboard.writeText(
+        `"${source.evidence}"\n— ${source.title}, ${source.author}`
+      );
+    } catch {
+      return;
+    }
+    setCopiedSourceId(source.id);
+    setTimeout(() => setCopiedSourceId(null), 2000);
+  };
+
   const regenerateResponse = () => {
     if (loadingRef.current) return;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
@@ -1540,17 +1554,26 @@ export default function OraclePage() {
 
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="grid gap-2.5 sm:grid-cols-2">
-                      {msg.sources.map((source) => {
+                      {msg.sources.map((source, sourceIndex) => {
                         const isBookSource = !source.external && !source.sourceType;
                         const selected = isBookSource && selectedCompare.some((item) => item.id === source.id);
                         const busy = actionBookId === source.id;
                         return (
                           <div
                             key={source.id}
-                            className={`rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-[background-color,box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-primary/50 hover:bg-surface-container-lowest hover:shadow-md hover:shadow-primary/5 ${
-                              selected ? "border-primary" : "border-outline-variant/40"
+                            className={`relative rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-[background-color,box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-primary/50 hover:bg-surface-container-lowest hover:shadow-md hover:shadow-primary/5 ${
+                              selected
+                                ? "border-primary"
+                                : sourceIndex === 0
+                                  ? "border-primary/60 shadow-[0_0_18px_rgba(91,80,230,0.12)]"
+                                  : "border-outline-variant/40"
                             }`}
                           >
+                            {sourceIndex === 0 && (
+                              <span className="absolute -top-2 left-3 rounded-full border border-primary/40 bg-surface-container px-2 py-0.5 font-caption text-[10px] font-semibold uppercase tracking-wider text-primary">
+                                Fonte principal
+                              </span>
+                            )}
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
@@ -1573,7 +1596,11 @@ export default function OraclePage() {
                                     </h3>
                                     <Icon name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
                                   </Link>
-                                  ) : null}
+                                ) : (
+                                  <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
+                                    {source.title}
+                                  </h3>
+                                )}
                                 <p className="font-body-sm text-body-sm text-on-surface-variant">{source.author}</p>
                                 {(source.matchedBy || source.relevance !== undefined) && (
                                   <p className="mt-1 font-caption text-caption text-outline">
@@ -1584,9 +1611,19 @@ export default function OraclePage() {
                                   </p>
                                 )}
                                 {source.evidence && (
-                                  <p className="mt-2 line-clamp-2 font-caption text-caption italic leading-relaxed text-on-surface-variant">
-                                    &ldquo;{source.evidence}&rdquo;
-                                  </p>
+                                  <details className="group/evidence mt-2 rounded-lg border border-outline-variant/20 bg-surface-container-low/60">
+                                    <summary className="cursor-pointer list-none px-2 py-1.5 font-caption text-caption text-on-surface-variant marker:hidden">
+                                      <span className="group-open/evidence:hidden line-clamp-2 italic">
+                                        &ldquo;{source.evidence}&rdquo;
+                                      </span>
+                                      <span className="hidden group-open/evidence:block font-semibold text-primary">
+                                        Ocultar evidência
+                                      </span>
+                                    </summary>
+                                    <p className="border-t border-outline-variant/20 px-2 pb-2 pt-1.5 font-caption text-caption italic leading-relaxed text-on-surface-variant">
+                                      &ldquo;{source.evidence}&rdquo;
+                                    </p>
+                                  </details>
                                 )}
                               </div>
                               <span className={`rounded-full border px-2 py-0.5 text-[11px] ${source.external ? "border-tertiary/30 bg-tertiary-container/20 text-tertiary" : "border-primary/30 bg-primary-container/20 text-primary"}`}>
@@ -1606,6 +1643,16 @@ export default function OraclePage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5">
+                              {source.evidence && (
+                                <button
+                                  type="button"
+                                  onClick={() => void copyEvidence(source)}
+                                  className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface transition-colors hover:border-primary/50 hover:text-primary"
+                                >
+                                  <Icon name={copiedSourceId === source.id ? "check" : "content_copy"} className="text-xs" />
+                                  {copiedSourceId === source.id ? "Copiado" : "Copiar evidência"}
+                                </button>
+                              )}
                               {source.external ? (
                                 <Link
                                   href="/search-add"
