@@ -563,6 +563,7 @@ export async function POST(request: NextRequest) {
       conversationHistory,
       apiKey
     );
+    const retrievalStartedAt = Date.now();
     const questionEmbedding = await generateEmbedding(retrievalQuery);
 
     if (!questionEmbedding) {
@@ -841,6 +842,17 @@ export async function POST(request: NextRequest) {
       return groundedFallbackResponse(sessionId);
     }
 
+    const retrievalStats = {
+      durationMs: Date.now() - retrievalStartedAt,
+      vectorCandidates:
+        similarBooks.length + semanticDiary.length + semanticReviews.length,
+      selectedBooks: contextBooks.length,
+      selectedDiary: relevantDiary.length,
+      selectedReviews: relevantReviews.length,
+      externalBooks: externalBooks.length,
+      scope,
+    };
+
     const externalContext =
       externalBooks.length > 0
         ? `\n\nSugestões fora do acervo (o leitor NÃO possui estes livros):\n${externalBooks
@@ -1037,6 +1049,9 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         );
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`)
+        );
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ retrievalStats })}\n\n`)
         );
 
         try {
