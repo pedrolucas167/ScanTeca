@@ -21,6 +21,17 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  retrievalStats?: RetrievalStats;
+}
+
+interface RetrievalStats {
+  durationMs: number;
+  vectorCandidates: number;
+  selectedBooks: number;
+  selectedDiary: number;
+  selectedReviews: number;
+  externalBooks: number;
+  scope: "library" | "all";
 }
 
 interface OracleSession {
@@ -496,6 +507,16 @@ export default function OraclePage() {
               updated[updated.length - 1] = {
                 ...updated[updated.length - 1],
                 sources: json.sources,
+              };
+              return updated;
+            });
+          }
+          if (json.retrievalStats) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                retrievalStats: json.retrievalStats,
               };
               return updated;
             });
@@ -1550,6 +1571,51 @@ export default function OraclePage() {
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
                       )}
                     </div>
+                  )}
+
+                  {msg.retrievalStats && (
+                    <details className="group/retrieval overflow-hidden rounded-xl border border-primary/20 bg-surface-container-lowest/70">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 font-caption text-caption marker:hidden">
+                        <span className="flex min-w-0 items-center gap-2 text-primary">
+                          <Icon name="travel_explore" className="text-sm" />
+                          <span className="font-semibold uppercase tracking-wider">
+                            Como encontrei estas fontes?
+                          </span>
+                        </span>
+                        <span className="flex flex-shrink-0 items-center gap-1.5 text-outline">
+                          <span>{msg.retrievalStats.durationMs} ms</span>
+                          <Icon name="expand_more" className="text-sm transition-transform group-open/retrieval:rotate-180" />
+                        </span>
+                      </summary>
+                      <div className="grid gap-2 border-t border-outline-variant/20 px-3 pb-3 pt-2 sm:grid-cols-2">
+                        <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
+                          <span>Candidatos vetoriais</span>
+                          <strong className="font-mono text-on-surface">{msg.retrievalStats.vectorCandidates}</strong>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
+                          <span>Livros selecionados</span>
+                          <strong className="font-mono text-on-surface">{msg.retrievalStats.selectedBooks}</strong>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
+                          <span>Diário considerado</span>
+                          <strong className="font-mono text-on-surface">{msg.retrievalStats.selectedDiary}</strong>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
+                          <span>Avaliações consideradas</span>
+                          <strong className="font-mono text-on-surface">{msg.retrievalStats.selectedReviews}</strong>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
+                          <span>Fontes externas</span>
+                          <strong className="font-mono text-on-surface">{msg.retrievalStats.externalBooks}</strong>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
+                          <span>Escopo</span>
+                          <strong className="font-mono text-on-surface">
+                            {msg.retrievalStats.scope === "all" ? "Acervo + mundo" : "Todo o acervo"}
+                          </strong>
+                        </div>
+                      </div>
+                    </details>
                   )}
 
                   {msg.sources && msg.sources.length > 0 && (
