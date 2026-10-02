@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useSyncExternalStore } from "react";
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
 
@@ -86,6 +86,7 @@ export default function OraclePage() {
       : new URLSearchParams(window.location.search).get("question") ?? ""
   );
   const [loading, setLoading] = useState(false);
+  const [generationStage, setGenerationStage] = useState("Consultando sua estante...");
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -153,6 +154,16 @@ export default function OraclePage() {
   const abortRef = useRef<AbortController | null>(null);
   const receivedAnyRef = useRef(false);
   const wasLoadingRef = useRef(false);
+
+  const releaseAutoScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    stickToBottomRef.current = false;
+    // Cancela qualquer smooth scroll ainda em andamento para devolver o
+    // controle imediatamente ao gesto do usuário.
+    el.scrollTo({ top: el.scrollTop, behavior: "auto" });
+    setShowJumpDown(true);
+  }, []);
 
   // Só segue o fim da conversa se o usuário já estiver perto do fundo —
   // se ele subiu para ler, o stream não arrasta a tela de volta.
@@ -478,6 +489,7 @@ export default function OraclePage() {
             });
           }
           if (json.sources) {
+            setGenerationStage("Organizando evidências...");
             setMessages((prev) => {
               const updated = [...prev];
               updated[updated.length - 1] = {
@@ -488,6 +500,7 @@ export default function OraclePage() {
             });
           }
           if (json.text) {
+            setGenerationStage("Redigindo uma resposta...");
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
             queueReveal(json.text);
@@ -515,6 +528,7 @@ export default function OraclePage() {
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     setError(null);
+    setGenerationStage("Entendendo sua pergunta...");
     setLoading(true);
 
     // No regenerate a pergunta já está na tela — só entra o placeholder da resposta.
@@ -574,6 +588,7 @@ export default function OraclePage() {
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
+      setGenerationStage("Consultando sua estante...");
       inputRef.current?.focus();
       maybeAutoListen();
     }
@@ -590,6 +605,7 @@ export default function OraclePage() {
     stopReveal();
     stickToBottomRef.current = true;
     setError(null);
+    setGenerationStage("Transcrevendo áudio...");
     setLoading(true);
     setMessages((prev) => [
       ...prev,
@@ -640,6 +656,7 @@ export default function OraclePage() {
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
+      setGenerationStage("Consultando sua estante...");
       maybeAutoListen();
     }
   };
@@ -763,6 +780,7 @@ export default function OraclePage() {
     stopReveal();
     stickToBottomRef.current = true;
     setError(null);
+    setGenerationStage("Transcrevendo áudio...");
     setLoading(true);
     voiceChatDataRef.current = [];
     setMessages((prev) => [
@@ -814,6 +832,7 @@ export default function OraclePage() {
       loadingRef.current = false;
       streamDoneRef.current = true;
       setLoading(false);
+      setGenerationStage("Consultando sua estante...");
       maybeAutoListen();
     }
   };
@@ -1081,7 +1100,8 @@ export default function OraclePage() {
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col bg-surface text-on-surface">
       {/* Header */}
-      <header className="z-40 flex w-full shrink-0 items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+      <header className="z-40 flex w-full shrink-0 flex-col border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-space-xs">
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20">
             <Icon name="auto_awesome" className="text-xl text-primary" />
@@ -1089,10 +1109,10 @@ export default function OraclePage() {
           <div>
             <div className="flex items-center gap-space-2xs">
               <h1 className="font-headline-md text-headline-md italic leading-none text-on-surface">
-                Oráculo
+                Oráculo de Bolso
               </h1>
               <span className="rounded bg-primary-container/20 px-1.5 py-0.5 font-caption text-caption font-semibold uppercase tracking-widest text-primary">
-                RAG
+                RAG v2
               </span>
             </div>
             <div className="mt-0.5 flex items-center gap-1.5">
@@ -1132,11 +1152,6 @@ export default function OraclePage() {
             <Icon name="psychology" className="text-sm text-primary" />
             <span className="hidden sm:inline">Minha memória</span>
           </button>
-          <span className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface transition-colors hover:border-primary/50">
-            <Icon name="shelves" className="text-sm text-tertiary" />
-            <span>Acervo Todo</span>
-            <Icon name="expand_more" className="text-xs text-outline" />
-          </span>
           <button
             onClick={() =>
               setPlaybackRate((prev) => {
@@ -1170,6 +1185,36 @@ export default function OraclePage() {
               <Icon name="delete" className="text-lg" />
             </button>
           )}
+        </div>
+        </div>
+        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-outline-variant/20 pt-2">
+          <span className="flex flex-shrink-0 items-center gap-1 px-0.5 font-caption text-caption uppercase tracking-wider text-outline">
+            <Icon name="filter_alt" className="text-xs" /> Escopo
+          </span>
+          <button
+            type="button"
+            onClick={() => setScope("library")}
+            aria-pressed={scope === "library"}
+            className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-label-sm text-label-sm transition-all active:scale-95 ${
+              scope === "library"
+                ? "border-primary bg-primary text-on-primary"
+                : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
+            }`}
+          >
+            <Icon name="library_books" className="text-xs" /> Todo o acervo
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("all")}
+            aria-pressed={scope === "all"}
+            className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-label-sm text-label-sm transition-all active:scale-95 ${
+              scope === "all"
+                ? "border-tertiary bg-tertiary-container/30 text-tertiary"
+                : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
+            }`}
+          >
+            <Icon name="public" className="text-xs" /> Acervo + mundo
+          </button>
         </div>
       </header>
 
@@ -1341,6 +1386,10 @@ export default function OraclePage() {
       {/* Main — container de scroll da conversa */}
       <main
         ref={scrollRef}
+        onWheel={(event) => {
+          if (event.deltaY < 0) releaseAutoScroll();
+        }}
+        onTouchMove={releaseAutoScroll}
         className="min-h-0 w-full flex-1 overflow-y-auto"
       >
         <div className="mx-auto w-full max-w-lg px-4 pb-6 pt-4 md:max-w-2xl lg:max-w-3xl">
@@ -1457,11 +1506,11 @@ export default function OraclePage() {
                     </span>
                   )}
                 </div>
-                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[box-shadow,border-color] duration-500">
+                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && !msg.content ? (
+                  <div className="flex items-center gap-2 py-1" aria-label="Oráculo digitando">
                     <div
-                      className="flex items-center gap-1.5 py-1"
-                      aria-label="Oráculo digitando"
+                      className="flex items-center gap-1.5"
                     >
                       <span className="typing-dot h-1.5 w-1.5 rounded-full bg-primary" />
                       <span
@@ -1473,7 +1522,11 @@ export default function OraclePage() {
                         style={{ animationDelay: "0.3s" }}
                       />
                     </div>
-                  ) : (
+                    <span className="font-caption text-caption text-on-surface-variant">
+                      {generationStage}
+                    </span>
+                  </div>
+                ) : (
                     <div
                       aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
                       className="transition-opacity duration-300"
@@ -1494,7 +1547,7 @@ export default function OraclePage() {
                         return (
                           <div
                             key={source.id}
-                            className={`rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-colors ${
+                            className={`rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-[background-color,box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-primary/50 hover:bg-surface-container-lowest hover:shadow-md hover:shadow-primary/5 ${
                               selected ? "border-primary" : "border-outline-variant/40"
                             }`}
                           >
@@ -1524,7 +1577,9 @@ export default function OraclePage() {
                                 <p className="font-body-sm text-body-sm text-on-surface-variant">{source.author}</p>
                                 {(source.matchedBy || source.relevance !== undefined) && (
                                   <p className="mt-1 font-caption text-caption text-outline">
-                                    {source.relevance !== undefined ? `${source.relevance}% relevante` : "Relevante"}
+                                    {source.relevance !== undefined && source.relevance !== null
+                                      ? `${Number(source.relevance).toFixed(2).replace(".", ",")}% relevante`
+                                      : "Relevante"}
                                     {source.matchedBy ? ` · ${source.matchedBy}` : ""}
                                   </p>
                                 )}
