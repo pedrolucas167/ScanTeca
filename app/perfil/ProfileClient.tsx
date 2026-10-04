@@ -121,49 +121,49 @@ export default function ProfileClient() {
   };
 
   return (
-    <main className="min-h-[calc(100dvh-4rem)] bg-surface px-4 py-6 pb-28 text-on-surface">
-      <div className="mx-auto max-w-2xl">
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Minha presença social</p>
-        <h1 className="font-headline-lg-mobile text-3xl font-medium">Perfil do leitor</h1>
-        <p className="mt-1 text-sm text-on-surface-variant">Escolha como a comunidade pode encontrar você.</p>
+    <main className="min-h-[calc(100dvh-4rem)] bg-surface px-4 py-6 pb-28 text-on-surface sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-2xl sm:max-w-3xl">
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary sm:text-xs">Minha presença social</p>
+        <h1 className="font-headline-lg-mobile text-3xl font-medium sm:text-4xl">Perfil do leitor</h1>
+        <p className="mt-1 text-sm text-on-surface-variant sm:text-base">Escolha como a comunidade pode encontrar você.</p>
 
-        <section className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 shadow-lg">
-          <div className="mb-5 flex items-center gap-4">
-            <div className="relative group">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-primary/40 bg-surface-container-high">
+        <section className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 shadow-lg sm:p-6">
+          <div className="mb-5 flex items-center gap-4 sm:gap-6">
+            <div className="relative group shrink-0">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-primary/40 bg-surface-container-high sm:h-24 sm:w-24">
                 {avatarPreview ? (
-                  <Image src={avatarPreview} alt="Preview" width={80} height={80} className="h-full w-full object-cover" />
+                  <Image src={avatarPreview} alt="Preview" width={96} height={96} className="h-full w-full object-cover" />
                 ) : profile.avatarUrl ? (
-                  <Image src={profile.avatarUrl} alt={profile.displayName} width={80} height={80} className="h-full w-full object-cover" />
+                  <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-lg font-bold text-primary">{profile.displayName.slice(0, 2).toUpperCase()}</span>
+                  <span className="text-lg font-bold text-primary sm:text-xl">{profile.displayName.slice(0, 2).toUpperCase()}</span>
                 )}
               </div>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingAvatar}
-                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-lg transition hover:bg-primary/90 disabled:opacity-50"
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-lg transition hover:bg-primary/90 disabled:opacity-50 sm:h-9 sm:w-9"
                 aria-label="Alterar avatar"
               >
-                <Camera className="h-4 w-4" />
+                <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               {profile.avatarUrl && !avatarPreview && (
                 <button
                   type="button"
                   onClick={() => void removeAvatar()}
                   disabled={uploadingAvatar}
-                  className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow-lg transition hover:bg-error/90 disabled:opacity-50"
+                  className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow-lg transition hover:bg-error/90 disabled:opacity-50 sm:h-7 sm:w-7"
                   aria-label="Remover avatar"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
                 </button>
               )}
             </div>
-            <div>
-              <h2 className="text-lg font-semibold">{profile.displayName}</h2>
-              <div className="mt-1 flex gap-3 text-xs text-on-surface-variant">
-                <span><Users className="mr-1 inline h-3.5 w-3.5" />{profile.followers} seguidores</span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold sm:text-xl">{profile.displayName}</h2>
+              <div className="mt-1 flex gap-3 text-xs text-on-surface-variant sm:text-sm">
+                <span><Users className="mr-1 inline h-3.5 w-3.5 sm:h-4 sm:w-4" />{profile.followers} seguidores</span>
                 <span>{profile.following} seguindo</span>
               </div>
             </div>
