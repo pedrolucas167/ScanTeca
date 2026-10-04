@@ -16,6 +16,7 @@ import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
+import NotificationsMenu from "./NotificationsMenu";
 import PushOptIn from "./PushOptIn";
 import InstallPrompt from "./InstallPrompt";
 import AdminLink from "./AdminLink";
@@ -147,6 +148,24 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     Descobrir
                   </Link>
                   <Link
+                    href="/feed"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Feed
+                  </Link>
+                  <Link
+                    href="/perfil"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Perfil
+                  </Link>
+                  <Link
+                    href="/descobrir/leitores"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Leitores
+                  </Link>
+                  <Link
                     href="/jornada"
                     className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
                   >
@@ -218,6 +237,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <AccentPicker />
                 <ThemeToggle />
                 <Show when="signed-in">
+                  <NotificationsMenu />
                   <PushBell />
                   <AdminLink />
                   <UserButton>
