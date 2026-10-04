@@ -22,6 +22,10 @@ export const rateLimits: Record<string, RateLimitConfig> = {
   books: { userLimit: 60, ipLimit: 180, windowMs: 60_000 },
   "books/reorder": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
   "books/reviews": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
+  "books/discussions": { userLimit: 40, ipLimit: 120, windowMs: 60_000 },
+  feed: { userLimit: 60, ipLimit: 180, windowMs: 60_000 },
+  "social/discover": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
+  "social/moderation": { userLimit: 30, ipLimit: 90, windowMs: 60_000 },
   // Chamadas externas por livro (Google Books + OpenRouter) — bem restrito.
   "books/enrich": { userLimit: 5, ipLimit: 15, windowMs: 60_000 },
   "embeddings/backfill": { userLimit: 5, ipLimit: 15, windowMs: 60_000 },

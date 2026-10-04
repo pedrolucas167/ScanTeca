@@ -27,38 +27,195 @@ enum RecommendationFeedbackKind {
   DISMISSED
 }
 
+enum SocialProfileVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+model SocialProfile {
+  id          String                  @id @default(cuid())
+  userId      String                  @unique
+  displayName String?
+  bio         String?
+  visibility  SocialProfileVisibility @default(PUBLIC)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([visibility])
+}
+
+model SocialFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model SocialNotification {
+  id          String    @id @default(cuid())
+  recipientId String
+  actorId     String
+  type        String
+  message     String
+  url         String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
+}
+
+model SocialBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model SocialReport {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String
+  targetId   String
+  reason     String
+  details    String?
+  status     String   @default("OPEN")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@index([status, createdAt])
+}
+
 model Book {
-  id            String     @id @default(cuid())
-  isbn          String
-  title         String
-  author        String
-  publishedDate String?
-  synopsis      String?
-  coverUrl      String?
-  status        BookStatus @default(TO_READ)
-  collectionId  String
-  collection    Collection @relation(fields: [collectionId], references: [id], onDelete: Restrict)
-  notes         String?
-  rating        Int?
-  genre         String?
-  pages         Int?
-  currentPage   Int?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  customOrder   Int?
-  embedding     Unsupported("vector(1536)")?
-  userId        String
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  reviews       Review[]
+  id              String                       @id @default(cuid())
+  isbn            String
+  title           String
+  author          String
+  publishedDate   String?
+  synopsis        String?
+  coverUrl        String?
+  status          BookStatus                   @default(TO_READ)
+  collectionId    String
+  collection      Collection                   @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  notes           String?
+  rating          Int?
+  genre           String?
+  pages           Int?
+  currentPage     Int?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  customOrder     Int?
+  embedding       Unsupported("vector(1536)")?
+  userId          String
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  reviews         Review[]
   readingSessions ReadingSession[]
   diaryEntries    DiaryEntry[]
+  feedPosts       FeedPost[]
+  discussions     BookDiscussion[]
 
   @@unique([isbn, userId])
   @@index([userId])
   @@index([status])
   @@index([collectionId])
   @@index([genre])
+}
+
+model BookDiscussion {
+  id        String                @id @default(cuid())
+  bookId    String
+  book      Book                  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  userId    String
+  userName  String?
+  title     String
+  content   String
+  quote     String?
+  replies   BookDiscussionReply[]
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([bookId, createdAt])
+  @@index([userId])
+}
+
+model BookDiscussionReply {
+  id           String         @id @default(cuid())
+  discussionId String
+  discussion   BookDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  userName     String?
+  content      String
+  quote        String?
+  createdAt    DateTime       @default(now())
+
+  @@index([discussionId, createdAt])
+  @@index([userId])
+}
+
+model FeedPost {
+  id        String         @id @default(cuid())
+  userId    String
+  userName  String?
+  content   String
+  label     String         @default("Reflexão compartilhada")
+  bookId    String?
+  book      Book?          @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  comments  FeedComment[]
+  reactions FeedReaction[]
+  bookmarks FeedBookmark[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([bookId])
+}
+
+model FeedComment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  userName  String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId, createdAt])
+  @@index([userId])
+}
+
+model FeedReaction {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model FeedBookmark {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([userId])
 }
 
 model Collection {
@@ -73,16 +230,16 @@ model Collection {
 }
 
 model Review {
-  id        String   @id @default(cuid())
+  id        String                       @id @default(cuid())
   content   String
   rating    Int?
   bookId    String
-  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  book      Book                         @relation(fields: [bookId], references: [id], onDelete: Cascade)
   userId    String
   userName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  embedding  Unsupported("vector(1536)")?
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+  embedding Unsupported("vector(1536)")?
 
   @@index([bookId])
   @@index([userId])
@@ -131,19 +288,19 @@ model ReadingSession {
 }
 
 model DiaryEntry {
-  id         String          @id @default(cuid())
+  id         String                       @id @default(cuid())
   userId     String
   bookId     String
-  book       Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  book       Book                         @relation(fields: [bookId], references: [id], onDelete: Cascade)
   sessionId  String?
-  session    ReadingSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  type       DiaryEntryType  @default(REFLECTION)
+  session    ReadingSession?              @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  type       DiaryEntryType               @default(REFLECTION)
   content    String
   page       Int?
-  tags       String[]        @default([])
-  ragEnabled Boolean         @default(true)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  tags       String[]                     @default([])
+  ragEnabled Boolean                      @default(true)
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime                     @updatedAt
   embedding  Unsupported("vector(1536)")?
 
   @@index([userId, createdAt])
@@ -160,20 +317,20 @@ model OracleMessage {
   requestId String?
   sessionId String?
   session   OracleSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  createdAt DateTime       @default(now())
 
+  @@unique([userId, requestId])
   @@index([userId])
   @@index([sessionId])
-  @@unique([userId, requestId])
 }
 
 model OracleSession {
-  id        String          @id @default(cuid())
+  id        String           @id @default(cuid())
   userId    String
   title     String
-  mode      String          @default("EXPLORE")
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  mode      String           @default("EXPLORE")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   messages  OracleMessage[]
   artifacts OracleArtifact[]
 
@@ -238,7 +395,7 @@ model BroadcastLog {
 }
 
 model RecommendationFeedback {
-  id               String                    @id @default(cuid())
+  id               String                     @id @default(cuid())
   userId           String
   title            String
   author           String
@@ -246,8 +403,8 @@ model RecommendationFeedback {
   normalizedAuthor String
   kind             RecommendationFeedbackKind
   source           String?
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
   @@unique([userId, normalizedTitle, normalizedAuthor])
   @@index([userId])

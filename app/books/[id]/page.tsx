@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Star } from "lucide-react";
 import { BookReviews } from "./BookReviews";
+import { BookDiscussions } from "./BookDiscussions";
 
 export const dynamic = "force-dynamic";
 
@@ -193,6 +194,7 @@ export default async function BookDetailPage({
         </div>
 
         <BookReviews bookId={book.id} initialReviews={book.reviews} />
+        <BookDiscussions bookId={book.id} />
       </div>
     </div>
   );
