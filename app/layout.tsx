@@ -10,7 +10,7 @@ import {
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { unstable_cache } from "next/cache";
-import { BookOpen, Heart, Settings, Sparkles } from "lucide-react";
+import { BookOpen, Heart, Settings, Sparkles, ChevronDown, Menu } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
@@ -125,7 +125,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-md shadow-indigo-600/20 transition-transform duration-200 group-hover:scale-105">
                     <BookOpen className="h-5 w-5 text-white" />
                   </div>
-                  <div className="flex flex-col">
+                  <div className="hidden flex-col sm:flex">
                     <span className="text-lg font-bold leading-none tracking-tight text-foreground">
                       Scanteca
                     </span>
@@ -134,7 +134,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     </span>
                   </div>
                 </Link>
-                <div className="hidden min-w-0 items-center gap-0 md:flex md:[&>a]:whitespace-nowrap md:[&>a]:px-2 md:[&>a]:text-xs xl:[&>a]:px-2.5 xl:[&>a]:text-sm md:[&>a:nth-child(n+6)]:hidden xl:[&>a:nth-child(n+6)]:inline-flex">
+                <div className="hidden min-w-0 items-center gap-1 lg:flex lg:[&>a]:whitespace-nowrap lg:[&>a]:px-2 lg:[&>a]:text-xs xl:[&>a]:px-2.5 xl:[&>a]:text-sm">
                   <Link
                     href="/"
                     className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -154,48 +154,56 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     Feed
                   </Link>
                   <Link
-                    href="/perfil"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Perfil
-                  </Link>
-                  <Link
-                    href="/descobrir/leitores"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Leitores
-                  </Link>
-                  <Link
-                    href="/jornada"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Jornada
-                  </Link>
-                  <Link
-                    href="/diario"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Diário
-                  </Link>
-                  <Link
-                    href="/rota"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Rota
-                  </Link>
-                  <Link
-                    href="/manifesto"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Manifesto
-                  </Link>
-                  <Link
                     href="/oracle"
                     className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     Oráculo
                   </Link>
+                  <div className="relative group">
+                    <button className="flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800">
+                      Mais
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <div className="absolute left-0 top-full mt-1 hidden w-48 rounded-lg border border-zinc-200 bg-white py-2 shadow-lg group-hover:block dark:border-zinc-800 dark:bg-zinc-950">
+                      <Link
+                        href="/perfil"
+                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Perfil
+                      </Link>
+                      <Link
+                        href="/descobrir/leitores"
+                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Leitores
+                      </Link>
+                      <Link
+                        href="/jornada"
+                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Jornada
+                      </Link>
+                      <Link
+                        href="/diario"
+                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Diário
+                      </Link>
+                      <Link
+                        href="/rota"
+                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Rota
+                      </Link>
+                      <Link
+                        href="/manifesto"
+                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Manifesto
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
