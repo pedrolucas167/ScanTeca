@@ -18,6 +18,7 @@ function displayName(user: Awaited<ReturnType<typeof currentUser>>) {
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const viewer = await currentUser();
   const rateLimit = await rateLimitGuard(request, {
     route: "feed",
     userId,
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
       authorId: post.userId,
       isOwner: post.userId === userId,
       author: post.userName || "Leitor anônimo",
+      avatarUrl: post.avatarUrl || (post.userId === userId ? viewer?.imageUrl || null : null),
       initials: (post.userName || "LA").slice(0, 2).toUpperCase(),
       time: post.createdAt.toISOString(),
       label: post.label,
@@ -117,6 +119,7 @@ export async function POST(request: NextRequest) {
     data: {
       userId,
       userName: displayName(user),
+      avatarUrl: user?.imageUrl || null,
       content: parsed.data.content,
       label: parsed.data.label || "Reflexão compartilhada",
       bookId: parsed.data.bookId,
@@ -130,6 +133,7 @@ export async function POST(request: NextRequest) {
       authorId: post.userId,
       isOwner: true,
       author: post.userName || "Leitor anônimo",
+      avatarUrl: post.avatarUrl,
       initials: (post.userName || "LA").slice(0, 2).toUpperCase(),
       time: post.createdAt.toISOString(),
       label: post.label,
