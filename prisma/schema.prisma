@@ -38,6 +38,7 @@ model SocialProfile {
   userId      String                  @unique
   displayName String?
   bio         String?
+  avatarUrl   String?
   visibility  SocialProfileVisibility @default(PUBLIC)
   createdAt   DateTime                @default(now())
   updatedAt   DateTime                @updatedAt
