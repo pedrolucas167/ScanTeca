@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import {
   Bookmark,
@@ -15,6 +16,7 @@ import { TextComposer } from "./TextComposer";
 interface Comment {
   id: string;
   author: string;
+  avatarUrl?: string | null;
   content: string;
 }
 
@@ -23,6 +25,7 @@ interface FeedPost {
   authorId: string;
   isOwner: boolean;
   author: string;
+  avatarUrl: string | null;
   initials: string;
   time: string;
   label: string;
@@ -36,6 +39,7 @@ interface FeedPost {
 }
 
 export default function FeedClient() {
+  const { user } = useUser();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -157,7 +161,11 @@ export default function FeedClient() {
         <section className="mb-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4 shadow-lg">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary-container">
-              VC
+              {user?.imageUrl ? (
+                <Image src={user.imageUrl} alt="" width={40} height={40} className="h-full w-full rounded-full object-cover" />
+              ) : (
+                "VC"
+              )}
             </div>
             <div>
               <p className="text-sm font-semibold">Compartilhe com a rede</p>
@@ -199,8 +207,12 @@ export default function FeedClient() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-primary/40 bg-surface-container-high text-xs font-semibold text-primary">
-                      {post.initials}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/40 bg-surface-container-high text-xs font-semibold text-primary">
+                      {post.avatarUrl ? (
+                        <Image src={post.avatarUrl} alt={`Foto de ${post.author}`} width={44} height={44} className="h-full w-full object-cover" />
+                      ) : (
+                        post.initials
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
