@@ -130,13 +130,13 @@ export default function ProfileClient() {
         <section className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 shadow-lg sm:p-6">
           <div className="mb-5 flex items-center gap-4 sm:gap-6">
             <div className="relative group shrink-0">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-primary/40 bg-surface-container-high sm:h-24 sm:w-24">
+              <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-primary/40 bg-surface-container-high sm:h-24 sm:w-24">
                 {avatarPreview ? (
-                  <Image src={avatarPreview} alt="Preview" width={96} height={96} className="h-full w-full object-cover" />
+                  <Image src={avatarPreview} alt="Preview" fill className="object-cover" />
                 ) : profile.avatarUrl ? (
-                  <Image src={profile.avatarUrl} alt={profile.displayName} width={96} height={96} className="h-full w-full object-cover" />
+                  <Image src={profile.avatarUrl} alt={profile.displayName} fill className="object-cover" />
                 ) : (
-                  <span className="text-lg font-bold text-primary sm:text-xl">{profile.displayName.slice(0, 2).toUpperCase()}</span>
+                  <span className="flex h-full w-full items-center justify-center text-lg font-bold text-primary sm:text-xl">{profile.displayName.slice(0, 2).toUpperCase()}</span>
                 )}
               </div>
               <button
