@@ -50,8 +50,7 @@ const TOOL_PATTERNS = [
  * Route query based on heuristics (TODO: replace with Jev API)
  */
 export async function jevRouteQuery(
-  query: string,
-  _history: Message[] = []
+  query: string
 ): Promise<RoutingDecision> {
   const trimmed = query.trim().toLowerCase();
   

@@ -37,30 +37,30 @@ export default function ModerationPage() {
 
   const isAdmin = user?.publicMetadata?.role === "admin";
 
-  const fetchPosts = useCallback(async () => {
-    if (!isAdmin) {
-      setError("Acesso negado. Você não tem permissão de administrador.");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/admin/moderation?status=${filter}`);
-      if (!response.ok) throw new Error("Erro ao carregar posts.");
-      const data = await response.json();
-      setPosts(data.posts);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao carregar posts.");
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, filter]);
-
   useEffect(() => {
+    const fetchPosts = async () => {
+      if (!isAdmin) {
+        setError("Acesso negado. Você não tem permissão de administrador.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/admin/moderation?status=${filter}`);
+        if (!response.ok) throw new Error("Erro ao carregar posts.");
+        const data = await response.json();
+        setPosts(data.posts);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro ao carregar posts.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchPosts();
-  }, [fetchPosts]);
+  }, [isAdmin, filter]);
 
   const moderatePost = async (postId: string, action: "APPROVE" | "REJECT" | "FLAG") => {
     setProcessing(postId);
@@ -71,7 +71,12 @@ export default function ModerationPage() {
         body: JSON.stringify({ postId, action }),
       });
       if (!response.ok) throw new Error("Erro ao moderar post.");
-      await fetchPosts();
+
+      // Refresh posts after moderation
+      const refreshResponse = await fetch(`/api/admin/moderation?status=${filter}`);
+      if (!refreshResponse.ok) throw new Error("Erro ao carregar posts.");
+      const data = await refreshResponse.json();
+      setPosts(data.posts);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao moderar post.");
     } finally {

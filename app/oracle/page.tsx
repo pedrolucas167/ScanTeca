@@ -1427,7 +1427,7 @@ export default function OraclePage() {
         onTouchMove={releaseAutoScroll}
         className="min-h-0 w-full flex-1 overflow-y-auto"
       >
-        <div className="mx-auto w-full max-w-lg px-4 pb-6 pt-4 md:max-w-2xl lg:max-w-3xl">
+        <div className="mx-auto w-full max-w-lg px-4 pb-6 pt-4 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
         <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Modo do Oráculo">
           {ORACLE_MODES.map((item) => (
@@ -1861,7 +1861,7 @@ export default function OraclePage() {
 
       {/* Input bar — em fluxo no fim da coluna, nunca sobrepõe o footer */}
       <div className="w-full shrink-0 border-t border-outline-variant/20 bg-surface/95 pt-2 backdrop-blur-md">
-        <div className="relative mx-auto flex w-full max-w-lg flex-col gap-2.5 px-4 pb-4 md:max-w-2xl lg:max-w-3xl">
+        <div className="relative mx-auto flex w-full max-w-lg flex-col gap-2.5 px-4 pb-4 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
           {showJumpDown && (
             <button
               type="button"
