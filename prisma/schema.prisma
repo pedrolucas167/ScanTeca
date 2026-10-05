@@ -33,6 +33,13 @@ enum SocialProfileVisibility {
   PRIVATE
 }
 
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
 model SocialProfile {
   id          String                  @id @default(cuid())
   userId      String                  @unique
@@ -164,24 +171,29 @@ model BookDiscussionReply {
 }
 
 model FeedPost {
-  id        String         @id @default(cuid())
-  userId    String
-  userName  String?
-  avatarUrl String?
-  content   String
-  label     String         @default("Reflexão compartilhada")
-  bookId    String?
-  book      Book?          @relation(fields: [bookId], references: [id], onDelete: SetNull)
-  imageUrl  String?
-  comments  FeedComment[]
-  reactions FeedReaction[]
-  bookmarks FeedBookmark[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id               String           @id @default(cuid())
+  userId           String
+  userName         String?
+  avatarUrl        String?
+  content          String
+  label            String           @default("Reflexão compartilhada")
+  bookId           String?
+  book             Book?            @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  imageUrl         String?
+  moderationStatus ModerationStatus @default(PENDING)
+  moderationReason String?
+  moderatedBy      String?
+  moderatedAt      DateTime?
+  comments         FeedComment[]
+  reactions        FeedReaction[]
+  bookmarks        FeedBookmark[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([createdAt])
   @@index([userId, createdAt])
   @@index([bookId])
+  @@index([moderationStatus])
 }
 
 model FeedComment {

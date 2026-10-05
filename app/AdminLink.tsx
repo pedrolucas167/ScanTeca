@@ -10,8 +10,8 @@ export default function AdminLink() {
 
   return (
     <Link
-      href="/admin"
-      title="Painel de administração"
+      href="/admin/moderation"
+      title="Moderação de conteúdo"
       className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
     >
       <ShieldCheck className="h-5 w-5" />

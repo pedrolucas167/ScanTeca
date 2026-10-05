@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { z } from "zod";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
+import { moderateContent } from "@/lib/moderation";
 
 const postSchema = z.object({
   content: z.string().trim().min(1).max(1000),
@@ -62,6 +63,8 @@ export async function GET(request: NextRequest) {
   const visiblePosts = posts.filter((post) => {
     if (blockedIds.has(post.userId)) return false;
     if (post.userId === userId) return true;
+    // Only show approved posts from other users
+    if (post.moderationStatus !== "APPROVED") return false;
     const visibility = profileByUserId.get(post.userId) || "PUBLIC";
     return visibility === "PUBLIC" || (visibility === "FOLLOWERS" && followedIds.has(post.userId));
   });
@@ -115,6 +118,10 @@ export async function POST(request: NextRequest) {
     if (!book) return NextResponse.json({ error: "Livro não encontrado" }, { status: 404 });
   }
 
+  // Run content moderation
+  const moderation = await moderateContent(parsed.data.content);
+  const moderationStatus = moderation.approved ? "APPROVED" : moderation.flagged ? "FLAGGED" : "REJECTED";
+
   const post = await prisma.feedPost.create({
     data: {
       userId,
@@ -123,6 +130,8 @@ export async function POST(request: NextRequest) {
       content: parsed.data.content,
       label: parsed.data.label || "Reflexão compartilhada",
       bookId: parsed.data.bookId,
+      moderationStatus,
+      moderationReason: moderation.reason,
     },
     include: { book: { select: { title: true, author: true, coverUrl: true } } },
   });
