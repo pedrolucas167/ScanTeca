@@ -24,6 +24,8 @@ export async function uploadFeedImage(
     Body: file,
     ContentType: contentType,
     CacheControl: "public, max-age=31536000",
+    // Server-side encryption with AES-256
+    ServerSideEncryption: "AES256",
   });
 
   await s3Client.send(command);
