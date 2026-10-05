@@ -8,7 +8,7 @@ const s3Client = new S3Client({
   },
 });
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET || "scanteca-feed-images-343212497955-sa-east-1-an";
+const BUCKET_NAME = process.env.AWS_S3_BUCKET || "scanteca-avatars-343212497955-sa-east-1-an";
 
 export async function uploadFeedImage(
   userId: string,
