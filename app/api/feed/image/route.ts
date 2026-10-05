@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     const imageUrl = await uploadFeedImage(userId, postId, buffer, mimeType);
 
     // Atualizar post
-    const updatedPost = await prisma.feedPost.update({
+    await prisma.feedPost.update({
       where: { id: postId },
       data: { imageUrl },
     });

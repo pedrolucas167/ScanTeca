@@ -51,7 +51,7 @@ const TOOL_PATTERNS = [
  */
 export async function jevRouteQuery(
   query: string,
-  history: Message[] = []
+  _history: Message[] = []
 ): Promise<RoutingDecision> {
   const trimmed = query.trim().toLowerCase();
   

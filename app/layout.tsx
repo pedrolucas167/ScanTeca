@@ -10,7 +10,7 @@ import {
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { unstable_cache } from "next/cache";
-import { BookOpen, Heart, Settings, Sparkles, ChevronDown, Menu } from "lucide-react";
+import { BookOpen, Heart, Settings, Sparkles, ChevronDown } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";

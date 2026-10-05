@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import {
@@ -37,17 +37,13 @@ export default function ModerationPage() {
 
   const isAdmin = user?.publicMetadata?.role === "admin";
 
-  useEffect(() => {
+  const fetchPosts = useCallback(async () => {
     if (!isAdmin) {
       setError("Acesso negado. Você não tem permissão de administrador.");
       setLoading(false);
       return;
     }
 
-    fetchPosts();
-  }, [isAdmin, filter]);
-
-  const fetchPosts = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -60,7 +56,11 @@ export default function ModerationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, filter]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   const moderatePost = async (postId: string, action: "APPROVE" | "REJECT" | "FLAG") => {
     setProcessing(postId);
