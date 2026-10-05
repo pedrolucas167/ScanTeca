@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { ModerationStatus, Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
@@ -15,7 +16,12 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "20");
 
-  const where = status === "ALL" ? {} : { moderationStatus: status };
+  const where: Prisma.FeedPostWhereInput =
+    status === "ALL"
+      ? {}
+      : Object.values(ModerationStatus).includes(status as ModerationStatus)
+        ? { moderationStatus: status as ModerationStatus }
+        : { moderationStatus: ModerationStatus.PENDING };
 
   const posts = await prisma.feedPost.findMany({
     where,
@@ -76,7 +82,7 @@ export async function PATCH(request: NextRequest) {
   const post = await prisma.feedPost.update({
     where: { id: postId },
     data: {
-      moderationStatus: statusMap[action as keyof typeof statusMap],
+      moderationStatus: statusMap[action as keyof typeof statusMap] as ModerationStatus,
       moderationReason: reason || null,
       moderatedBy: user?.fullName || user?.username || userId,
       moderatedAt: new Date(),
