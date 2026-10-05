@@ -119,7 +119,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         />
         <ClerkProvider>
           <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
-            <nav className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 overflow-hidden px-3 sm:px-5">
+            <nav className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 px-3 sm:px-5">
               <div className="flex min-w-0 flex-1 items-center gap-3 xl:gap-6">
                 <Link href="/" className="group flex shrink-0 items-center gap-2">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-md shadow-indigo-600/20 transition-transform duration-200 group-hover:scale-105">
@@ -160,7 +160,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     <Sparkles className="h-3.5 w-3.5" />
                     Oráculo
                   </Link>
-                  <div className="relative group">
+                  <div className="relative group z-50">
                     <button className="flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800">
                       Mais
                       <ChevronDown className="h-4 w-4" />
