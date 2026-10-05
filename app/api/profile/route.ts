@@ -26,7 +26,6 @@ export async function GET() {
       visibility: profile?.visibility || "PUBLIC",
       followers,
       following,
-      avatarUrl: profile?.avatarUrl || null,
     },
   });
 }

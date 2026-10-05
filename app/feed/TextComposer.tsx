@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Send, Smile } from "lucide-react";
+import { Send, Smile } from "lucide-react";
 
 const EMOJIS = ["📚", "❤️", "✨", "😍", "🤔", "😂", "👏", "☕", "🌙", "🔥"];
 
@@ -100,13 +100,6 @@ export function TextComposer({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            aria-label="Adicionar imagem"
-            className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
-          >
-            <ImagePlus className="h-4 w-4" />
-          </button>
         </div>
         <button
           type="button"

@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || "sa-east-1",
@@ -8,14 +8,15 @@ const s3Client = new S3Client({
   },
 });
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET || "scanteca-avatars-343212497955-sa-east-1-an";
+const BUCKET_NAME = process.env.AWS_S3_BUCKET || "scanteca-feed-images-343212497955-sa-east-1-an";
 
-export async function uploadAvatar(
+export async function uploadFeedImage(
   userId: string,
+  postId: string,
   file: Buffer,
   contentType: string
 ): Promise<string> {
-  const key = `avatars/${userId}/${Date.now()}.jpg`;
+  const key = `feed/${userId}/${postId}/${Date.now()}.jpg`;
 
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
@@ -30,18 +31,17 @@ export async function uploadAvatar(
   return `https://${BUCKET_NAME}.s3.sa-east-1.amazonaws.com/${key}`;
 }
 
-export async function deleteAvatar(url: string | null): Promise<void> {
+export async function deleteFeedImage(url: string | null): Promise<void> {
   if (!url) return;
 
   try {
-    const key = url.split("/").slice(-2).join("/");
+    const key = url.split("/").slice(-3).join("/");
     const command = new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
     });
     await s3Client.send(command);
   } catch (error) {
-    console.error("[s3] Error deleting avatar:", error);
-    // Não falhar se a deleção falhar (arquivo pode não existir)
+    console.error("[s3] Error deleting feed image:", error);
   }
 }

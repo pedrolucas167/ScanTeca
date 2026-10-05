@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import {
@@ -10,6 +10,8 @@ import {
   MoreHorizontal,
   Quote,
   Send,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { TextComposer } from "./TextComposer";
 
@@ -30,6 +32,7 @@ interface FeedPost {
   time: string;
   label: string;
   text: string;
+  imageUrl?: string | null;
   book?: { title: string; author: string; cover: string | null };
   likes: number;
   liked: boolean;
@@ -44,6 +47,9 @@ export default function FeedClient() {
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/feed")
@@ -59,14 +65,66 @@ export default function FeedClient() {
   }, []);
 
   const addPost = async (content: string) => {
-    const response = await fetch("/api/feed", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    if (!response.ok) throw new Error("Não foi possível publicar o post.");
-    const data = (await response.json()) as { post: FeedPost };
-    setPosts((current) => [data.post, ...current]);
+    let postId: string | null = null;
+    
+    try {
+      // First create the post
+      const response = await fetch("/api/feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!response.ok) throw new Error("Não foi possível publicar o post.");
+      const data = (await response.json()) as { post: FeedPost };
+      postId = data.post.id;
+      
+      // If there's an image, upload it
+      if (imagePreview) {
+        setUploadingImage(true);
+        const imageResponse = await fetch("/api/feed/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: imagePreview, postId }),
+        });
+        if (!imageResponse.ok) {
+          const error = await imageResponse.json();
+          throw new Error(error.error || "Erro ao fazer upload da imagem.");
+        }
+        const imageData = (await imageResponse.json()) as { imageUrl: string };
+        data.post.imageUrl = imageData.imageUrl;
+      }
+      
+      setPosts((current) => [data.post, ...current]);
+      setImagePreview(null);
+    } catch (error) {
+      if (postId) {
+        // If post was created but image upload failed, delete the post
+        await fetch(`/api/feed/${postId}`, { method: "DELETE" });
+      }
+      throw error;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Imagem muito grande. Máximo 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
   };
 
   const addComment = async (postId: string, content: string) => {
@@ -174,10 +232,48 @@ export default function FeedClient() {
               </p>
             </div>
           </div>
+          
+          {imagePreview && (
+            <div className="mb-3 relative">
+              <div className="relative h-48 w-full overflow-hidden rounded-xl border border-outline-variant/30">
+                <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  disabled={uploadingImage}
+                  className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70 disabled:opacity-50"
+                  aria-label="Remover imagem"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="mb-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/20 disabled:opacity-50"
+            >
+              <ImageIcon className="h-4 w-4" />
+              Adicionar imagem
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+          
           <TextComposer
             placeholder="O que você está lendo ou pensando? 📖"
-            submitLabel="Publicar"
+            submitLabel={uploadingImage ? "Enviando..." : "Publicar"}
             onSubmit={addPost}
+            disabled={uploadingImage}
           />
         </section>
 
@@ -230,6 +326,14 @@ export default function FeedClient() {
                 </div>
 
                 <p className="my-4 text-sm leading-6 text-on-surface">{post.text}</p>
+
+                {post.imageUrl && (
+                  <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant/20">
+                    <div className="relative h-64 w-full">
+                      <Image src={post.imageUrl} alt="Imagem do post" fill className="object-cover" />
+                    </div>
+                  </div>
+                )}
 
                 {post.book && (
                   <div className="mb-4 flex gap-3 rounded-xl border border-outline-variant/20 bg-surface-container p-3">
