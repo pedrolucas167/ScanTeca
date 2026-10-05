@@ -142,16 +142,16 @@ function renderInline(text: string): ReactNode[] {
 }
 
 const HEADING_CLASS: Record<number, string> = {
-  1: "mt-4 mb-2 font-headline-md text-lg font-semibold text-on-surface first:mt-0",
-  2: "mt-4 mb-2 font-headline-md text-base font-semibold text-on-surface first:mt-0",
-  3: "mt-3 mb-1.5 text-sm font-semibold uppercase tracking-wide text-primary first:mt-0",
+  1: "mt-4 mb-2 font-headline-md text-xl font-semibold text-on-surface first:mt-0",
+  2: "mt-4 mb-2 font-headline-md text-lg font-semibold text-on-surface first:mt-0",
+  3: "mt-3 mb-1.5 text-base font-semibold uppercase tracking-wide text-primary first:mt-0",
 };
 
 export default function Markdown({ content }: { content: string }) {
   const blocks = parseBlocks(content);
 
   return (
-    <div className="font-body-md text-body-md leading-relaxed text-on-surface">
+    <div className="font-body-md text-body-md leading-7 text-on-surface">
       {blocks.map((block, i) => {
         switch (block.type) {
           case "code":
@@ -202,7 +202,7 @@ export default function Markdown({ content }: { content: string }) {
             );
           case "paragraph":
             return (
-              <p key={i} className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0">
+              <p key={i} className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0 text-base">
                 {renderInline(block.text)}
               </p>
             );

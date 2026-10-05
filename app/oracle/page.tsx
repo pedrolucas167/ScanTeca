@@ -179,12 +179,13 @@ export default function OraclePage() {
 
   // Só segue o fim da conversa se o usuário já estiver perto do fundo —
   // se ele subiu para ler, o stream não arrasta a tela de volta.
+  // Threshold de 200px para ser mais tolerante com pequenas rolagens
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
       const nearBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - 160;
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 200;
       stickToBottomRef.current = nearBottom;
       setShowJumpDown(!nearBottom);
     };
@@ -213,9 +214,10 @@ export default function OraclePage() {
     wasLoadingRef.current = loading;
     // Desliza até a nova resposta uma vez; depois acompanha o stream sem
     // interromper a animação a cada caractere revelado.
+    // Usa 'auto' durante streaming para evitar jitter visual
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
-      behavior: startedLoading || !loading ? "smooth" : "auto",
+      behavior: startedLoading ? "smooth" : "auto",
     });
   }, [messages, loading]);
 
@@ -1543,7 +1545,7 @@ export default function OraclePage() {
                 </div>
                 <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && !msg.content ? (
-                  <div className="flex items-center gap-2 py-1" aria-label="Oráculo digitando">
+                  <div className="flex items-center gap-2 py-1 min-h-[60px]" aria-label="Oráculo digitando">
                     <div
                       className="flex items-center gap-1.5"
                     >
@@ -1564,7 +1566,7 @@ export default function OraclePage() {
                 ) : (
                     <div
                       aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
-                      className="transition-opacity duration-300"
+                      className="transition-opacity duration-300 min-h-[100px]"
                     >
                       <Markdown content={msg.content} />
                       {loading && i === messages.length - 1 && (
