@@ -30,19 +30,19 @@ export default function BookClubsPage() {
     isPrivate: false,
   });
 
-  const fetchClubs = async () => {
-    try {
-      const response = await fetch(`/api/book-clubs?my=${showMyClubs}`);
-      const data = await response.json();
-      setClubs(data.clubs || []);
-    } catch {
-      console.error("Erro ao carregar clubes");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchClubs = async () => {
+      try {
+        const response = await fetch(`/api/book-clubs?my=${showMyClubs}`);
+        const data = await response.json();
+        setClubs(data.clubs || []);
+      } catch {
+        console.error("Erro ao carregar clubes");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchClubs();
   }, [showMyClubs]);
 
@@ -69,7 +69,7 @@ export default function BookClubsPage() {
       setShowCreateModal(false);
       setFormData({ name: "", description: "", maxMembers: "", isPrivate: false });
       fetchClubs();
-    } catch (error) {
+    } catch {
       alert("Erro ao criar clube");
     }
   };

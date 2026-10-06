@@ -49,29 +49,29 @@ export default function BookClubDetailPage() {
   const [showNewDiscussion, setShowNewDiscussion] = useState(false);
   const [newDiscussion, setNewDiscussion] = useState({ title: "", content: "", bookId: "" });
 
-  const fetchClub = async () => {
-    try {
-      const response = await fetch(`/api/book-clubs/${params.id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError("Clube não encontrado");
-        } else if (response.status === 403) {
-          setError("Acesso negado");
-        } else {
-          setError("Erro ao carregar clube");
-        }
-        return;
-      }
-      const data = await response.json();
-      setClub(data.club);
-    } catch {
-      setError("Erro ao carregar clube");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchClub = async () => {
+      try {
+        const response = await fetch(`/api/book-clubs/${params.id}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError("Clube não encontrado");
+          } else if (response.status === 403) {
+            setError("Acesso negado");
+          } else {
+            setError("Erro ao carregar clube");
+          }
+          return;
+        }
+        const data = await response.json();
+        setClub(data.club);
+      } catch {
+        setError("Erro ao carregar clube");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchClub();
   }, [params.id]);
 
