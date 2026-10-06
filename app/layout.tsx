@@ -14,15 +14,15 @@ import { BookOpen, Heart, Settings, Sparkles, ChevronDown } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
-import PwaRegister from "./PwaRegister";
+// import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
 import NotificationsMenu from "./NotificationsMenu";
 import PushOptIn from "./PushOptIn";
 import InstallPrompt from "./InstallPrompt";
 import AdminLink from "./AdminLink";
 import MobileNav from "./MobileNav";
-import RoutePrefetch from "./RoutePrefetch";
-import WebVitals from "./WebVitals";
+// import RoutePrefetch from "./RoutePrefetch";
+// import WebVitals from "./WebVitals";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -313,9 +313,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <InstallPrompt />
           </Show>
         </ClerkProvider>
-        <PwaRegister />
-        <RoutePrefetch />
-        <WebVitals />
+        {/* <PwaRegister /> */}
+        {/* <RoutePrefetch /> */}
+        {/* <WebVitals /> */}
       </body>
     </html>
   );
