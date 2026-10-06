@@ -13,11 +13,33 @@ export default async function Home() {
     return <LandingPage />;
   }
 
-  // TEMPORARY: Test without Catalog component
+  const [books, setting] = await Promise.all([
+    prisma.book.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: { collection: { select: { name: true } } },
+    }),
+    prisma.librarySetting.upsert({
+      where: { userId },
+      update: {},
+      create: {
+        userId,
+        name: "Minha Biblioteca",
+      },
+    }),
+  ]);
+
+  const bookList = books.map((b) => ({ ...b, collection: b.collection.name }));
+
+  console.log("Home: rendering Catalog with", bookList.length, "books");
+
+  // Test with empty books array first
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Home - Teste sem Catalog</h1>
-      <p>Se você está vendo isso, o middleware funcionou e a página carregou sem o componente Catalog.</p>
-    </div>
+    <Catalog
+      books={[]}
+      libraryName={setting.name}
+      shareEnabled={setting.shareEnabled}
+      shareId={setting.shareId}
+    />
   );
 }
