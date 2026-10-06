@@ -40,6 +40,12 @@ enum ModerationStatus {
   FLAGGED
 }
 
+enum BookClubRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 model SocialProfile {
   id          String                  @id @default(cuid())
   userId      String                  @unique
@@ -101,6 +107,65 @@ model SocialReport {
   @@unique([reporterId, targetType, targetId])
   @@index([targetType, targetId])
   @@index([status, createdAt])
+}
+
+model BookClub {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+  maxMembers  Int?
+  isPrivate   Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  members     BookClubMember[]
+  discussions BookClubDiscussion[]
+
+  @@index([isPrivate])
+}
+
+model BookClubMember {
+  id        String       @id @default(cuid())
+  clubId    String
+  club      BookClub     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId    String
+  role      BookClubRole @default(MEMBER)
+  joinedAt  DateTime     @default(now())
+
+  @@unique([clubId, userId])
+  @@index([clubId])
+  @@index([userId])
+}
+
+model BookClubDiscussion {
+  id        String             @id @default(cuid())
+  clubId    String
+  club      BookClub           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  bookId    String?
+  userId    String
+  userName  String?
+  title     String
+  content   String
+  replies   BookClubDiscussionReply[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([clubId, createdAt])
+  @@index([userId])
+  @@index([bookId])
+}
+
+model BookClubDiscussionReply {
+  id           String             @id @default(cuid())
+  discussionId String
+  discussion   BookClubDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  userName     String?
+  content      String
+  createdAt    DateTime           @default(now())
+
+  @@index([discussionId, createdAt])
+  @@index([userId])
 }
 
 model Book {
