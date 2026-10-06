@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { z } from "zod";
@@ -12,10 +12,6 @@ const bookClubCreateSchema = z.object({
   maxMembers: z.number().int().min(1).max(1000).optional(),
   isPrivate: z.boolean().optional(),
 });
-
-function displayName(user: Awaited<ReturnType<typeof currentUser>>) {
-  return user?.fullName || user?.firstName || user?.username || null;
-}
 
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
@@ -59,8 +55,6 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  const viewer = await currentUser();
-
   return NextResponse.json({
     clubs: clubs.map((club) => ({
       id: club.id,
@@ -91,8 +85,6 @@ export async function POST(request: NextRequest) {
 
   const parsed = await readJson(request, bookClubCreateSchema);
   if (!parsed.ok) return parsed.response;
-
-  const user = await currentUser();
 
   const club = await prisma.bookClub.create({
     data: {

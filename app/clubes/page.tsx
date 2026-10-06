@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { auth } from "@clerk/nextjs/server";
 import { Plus, Users, Lock, Globe, BookOpen } from "lucide-react";
 import Link from "next/link";
 
@@ -31,21 +30,21 @@ export default function BookClubsPage() {
     isPrivate: false,
   });
 
-  useEffect(() => {
-    fetchClubs();
-  }, [showMyClubs]);
-
   const fetchClubs = async () => {
     try {
       const response = await fetch(`/api/book-clubs?my=${showMyClubs}`);
       const data = await response.json();
       setClubs(data.clubs || []);
-    } catch (error) {
-      console.error("Erro ao carregar clubes:", error);
+    } catch {
+      console.error("Erro ao carregar clubes");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchClubs();
+  }, [showMyClubs]);
 
   const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();

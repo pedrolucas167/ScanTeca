@@ -3,7 +3,6 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { z } from "zod";
-import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 const bookClubUpdateSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),

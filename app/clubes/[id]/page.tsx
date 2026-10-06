@@ -49,10 +49,6 @@ export default function BookClubDetailPage() {
   const [showNewDiscussion, setShowNewDiscussion] = useState(false);
   const [newDiscussion, setNewDiscussion] = useState({ title: "", content: "", bookId: "" });
 
-  useEffect(() => {
-    fetchClub();
-  }, [params.id]);
-
   const fetchClub = async () => {
     try {
       const response = await fetch(`/api/book-clubs/${params.id}`);
@@ -68,12 +64,16 @@ export default function BookClubDetailPage() {
       }
       const data = await response.json();
       setClub(data.club);
-    } catch (err) {
+    } catch {
       setError("Erro ao carregar clube");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchClub();
+  }, [params.id]);
 
   const handleJoinLeave = async (action: "join" | "leave") => {
     try {
@@ -90,7 +90,7 @@ export default function BookClubDetailPage() {
       }
 
       fetchClub();
-    } catch (error) {
+    } catch {
       alert("Erro ao realizar ação");
     }
   };
@@ -113,7 +113,7 @@ export default function BookClubDetailPage() {
       setShowNewDiscussion(false);
       setNewDiscussion({ title: "", content: "", bookId: "" });
       fetchClub();
-    } catch (error) {
+    } catch {
       alert("Erro ao criar discussão");
     }
   };

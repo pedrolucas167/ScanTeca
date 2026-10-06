@@ -5,11 +5,9 @@ import { RotateCcw } from "lucide-react";
 
 interface ReclubeButtonProps {
   bookId: string;
-  reclubeCount: number;
-  readCount: number;
 }
 
-export default function ReclubeButton({ bookId, reclubeCount, readCount }: ReclubeButtonProps) {
+export default function ReclubeButton({ bookId }: ReclubeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,7 +33,7 @@ export default function ReclubeButton({ bookId, reclubeCount, readCount }: Reclu
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (error) {
+    } catch {
       setMessage("Erro ao iniciar reclube");
     } finally {
       setIsLoading(false);
