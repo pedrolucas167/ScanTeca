@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 interface Book {
   id: string;
@@ -221,6 +221,8 @@ export default function Catalog({
   const [noCoverOnly, setNoCoverOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"physical-shelf" | "physical-stack" | "list" | "grid">("physical-shelf");
   const router = useRouter();
+  const pathname = usePathname();
+  console.log("Catalog rendered, pathname:", pathname);
   const [showStats, setShowStats] = useState(false);
   const [sortBy, setSortBy] = useState<
     "title-asc" | "title-desc" | "author-asc" | "author-desc" | "newest" | "oldest" | "rating" | "custom"
