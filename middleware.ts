@@ -3,13 +3,13 @@ import { clerkMiddleware, createRouteMatcher, NextResponse } from "@clerk/nextjs
 const isProtectedRoute = createRouteMatcher(["/scanner(.*)", "/api/scan(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-  }
-  
-  // Redirect /catalogo to /
+  // Redirect /catalogo to / before auth check
   if (req.nextUrl.pathname === "/catalogo") {
     return NextResponse.redirect(new URL("/", req.url));
+  }
+  
+  if (isProtectedRoute(req)) {
+    await auth.protect();
   }
 });
 
