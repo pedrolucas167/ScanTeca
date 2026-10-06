@@ -6,6 +6,7 @@ import LandingPage from "./LandingPage";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  console.log("Home page rendering");
   const { userId } = await auth();
 
   if (!userId) {
@@ -29,6 +30,8 @@ export default async function Home() {
   ]);
 
   const bookList = books.map((b) => ({ ...b, collection: b.collection.name }));
+
+  console.log("Home: rendering Catalog with", bookList.length, "books");
 
   return (
     <Catalog
