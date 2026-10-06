@@ -5,10 +5,10 @@ import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
 const metricSchema = z.object({
   id: z.string().max(200),
-  name: z.enum(["CLS", "FCP", "INP", "LCP", "TTFB"]),
+  name: z.string().max(50),
   value: z.number().finite().nonnegative(),
   rating: z.enum(["good", "needs-improvement", "poor"]),
-  path: z.string().startsWith("/").max(300),
+  path: z.string().max(300),
 });
 
 export async function POST(request: NextRequest) {
