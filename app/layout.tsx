@@ -14,7 +14,7 @@ import { BookOpen, Heart, Settings, Sparkles, ChevronDown } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
-import PwaRegister from "./PwaRegister";
+// import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
 import NotificationsMenu from "./NotificationsMenu";
 import PushOptIn from "./PushOptIn";
@@ -313,7 +313,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <InstallPrompt />
           </Show>
         </ClerkProvider>
-        <PwaRegister />
+        {/* <PwaRegister /> */}
         <RoutePrefetch />
         <WebVitals />
       </body>
