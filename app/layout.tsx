@@ -21,8 +21,8 @@ import PushOptIn from "./PushOptIn";
 import InstallPrompt from "./InstallPrompt";
 import AdminLink from "./AdminLink";
 import MobileNav from "./MobileNav";
-import RoutePrefetch from "./RoutePrefetch";
-import WebVitals from "./WebVitals";
+// import RoutePrefetch from "./RoutePrefetch";
+// import WebVitals from "./WebVitals";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -314,8 +314,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </Show>
         </ClerkProvider>
         {/* <PwaRegister /> */}
-        <RoutePrefetch />
-        <WebVitals />
+        {/* <RoutePrefetch /> */}
+        {/* <WebVitals /> */}
       </body>
     </html>
   );
