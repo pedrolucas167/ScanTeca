@@ -6,6 +6,11 @@ export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
+  
+  // Redirect /catalogo to /
+  if (req.nextUrl.pathname === "/catalogo") {
+    return Response.redirect(new URL("/", req.url));
+  }
 });
 
 export const config = {
