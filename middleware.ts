@@ -6,11 +6,11 @@ const isProtectedRoute = createRouteMatcher(["/scanner(.*)", "/api/scan(.*)"]);
 export default clerkMiddleware(async (auth, req) => {
   console.log("Middleware: pathname =", req.nextUrl.pathname);
   
-  // Redirect /catalogo to / before auth check
-  if (req.nextUrl.pathname === "/catalogo") {
-    console.log("Middleware: redirecting /catalogo to /");
-    return NextResponse.redirect(new URL("/", req.url));
-  }
+  // TEMPORARY: Removed redirect to test if it's causing the loop
+  // if (req.nextUrl.pathname === "/catalogo") {
+  //   console.log("Middleware: redirecting /catalogo to /");
+  //   return NextResponse.redirect(new URL("/", req.url));
+  // }
   
   if (isProtectedRoute(req)) {
     await auth.protect();
