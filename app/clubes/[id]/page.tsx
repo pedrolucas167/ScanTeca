@@ -49,31 +49,33 @@ export default function BookClubDetailPage() {
   const [showNewDiscussion, setShowNewDiscussion] = useState(false);
   const [newDiscussion, setNewDiscussion] = useState({ title: "", content: "", bookId: "" });
 
-  useEffect(() => {
-    const fetchClub = async () => {
-      try {
-        const response = await fetch(`/api/book-clubs/${params.id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError("Clube não encontrado");
-          } else if (response.status === 403) {
-            setError("Acesso negado");
-          } else {
-            setError("Erro ao carregar clube");
-          }
-          return;
+  const loadClub = async () => {
+    try {
+      const response = await fetch(`/api/book-clubs/${params.id}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError("Clube não encontrado");
+        } else if (response.status === 403) {
+          setError("Acesso negado");
+        } else {
+          setError("Erro ao carregar clube");
         }
-        const data = await response.json();
-        setClub(data.club);
-      } catch {
-        setError("Erro ao carregar clube");
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
+      const data = await response.json();
+      setClub(data.club);
+    } catch {
+      setError("Erro ao carregar clube");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchClub();
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+  useEffect(() => {
+    loadClub();
   }, [params.id]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const handleJoinLeave = async (action: "join" | "leave") => {
     try {
@@ -89,7 +91,7 @@ export default function BookClubDetailPage() {
         return;
       }
 
-      fetchClub();
+      loadClub();
     } catch {
       alert("Erro ao realizar ação");
     }
@@ -112,7 +114,7 @@ export default function BookClubDetailPage() {
 
       setShowNewDiscussion(false);
       setNewDiscussion({ title: "", content: "", bookId: "" });
-      fetchClub();
+      loadClub();
     } catch {
       alert("Erro ao criar discussão");
     }

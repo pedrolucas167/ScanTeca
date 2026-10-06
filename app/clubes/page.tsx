@@ -30,21 +30,23 @@ export default function BookClubsPage() {
     isPrivate: false,
   });
 
-  useEffect(() => {
-    const fetchClubs = async () => {
-      try {
-        const response = await fetch(`/api/book-clubs?my=${showMyClubs}`);
-        const data = await response.json();
-        setClubs(data.clubs || []);
-      } catch {
-        console.error("Erro ao carregar clubes");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadClubs = async () => {
+    try {
+      const response = await fetch(`/api/book-clubs?my=${showMyClubs}`);
+      const data = await response.json();
+      setClubs(data.clubs || []);
+    } catch {
+      console.error("Erro ao carregar clubes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchClubs();
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+  useEffect(() => {
+    loadClubs();
   }, [showMyClubs]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +70,7 @@ export default function BookClubsPage() {
 
       setShowCreateModal(false);
       setFormData({ name: "", description: "", maxMembers: "", isPrivate: false });
-      fetchClubs();
+      loadClubs();
     } catch {
       alert("Erro ao criar clube");
     }
