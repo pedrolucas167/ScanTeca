@@ -49,6 +49,7 @@ const bookUpdateSchema = bookCreateSchema.partial().extend({
   id: z.string("ID do livro é obrigatório").min(1, "ID do livro é obrigatório"),
   currentPage: optionalNumber,
   sessionNote: z.string().nullish(),
+  startReclube: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -233,7 +234,7 @@ export async function PATCH(request: NextRequest) {
 
     const parsed = await readJson(request, bookUpdateSchema);
     if (!parsed.ok) return parsed.response;
-    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder, sessionNote } = parsed.data;
+    const { id, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, currentPage, customOrder, sessionNote, startReclube } = parsed.data;
 
     const existing = await prisma.book.findFirst({
       where: { id, userId },
@@ -274,6 +275,7 @@ export async function PATCH(request: NextRequest) {
       } else if (status === "READ") {
         if (!existing.startedAt) data.startedAt = new Date();
         data.finishedAt = new Date();
+        data.readCount = (existing.readCount || 0) + 1;
       } else {
         data.finishedAt = null;
       }
@@ -287,6 +289,21 @@ export async function PATCH(request: NextRequest) {
     if (genre !== undefined) data.genre = genre || null;
     if (pages !== undefined) data.pages = pages || null;
     if (customOrder !== undefined) data.customOrder = customOrder ?? null;
+
+    // Lógica de reclube
+    if (startReclube === true) {
+      if (existing.status !== "READ") {
+        return NextResponse.json(
+          { error: "Só é possível iniciar reclube de livros já lidos" },
+          { status: 400 }
+        );
+      }
+      data.status = "READING";
+      data.reclubeCount = (existing.reclubeCount || 0) + 1;
+      data.reclubeStartedAt = new Date();
+      data.currentPage = 0;
+      data.finishedAt = null;
+    }
 
     const book = await prisma.book.update({
       where: { id },

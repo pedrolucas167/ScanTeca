@@ -3,9 +3,10 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, Star, RotateCcw } from "lucide-react";
 import { BookReviews } from "./BookReviews";
 import { BookDiscussions } from "./BookDiscussions";
+import ReclubeButton from "./ReclubeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -166,6 +167,17 @@ export default async function BookDetailPage({
                 >
                   Abrir diário de leitura
                 </Link>
+              )}
+
+              {book.status === "READ" && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <ReclubeButton bookId={book.id} reclubeCount={book.reclubeCount || 0} readCount={book.readCount || 0} />
+                  {book.reclubeCount > 0 && (
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {book.reclubeCount} reclube{book.reclubeCount > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
               )}
 
               {book.synopsis && (

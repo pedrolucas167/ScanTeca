@@ -104,33 +104,36 @@ model SocialReport {
 }
 
 model Book {
-  id              String                       @id @default(cuid())
-  isbn            String
-  title           String
-  author          String
-  publishedDate   String?
-  synopsis        String?
-  coverUrl        String?
-  status          BookStatus                   @default(TO_READ)
-  collectionId    String
-  collection      Collection                   @relation(fields: [collectionId], references: [id], onDelete: Restrict)
-  notes           String?
-  rating          Int?
-  genre           String?
-  pages           Int?
-  currentPage     Int?
-  startedAt       DateTime?
-  finishedAt      DateTime?
-  customOrder     Int?
-  embedding       Unsupported("vector(1536)")?
-  userId          String
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
-  reviews         Review[]
-  readingSessions ReadingSession[]
-  diaryEntries    DiaryEntry[]
-  feedPosts       FeedPost[]
-  discussions     BookDiscussion[]
+  id               String                       @id @default(cuid())
+  isbn             String
+  title            String
+  author           String
+  publishedDate    String?
+  synopsis         String?
+  coverUrl         String?
+  status           BookStatus                   @default(TO_READ)
+  collectionId     String
+  collection       Collection                   @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  notes            String?
+  rating           Int?
+  genre            String?
+  pages            Int?
+  currentPage      Int?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  customOrder      Int?
+  readCount        Int                          @default(0)
+  reclubeCount     Int                          @default(0)
+  reclubeStartedAt DateTime?
+  embedding        Unsupported("vector(1536)")?
+  userId           String
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  reviews          Review[]
+  readingSessions  ReadingSession[]
+  diaryEntries     DiaryEntry[]
+  feedPosts        FeedPost[]
+  discussions      BookDiscussion[]
 
   @@unique([isbn, userId])
   @@index([userId])
