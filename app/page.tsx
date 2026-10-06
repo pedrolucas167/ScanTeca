@@ -33,10 +33,9 @@ export default async function Home() {
 
   console.log("Home: rendering Catalog with", bookList.length, "books");
 
-  // Test with empty books array first
   return (
     <Catalog
-      books={[]}
+      books={bookList}
       libraryName={setting.name}
       shareEnabled={setting.shareEnabled}
       shareId={setting.shareId}
