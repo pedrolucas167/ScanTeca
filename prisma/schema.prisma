@@ -40,6 +40,12 @@ enum ModerationStatus {
   FLAGGED
 }
 
+enum BookClubRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 model SocialProfile {
   id          String                  @id @default(cuid())
   userId      String                  @unique
@@ -103,34 +109,96 @@ model SocialReport {
   @@index([status, createdAt])
 }
 
+model BookClub {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+  maxMembers  Int?
+  isPrivate   Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  members     BookClubMember[]
+  discussions BookClubDiscussion[]
+
+  @@index([isPrivate])
+}
+
+model BookClubMember {
+  id        String       @id @default(cuid())
+  clubId    String
+  club      BookClub     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId    String
+  role      BookClubRole @default(MEMBER)
+  joinedAt  DateTime     @default(now())
+
+  @@unique([clubId, userId])
+  @@index([clubId])
+  @@index([userId])
+}
+
+model BookClubDiscussion {
+  id        String             @id @default(cuid())
+  clubId    String
+  club      BookClub           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  bookId    String?
+  userId    String
+  userName  String?
+  title     String
+  content   String
+  replies   BookClubDiscussionReply[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([clubId, createdAt])
+  @@index([userId])
+  @@index([bookId])
+}
+
+model BookClubDiscussionReply {
+  id           String             @id @default(cuid())
+  discussionId String
+  discussion   BookClubDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  userName     String?
+  content      String
+  createdAt    DateTime           @default(now())
+
+  @@index([discussionId, createdAt])
+  @@index([userId])
+}
+
 model Book {
-  id              String                       @id @default(cuid())
-  isbn            String
-  title           String
-  author          String
-  publishedDate   String?
-  synopsis        String?
-  coverUrl        String?
-  status          BookStatus                   @default(TO_READ)
-  collectionId    String
-  collection      Collection                   @relation(fields: [collectionId], references: [id], onDelete: Restrict)
-  notes           String?
-  rating          Int?
-  genre           String?
-  pages           Int?
-  currentPage     Int?
-  startedAt       DateTime?
-  finishedAt      DateTime?
-  customOrder     Int?
-  embedding       Unsupported("vector(1536)")?
-  userId          String
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
-  reviews         Review[]
-  readingSessions ReadingSession[]
-  diaryEntries    DiaryEntry[]
-  feedPosts       FeedPost[]
-  discussions     BookDiscussion[]
+  id               String                       @id @default(cuid())
+  isbn             String
+  title            String
+  author           String
+  publishedDate    String?
+  synopsis         String?
+  coverUrl         String?
+  status           BookStatus                   @default(TO_READ)
+  collectionId     String
+  collection       Collection                   @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  notes            String?
+  rating           Int?
+  genre            String?
+  pages            Int?
+  currentPage      Int?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  customOrder      Int?
+  readCount        Int                          @default(0)
+  reclubeCount     Int                          @default(0)
+  reclubeStartedAt DateTime?
+  embedding        Unsupported("vector(1536)")?
+  userId           String
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  reviews          Review[]
+  readingSessions  ReadingSession[]
+  diaryEntries     DiaryEntry[]
+  feedPosts        FeedPost[]
+  discussions      BookDiscussion[]
 
   @@unique([isbn, userId])
   @@index([userId])

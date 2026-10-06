@@ -18,11 +18,6 @@ export interface RoutingDecision {
   reason?: string;
 }
 
-interface Message {
-  role: string;
-  content: string;
-}
-
 const GREETING_PATTERNS = [
   /^(oi|olá|hey|e aí|bom dia|boa tarde|boa noite|oi tudo bem|olá tudo bem)/i,
   /^(tudo bem|como vai|e aí|beleza|suave)/i,
