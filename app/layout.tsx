@@ -15,12 +15,12 @@ import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 // import AccentPicker from "./AccentPicker";
 // import PwaRegister from "./PwaRegister";
-import PushBell from "./PushBell";
-import NotificationsMenu from "./NotificationsMenu";
-import PushOptIn from "./PushOptIn";
-import InstallPrompt from "./InstallPrompt";
-import AdminLink from "./AdminLink";
-import MobileNav from "./MobileNav";
+// import PushBell from "./PushBell";
+// import NotificationsMenu from "./NotificationsMenu";
+// import PushOptIn from "./PushOptIn";
+// import InstallPrompt from "./InstallPrompt";
+// import AdminLink from "./AdminLink";
+// import MobileNav from "./MobileNav";
 // import RoutePrefetch from "./RoutePrefetch";
 // import WebVitals from "./WebVitals";
 import "./globals.css";
@@ -243,11 +243,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   </SignUpButton>
                 </Show>
                 {/* <AccentPicker /> */}
-                <ThemeToggle />
+                {/* <ThemeToggle /> */}
                 <Show when="signed-in">
-                  <NotificationsMenu />
-                  <PushBell />
-                  <AdminLink />
+                  {/* <NotificationsMenu /> */}
+                  {/* <PushBell /> */}
+                  {/* <AdminLink /> */}
                   <UserButton>
                     <UserButton.MenuItems>
                       <UserButton.Link
@@ -258,7 +258,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     </UserButton.MenuItems>
                   </UserButton>
                 </Show>
-                <MobileNav />
+                {/* <MobileNav /> */}
               </div>
             </nav>
           </header>
@@ -308,10 +308,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </p>
             </div>
           </footer>
-          <Show when="signed-in">
+          {/* <Show when="signed-in">
             <PushOptIn />
             <InstallPrompt />
-          </Show>
+          </Show> */}
         </ClerkProvider>
         {/* <PwaRegister /> */}
         {/* <RoutePrefetch /> */}
