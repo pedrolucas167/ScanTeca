@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher, NextResponse } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher(["/scanner(.*)", "/api/scan(.*)"]);
 
@@ -9,7 +9,7 @@ export default clerkMiddleware(async (auth, req) => {
   
   // Redirect /catalogo to /
   if (req.nextUrl.pathname === "/catalogo") {
-    return Response.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/", req.url));
   }
 });
 
