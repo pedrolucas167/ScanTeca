@@ -13,7 +13,7 @@ import { unstable_cache } from "next/cache";
 import { BookOpen, Heart, Settings, Sparkles, ChevronDown } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
-import AccentPicker from "./AccentPicker";
+// import AccentPicker from "./AccentPicker";
 // import PwaRegister from "./PwaRegister";
 import PushBell from "./PushBell";
 import NotificationsMenu from "./NotificationsMenu";
@@ -242,7 +242,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     </button>
                   </SignUpButton>
                 </Show>
-                <AccentPicker />
+                {/* <AccentPicker /> */}
                 <ThemeToggle />
                 <Show when="signed-in">
                   <NotificationsMenu />
