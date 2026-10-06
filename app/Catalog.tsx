@@ -1,10 +1,5 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-
 interface Book {
   id: string;
   isbn: string;
@@ -24,6 +19,28 @@ interface Book {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
+}
+
+export default function Catalog({
+  books,
+  libraryName,
+  shareEnabled,
+  shareId,
+}: {
+  books: Book[];
+  libraryName: string;
+  shareEnabled: boolean;
+  shareId: string | null;
+}) {
+  console.log("Catalog rendering with", books.length, "books");
+  
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold">{libraryName}</h1>
+      <p>Catalog minimalista - {books.length} livros</p>
+      {books.length === 0 && <p>Nenhum livro encontrado</p>}
+    </div>
+  );
 }
 
 const statusLabels: Record<string, string> = {
