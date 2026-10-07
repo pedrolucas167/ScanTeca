@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, Smile } from "lucide-react";
+import { Send, Smile, Quote, X } from "lucide-react";
 
 const EMOJIS = ["📚", "❤️", "✨", "😍", "🤔", "😂", "👏", "☕", "🌙", "🔥"];
 
@@ -11,6 +11,11 @@ export interface TextComposerProps {
   onSubmit: (content: string) => void | Promise<void>;
   disabled?: boolean;
   compact?: boolean;
+  quotedPost?: {
+    author: string;
+    text: string;
+  } | null;
+  onCancelQuote?: () => void;
 }
 
 export function TextComposer({
@@ -19,6 +24,8 @@ export function TextComposer({
   onSubmit,
   disabled = false,
   compact = false,
+  quotedPost,
+  onCancelQuote,
 }: TextComposerProps) {
   const [value, setValue] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -57,6 +64,25 @@ export function TextComposer({
 
   return (
     <div className="relative">
+      {quotedPost && (
+        <div className="mb-2 flex items-center justify-between rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-2">
+          <div className="flex items-center gap-2 text-xs">
+            <Quote className="h-3 w-3 text-primary" />
+            <span className="font-semibold text-primary">{quotedPost.author}</span>
+            <span className="text-on-surface-variant line-clamp-1">{quotedPost.text}</span>
+          </div>
+          {onCancelQuote && (
+            <button
+              type="button"
+              onClick={onCancelQuote}
+              className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container-high"
+              aria-label="Cancelar citação"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         value={value}

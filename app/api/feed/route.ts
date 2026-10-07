@@ -10,6 +10,7 @@ const postSchema = z.object({
   content: z.string().trim().min(1).max(1000),
   bookId: z.string().cuid().optional(),
   label: z.string().trim().min(1).max(80).optional(),
+  quotedPostId: z.string().cuid().optional(),
 });
 
 function displayName(user: Awaited<ReturnType<typeof currentUser>>) {
@@ -32,6 +33,9 @@ export async function GET(request: NextRequest) {
     take: 30,
     include: {
       book: { select: { title: true, author: true, coverUrl: true } },
+      quotedPost: {
+        select: { id: true, userName: true, content: true },
+      },
       comments: {
         orderBy: { createdAt: "asc" },
         take: 10,
@@ -81,6 +85,11 @@ export async function GET(request: NextRequest) {
       label: post.label,
       text: post.content,
       imageUrl: post.imageUrl,
+      quotedPost: post.quotedPost ? {
+        id: post.quotedPost.id,
+        author: post.quotedPost.userName || "Leitor anônimo",
+        text: post.quotedPost.content,
+      } : null,
       book: post.book
         ? { title: post.book.title, author: post.book.author, cover: post.book.coverUrl }
         : undefined,
@@ -131,10 +140,16 @@ export async function POST(request: NextRequest) {
       content: parsed.data.content,
       label: parsed.data.label || "Reflexão compartilhada",
       bookId: parsed.data.bookId,
+      quotedPostId: parsed.data.quotedPostId,
       moderationStatus,
       moderationReason: moderation.reason,
     },
-    include: { book: { select: { title: true, author: true, coverUrl: true } } },
+    include: { 
+      book: { select: { title: true, author: true, coverUrl: true } },
+      quotedPost: {
+        select: { id: true, userName: true, content: true },
+      },
+    },
   });
 
   return NextResponse.json({
@@ -148,6 +163,12 @@ export async function POST(request: NextRequest) {
       time: post.createdAt.toISOString(),
       label: post.label,
       text: post.content,
+      imageUrl: post.imageUrl,
+      quotedPost: post.quotedPost ? {
+        id: post.quotedPost.id,
+        author: post.quotedPost.userName || "Leitor anônimo",
+        text: post.quotedPost.content,
+      } : null,
       book: post.book
         ? { title: post.book.title, author: post.book.author, cover: post.book.coverUrl }
         : undefined,

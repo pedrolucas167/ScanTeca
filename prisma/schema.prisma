@@ -248,6 +248,9 @@ model FeedPost {
   bookId           String?
   book             Book?            @relation(fields: [bookId], references: [id], onDelete: SetNull)
   imageUrl         String?
+  quotedPostId     String?
+  quotedPost       FeedPost?        @relation("QuotedPosts", fields: [quotedPostId], references: [id], onDelete: SetNull)
+  quotes           FeedPost[]       @relation("QuotedPosts")
   moderationStatus ModerationStatus @default(PENDING)
   moderationReason String?
   moderatedBy      String?
@@ -262,6 +265,7 @@ model FeedPost {
   @@index([userId, createdAt])
   @@index([bookId])
   @@index([moderationStatus])
+  @@index([quotedPostId])
 }
 
 model FeedComment {

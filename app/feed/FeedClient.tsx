@@ -35,6 +35,11 @@ interface FeedPost {
   label: string;
   text: string;
   imageUrl?: string | null;
+  quotedPost?: {
+    id: string;
+    author: string;
+    text: string;
+  } | null;
   book?: { title: string; author: string; cover: string | null };
   likes: number;
   liked: boolean;
@@ -53,6 +58,7 @@ export default function FeedClient() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [quotedPost, setQuotedPost] = useState<FeedPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,7 +82,10 @@ export default function FeedClient() {
       const response = await fetch("/api/feed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ 
+          content,
+          quotedPostId: quotedPost?.id,
+        }),
       });
       if (!response.ok) throw new Error("Não foi possível publicar o post.");
       const data = (await response.json()) as { post: FeedPost };
@@ -100,6 +109,7 @@ export default function FeedClient() {
       
       setPosts((current) => [data.post, ...current]);
       setImagePreview(null);
+      setQuotedPost(null);
     } catch (error) {
       if (postId) {
         // If post was created but image upload failed, delete the post
@@ -129,6 +139,14 @@ export default function FeedClient() {
 
   const removeImage = () => {
     setImagePreview(null);
+  };
+
+  const quotePost = (post: FeedPost) => {
+    setQuotedPost(post);
+  };
+
+  const cancelQuote = () => {
+    setQuotedPost(null);
   };
 
   const addComment = async (postId: string, content: string) => {
@@ -278,6 +296,8 @@ export default function FeedClient() {
             submitLabel={uploadingImage ? "Enviando..." : "Publicar"}
             onSubmit={addPost}
             disabled={uploadingImage}
+            quotedPost={quotedPost ? { author: quotedPost.author, text: quotedPost.text } : null}
+            onCancelQuote={cancelQuote}
           />
         </section>
 
@@ -330,6 +350,16 @@ export default function FeedClient() {
                 </div>
 
                 <p className="my-4 text-sm leading-6 text-on-surface">{post.text}</p>
+
+                {post.quotedPost && (
+                  <div className="mb-4 rounded-xl border-l-4 border-primary bg-surface-container-low px-4 py-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Quote className="h-3 w-3 text-primary" />
+                      <span className="text-xs font-semibold text-primary">{post.quotedPost.author}</span>
+                    </div>
+                    <p className="text-sm text-on-surface-variant line-clamp-3">{post.quotedPost.text}</p>
+                  </div>
+                )}
 
                 {post.imageUrl && (
                   <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant/20">
@@ -389,7 +419,11 @@ export default function FeedClient() {
                       <Bookmark className="h-4 w-4" fill={isSaved ? "currentColor" : "none"} />
                     </button>
                   </div>
-                  <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-primary hover:bg-primary-container/20">
+                  <button 
+                    type="button" 
+                    onClick={() => quotePost(post)}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-primary hover:bg-primary-container/20"
+                  >
                     <Quote className="h-4 w-4" />
                     Citar
                   </button>
