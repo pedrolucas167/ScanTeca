@@ -336,7 +336,7 @@ export default function FeedClient() {
                     <div 
                       className="relative h-64 w-full cursor-pointer"
                       onClick={() => {
-                        setLightboxImage(post.imageUrl);
+                        setLightboxImage(post.imageUrl || null);
                         setLightboxOpen(true);
                       }}
                     >
