@@ -61,7 +61,15 @@ Seja estrito mas justo. Conteúdo sobre livros, leitura e reflexões literárias
     }
 
     const data = await response.json();
-    const result = JSON.parse(data.choices[0].message.content);
+    const rawContent = data.choices[0].message.content;
+    
+    // Remove markdown code blocks if present
+    const cleanedContent = rawContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    console.log("[moderation] Raw response:", rawContent);
+    console.log("[moderation] Cleaned response:", cleanedContent);
+    
+    const result = JSON.parse(cleanedContent);
 
     return {
       approved: result.approved ?? true,
@@ -71,6 +79,7 @@ Seja estrito mas justo. Conteúdo sobre livros, leitura e reflexões literárias
     };
   } catch (error) {
     console.error("[moderation] Error:", error);
+    console.error("[moderation] Error details:", error instanceof Error ? error.message : String(error));
     return { approved: true, flagged: false }; // Fail-safe: aprova em caso de erro
   }
 }
