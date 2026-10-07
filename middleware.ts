@@ -1,17 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher(["/scanner(.*)", "/api/scan(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  console.log("Middleware: pathname =", req.nextUrl.pathname);
-  
-  // TEMPORARY: Removed redirect to test if it's causing the loop
-  // if (req.nextUrl.pathname === "/catalogo") {
-  //   console.log("Middleware: redirecting /catalogo to /");
-  //   return NextResponse.redirect(new URL("/", req.url));
-  // }
-  
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
