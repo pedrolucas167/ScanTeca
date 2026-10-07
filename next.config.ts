@@ -35,6 +35,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "img.clerk.com",
       },
+      {
+        protocol: "https",
+        hostname: "scanteca-avatars-343212497955-sa-east-1-an.s3.sa-east-1.amazonaws.com",
+      },
     ],
   },
   async redirects() {
