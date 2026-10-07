@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
       time: post.createdAt.toISOString(),
       label: post.label,
       text: post.content,
+      imageUrl: post.imageUrl,
       book: post.book
         ? { title: post.book.title, author: post.book.author, cover: post.book.coverUrl }
         : undefined,
