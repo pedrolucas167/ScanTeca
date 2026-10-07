@@ -248,15 +248,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   <NotificationsMenu />
                   <PushBell />
                   <AdminLink />
-                  <UserButton>
-                    <UserButton.MenuItems>
-                      <UserButton.Link
-                        label="Configurações"
-                        href="/configuracoes"
-                        labelIcon={<Settings className="h-4 w-4" />}
-                      />
-                    </UserButton.MenuItems>
-                  </UserButton>
+                  <UserButton />
                 </Show>
                 <MobileNav />
               </div>
