@@ -13,6 +13,7 @@ O projeto é uma **PWA** em português do Brasil. O manifesto define instalaçã
 - Recomendações e feedback de livros.
 - Oráculo com chat, sessões, artefatos, voz, TTS e memória do acervo.
 - Compartilhamento público da biblioteca e avaliações.
+- Feed social com posts, imagens, citações, comentários, reações e salvos.
 - Notificações Web Push, lembretes de leitura e broadcasts administrativos.
 - Tema claro/escuro, temas de destaque e instalação como aplicativo.
 
@@ -39,6 +40,7 @@ O projeto é uma **PWA** em português do Brasil. O manifesto define instalaçã
 - **ZXing** e **jsQR** para leitura de códigos de barras.
 - **Google Books**, **Open Library** e **Wikimedia/Wikipedia** para metadados, capas e sinopses.
 - **OpenRouter** para o Oráculo, embeddings e síntese de voz.
+- **AWS S3** e **CloudFront** para armazenamento e CDN de imagens do feed.
 - **Web Push** com chaves VAPID para notificações no navegador.
 - **Vercel Cron** para lembretes diários de leitura.
 
@@ -233,3 +235,78 @@ Threshold configurável (padrão: 0.3) descarta resultados irrelevantes antes do
 - **Latência**: -30% para queries simples (routing)
 - **Precisão**: +20% em metadata filtering (NLP vs string)
 - **Tokens**: -15% no LLM final (reranking descarta irrelevante)
+
+## Feed Social
+
+O feed social permite que usuários compartilhem reflexões, imagens e citações de livros, com interações como comentários, reações e salvos.
+
+### Arquitetura
+
+```
+Client (FeedClient.tsx)
+    ↓ POST /api/feed
+[API Route] - Cria post com moderação
+    ├─→ Moderation API (OpenRouter)
+    ├─→ Prisma (FeedPost)
+    └─→ S3 Upload (se imagem)
+           ↓
+[CloudFront CDN] - Entrega de imagens
+    ↓
+Client - Renderiza posts com interações
+```
+
+### Componentes
+
+#### 1. API Routes
+
+- **POST /api/feed** - Cria posts com moderação de conteúdo
+- **GET /api/feed** - Busca posts com filtros (bloqueio, visibilidade, moderação)
+- **POST /api/feed/image** - Upload de imagens para S3
+- **POST /api/feed/{id}/comments** - Adiciona comentários
+- **POST /api/feed/{id}/reactions** - Adiciona/remove reações
+- **POST /api/feed/{id}/bookmarks** - Salva/remove posts
+- **DELETE /api/feed/{id}** - Deleta posts (próprios ou admin)
+
+#### 2. Moderação de Conteúdo
+
+- **API**: OpenRouter com modelo de moderação
+- **Status**: PENDING, APPROVED, FLAGGED, REJECTED
+- **Lógica**: Posts são marcados como PENDING, aprovados automaticamente em caso de erro
+- **Admin**: Interface para revisar posts FLAGGED
+
+#### 3. Armazenamento de Imagens
+
+- **S3 Bucket**: `scanteca-avatars-343212497955-sa-east-1-an`
+- **CloudFront CDN**: `d3ip9st4yxztrt.cloudfront.net`
+- **IAM User**: `scanteca-s3-upload` com permissões s3:PutObject, s3:GetObject, s3:DeleteObject
+- **Bucket Policy**: Leitura pública para Next.js Image optimization
+- **Cache**: 1 ano (max-age=31536000)
+
+#### 4. Citações (Quotes)
+
+- **Relação**: Self-referência em FeedPost (`quotedPostId`)
+- **UI**: Botão "Citar" adiciona post ao composer
+- **Exibição**: Posts citados mostrados com borda lateral e ícone
+
+#### 5. Interações
+
+- **Comentários**: Thread de comentários por post
+- **Reações**: Like/unlike (um por usuário por post)
+- **Salvos**: Bookmark de posts para acesso rápido
+- **Bloqueio**: Usuários podem bloquear outros (não veem posts)
+
+### Segurança
+
+- **Rate Limiting**: Upstash Redis por endpoint
+- **Moderation**: API externa para conteúdo impróprio
+- **Visibility**: PUBLIC, FOLLOWERS, PRIVATE (via SocialProfile)
+- **Block**: SocialBlock para filtrar conteúdo
+
+### Arquivos da Implementação
+
+- `app/api/feed/route.ts` - API principal do feed
+- `app/api/feed/image/route.ts` - Upload de imagens
+- `app/feed/FeedClient.tsx` - Componente cliente do feed
+- `app/feed/TextComposer.tsx` - Composer de posts com citações
+- `lib/moderation.ts` - Moderação de conteúdo
+- `lib/s3.ts` - Cliente S3/CloudFront

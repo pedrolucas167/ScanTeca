@@ -9,6 +9,7 @@ const s3Client = new S3Client({
 });
 
 const BUCKET_NAME = process.env.AWS_S3_BUCKET || "scanteca-avatars-343212497955-sa-east-1-an";
+const CLOUDFRONT_DOMAIN = process.env.AWS_CLOUDFRONT_DOMAIN || "d3ip9st4yxztrt.cloudfront.net";
 
 export async function uploadFeedImage(
   userId: string,
@@ -30,7 +31,7 @@ export async function uploadFeedImage(
 
   await s3Client.send(command);
 
-  return `https://${BUCKET_NAME}.s3.sa-east-1.amazonaws.com/${key}`;
+  return `https://${CLOUDFRONT_DOMAIN}/${key}`;
 }
 
 export async function deleteFeedImage(url: string | null): Promise<void> {
