@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
 import {
   Bookmark,
   CheckCircle2,
@@ -49,6 +51,8 @@ export default function FeedClient() {
   const [error, setError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -329,7 +333,13 @@ export default function FeedClient() {
 
                 {post.imageUrl && (
                   <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant/20">
-                    <div className="relative h-64 w-full">
+                    <div 
+                      className="relative h-64 w-full cursor-pointer"
+                      onClick={() => {
+                        setLightboxImage(post.imageUrl);
+                        setLightboxOpen(true);
+                      }}
+                    >
                       <Image src={post.imageUrl} alt="Imagem do post" fill className="object-cover" />
                     </div>
                   </div>
@@ -416,6 +426,14 @@ export default function FeedClient() {
           O feed social é o primeiro passo do roadmap da comunidade.
         </div>
       </div>
+
+      {lightboxOpen && lightboxImage && (
+        <Lightbox
+          open={lightboxOpen}
+          close={() => setLightboxOpen(false)}
+          slides={[{ src: lightboxImage }]}
+        />
+      )}
     </main>
   );
 }
