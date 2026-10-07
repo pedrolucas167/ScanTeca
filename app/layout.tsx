@@ -15,8 +15,7 @@ import { prisma } from "@/lib/prisma";
 import ThemeToggle from "./ThemeToggle";
 import AccentPicker from "./AccentPicker";
 import PwaRegister from "./PwaRegister";
-import PushBell from "./PushBell";
-import NotificationsMenu from "./NotificationsMenu";
+import UnifiedNotifications from "./UnifiedNotifications";
 import PushOptIn from "./PushOptIn";
 import InstallPrompt from "./InstallPrompt";
 import AdminLink from "./AdminLink";
@@ -245,8 +244,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <AccentPicker />
                 <ThemeToggle />
                 <Show when="signed-in">
-                  <NotificationsMenu />
-                  <PushBell />
+                  <UnifiedNotifications />
                   <AdminLink />
                   <UserButton />
                 </Show>
