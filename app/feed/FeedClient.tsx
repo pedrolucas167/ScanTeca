@@ -364,18 +364,17 @@ export default function FeedClient() {
                 {post.imageUrl && (
                   <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant/20">
                     <div 
-                      className="relative w-full cursor-pointer"
+                      className="relative h-96 w-full cursor-pointer"
                       onClick={() => {
                         setLightboxImage(post.imageUrl || null);
                         setLightboxOpen(true);
                       }}
-                      style={{ maxHeight: '512px' }}
                     >
                       <Image 
                         src={post.imageUrl} 
                         alt="Imagem do post" 
                         fill 
-                        className="object-contain"
+                        className="object-cover"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
                     </div>
