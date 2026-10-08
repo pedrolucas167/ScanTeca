@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+// Next.js configuration for image optimization and redirects
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
