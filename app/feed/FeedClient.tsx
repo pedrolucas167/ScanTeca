@@ -384,9 +384,9 @@ export default function FeedClient() {
                 {post.book && (
                   <div className="mb-4 flex gap-3 rounded-xl border border-outline-variant/20 bg-surface-container p-3">
                     {post.book.cover ? (
-                      <Image src={post.book.cover} alt={`Capa de ${post.book.title}`} width={56} height={80} className="h-20 w-14 rounded object-cover" />
+                      <Image src={post.book.cover} alt={`Capa de ${post.book.title}`} width={64} height={96} className="h-24 w-16 rounded object-contain" />
                     ) : (
-                      <div className="flex h-20 w-14 items-center justify-center rounded bg-surface-container-high text-xl">📖</div>
+                      <div className="flex h-24 w-16 items-center justify-center rounded bg-surface-container-high text-xl">📖</div>
                     )}
                     <div className="flex min-w-0 flex-col justify-center">
                       <span className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
