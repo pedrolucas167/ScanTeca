@@ -2,26 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-
-/* Material Symbols — helper pra ligaduras do icon font do design Stitch */
-function Icon({
-  name,
-  className = "",
-  fill = false,
-}: {
-  name: string;
-  className?: string;
-  fill?: boolean;
-}) {
-  return (
-    <span
-      className={`material-symbols-outlined ${className}`}
-      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
-    >
-      {name}
-    </span>
-  );
-}
+import { Icon } from "@/components/ui/Icon";
 
 const QUOTES = [
   {

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
+import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, type OracleMode } from "@/lib/constants/oracle";
 
 interface Source {
   id: string;
@@ -70,25 +71,6 @@ function Icon({
     </span>
   );
 }
-
-const DEFAULT_SUGGESTIONS = [
-  "O que ler num fim de semana chuvoso?",
-  "Livros sobre viagens no tempo",
-  "Volume mais antigo do acervo?",
-  "+500 páginas não lidas",
-];
-
-const ORACLE_MODES = [
-  { id: "RECOMMEND", label: "Recomendar", icon: "recommend" },
-  { id: "EXPLORE", label: "Explorar", icon: "travel_explore" },
-  { id: "COMPARE", label: "Comparar", icon: "compare_arrows" },
-  { id: "JOURNEY", label: "Jornada", icon: "hiking" },
-  { id: "CURATE", label: "Curadoria", icon: "collections_bookmark" },
-  { id: "LOCATE", label: "Localizar", icon: "route" },
-  { id: "ASSISTANT", label: "Assistente", icon: "support_agent" },
-] as const;
-
-type OracleMode = (typeof ORACLE_MODES)[number]["id"];
 
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -168,73 +150,6 @@ export default function OraclePage() {
   const receivedAnyRef = useRef(false);
   const wasLoadingRef = useRef(false);
 
-  const releaseAutoScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el || !stickToBottomRef.current) return;
-    stickToBottomRef.current = false;
-    // Cancela qualquer smooth scroll ainda em andamento para devolver o
-    // controle imediatamente ao gesto do usuário.
-    el.scrollTo({ top: el.scrollTop, behavior: "auto" });
-    setShowJumpDown(true);
-  }, []);
-
-  // Só segue o fim da conversa se o usuário já estiver perto do fundo —
-  // se ele subiu para ler, o stream não arrasta a tela de volta.
-  // Threshold de 200px para ser mais tolerante com pequenas rolagens
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const nearBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - 200;
-      stickToBottomRef.current = nearBottom;
-      setShowJumpDown(!nearBottom);
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Rascunho persiste entre navegações; limpa sozinho ao enviar (input volta a "").
-  // A restauração acontece após a montagem para não quebrar a hidratação —
-  // o SSR não conhece sessionStorage.
-  useEffect(() => {
-    const draft = sessionStorage.getItem("oracle:draft");
-    if (!draft) return;
-    const t = setTimeout(() => setInput((prev) => prev || draft), 0);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (input) sessionStorage.setItem("oracle:draft", input);
-    else sessionStorage.removeItem("oracle:draft");
-  }, [input]);
-
-  useEffect(() => {
-    if (!stickToBottomRef.current) return;
-    const startedLoading = loading && !wasLoadingRef.current;
-    wasLoadingRef.current = loading;
-    // Desliza até a nova resposta uma vez; depois acompanha o stream sem
-    // interromper a animação a cada caractere revelado.
-    // Usa 'auto' durante streaming para evitar jitter visual
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: startedLoading ? "smooth" : "auto",
-    });
-  }, [messages, loading]);
-
-  useEffect(() => {
-    playbackRateRef.current = playbackRate;
-    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
-    localStorage.setItem("oraclePlaybackRate", playbackRate.toString());
-  }, [playbackRate]);
-
-  useEffect(() => {
-    return () => {
-      mediaRecorderRef.current?.stop();
-      audioRef.current?.pause();
-    };
-  }, []);
-
   useEffect(() => {
     fetch("/api/oracle")
       .then((res) => (res.ok ? res.json() : null))
@@ -269,148 +184,6 @@ export default function OraclePage() {
       .catch(() => {});
   }, []);
 
-  const stopAudio = () => {
-    audioQueueRef.current = [];
-    ttsBufferRef.current = "";
-    audioDoneRef.current?.();
-    audioDoneRef.current = null;
-    audioRef.current?.pause();
-    audioRef.current = null;
-    audioPlayingRef.current = false;
-    setPlayingTtsIndex(null);
-  };
-
-  const enqueueSpeech = (text: string) => {
-    const clean = text.replace(/[*_#`>]/g, "").trim();
-    if (!clean) return;
-    const p = fetch("/api/oracle/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: clean }),
-    })
-      .then((r) => (r.ok ? r.blob() : null))
-      .catch(() => null);
-    audioQueueRef.current.push(p);
-    void drainAudioQueue();
-  };
-
-  const drainAudioQueue = async () => {
-    if (audioPlayingRef.current) return;
-    audioPlayingRef.current = true;
-    while (audioQueueRef.current.length > 0) {
-      const blob = await audioQueueRef.current.shift()!;
-      if (!blob || blob.size === 0) continue;
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.playbackRate = playbackRateRef.current;
-      audioRef.current = audio;
-      await new Promise<void>((resolve) => {
-        audioDoneRef.current = resolve;
-        const done = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio.onended = done;
-        audio.onerror = done;
-        audio.play().catch(done);
-      });
-      audioDoneRef.current = null;
-      audioRef.current = null;
-    }
-    audioPlayingRef.current = false;
-    maybeAutoListen();
-  };
-
-  const maybeAutoListen = () => {
-    if (
-      voiceOnRef.current &&
-      micSupported &&
-      streamDoneRef.current &&
-      !mediaRecorderRef.current &&
-      !micBusyRef.current &&
-      !audioPlayingRef.current &&
-      audioQueueRef.current.length === 0
-    ) {
-      void handleMic();
-    }
-  };
-
-  const feedTts = (chunk: string, flush = false) => {
-    ttsBufferRef.current += chunk;
-    const re = /[^.!?…\n]+[.!?…]+|[^\n]+\n/g;
-    let consumed = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(ttsBufferRef.current)) !== null) {
-      if (m[0].trim()) enqueueSpeech(m[0]);
-      consumed = re.lastIndex;
-    }
-    ttsBufferRef.current = ttsBufferRef.current.slice(consumed);
-    if (flush) {
-      const tail = ttsBufferRef.current.trim();
-      if (tail) enqueueSpeech(tail);
-      ttsBufferRef.current = "";
-    }
-  };
-
-  // Reveal cadenciado: o stream chega em bursts de rede; o texto aparece em
-  // ritmo constante (estilo ChatGPT) em vez de blocos irregulares.
-  const pumpReveal = () => {
-    if (revealTimerRef.current !== null) return;
-    revealTimerRef.current = window.setInterval(() => {
-      const pending = pendingCharsRef.current;
-      if (!pending) {
-        if (streamDoneRef.current) {
-          window.clearInterval(revealTimerRef.current!);
-          revealTimerRef.current = null;
-          revealDoneRef.current?.();
-          revealDoneRef.current = null;
-        }
-        return;
-      }
-      // Mantém uma cadência estável mesmo quando a rede entrega a resposta
-      // inteira em um único burst.
-      // Com prefers-reduced-motion o texto aparece de uma vez, sem typewriter.
-      const n = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? pending.length
-        : Math.min(pending.length, Math.max(2, Math.min(6, Math.ceil(pending.length / 80))));
-      const slice = pending.slice(0, n);
-      pendingCharsRef.current = pending.slice(n);
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last) {
-          updated[updated.length - 1] = {
-            ...last,
-            content: last.content + slice,
-          };
-        }
-        return updated;
-      });
-    }, 24);
-  };
-
-  const queueReveal = (text: string) => {
-    receivedAnyRef.current = true;
-    pendingCharsRef.current += text;
-    pumpReveal();
-  };
-
-  const drainReveal = () =>
-    new Promise<void>((resolve) => {
-      if (!pendingCharsRef.current) return resolve();
-      revealDoneRef.current = resolve;
-    });
-
-  const stopReveal = () => {
-    if (revealTimerRef.current !== null) {
-      window.clearInterval(revealTimerRef.current);
-      revealTimerRef.current = null;
-    }
-    pendingCharsRef.current = "";
-    revealDoneRef.current?.();
-    revealDoneRef.current = null;
-  };
-
   const speak = async (text: string, index: number) => {
     try {
       stopAudio();
@@ -427,13 +200,12 @@ export default function OraclePage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      audio.playbackRate = playbackRateRef.current;
+      audio.playbackRate = playbackRate;
       audioRef.current = audio;
       audio.onended = () => {
         URL.revokeObjectURL(url);
         audioRef.current = null;
         setPlayingTtsIndex(null);
-        maybeAutoListen();
       };
       audio.onerror = () => {
         URL.revokeObjectURL(url);
@@ -1143,7 +915,7 @@ export default function OraclePage() {
   };
 
   const activeSuggestions =
-    suggestions.length > 0 ? suggestions : DEFAULT_SUGGESTIONS;
+    suggestions.length > 0 ? suggestions : ORACLE_DEFAULT_SUGGESTIONS;
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col bg-surface text-on-surface">

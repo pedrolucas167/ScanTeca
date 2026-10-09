@@ -4,6 +4,9 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/ui/Icon";
+import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES_STITCH } from "@/lib/constants/book-status";
+import { LITERARY_QUOTES } from "@/lib/constants/literary-quotes";
 
 interface Book {
   id: string;
@@ -26,20 +29,6 @@ interface Book {
   userId: string;
 }
 
-const statusLabels: Record<string, string> = {
-  READ: "Lido",
-  READING: "Lendo",
-  TO_READ: "A ler",
-  WISHLIST: "Desejo",
-};
-
-const statusClasses: Record<string, string> = {
-  READ: "bg-primary-container text-on-primary-container",
-  READING: "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40",
-  TO_READ: "bg-amber-950/80 text-amber-300 border border-amber-500/40",
-  WISHLIST: "bg-secondary-container/30 text-secondary",
-};
-
 const isKnownAuthor = (author: string | null | undefined) => {
   if (!author) return false;
   const a = author.trim().toLowerCase();
@@ -49,36 +38,6 @@ const isKnownAuthor = (author: string | null | undefined) => {
     a !== "[author not identified]"
   );
 };
-
-const literaryQuotes = [
-  { text: "Sempre imaginei que o paraíso fosse uma espécie de biblioteca.", author: "Jorge Luis Borges" },
-  { text: "Um quarto sem livros é como um corpo sem alma.", author: "Cícero" },
-  { text: "A leitura de todos os bons livros é uma conversação com as mais honestas pessoas dos séculos passados.", author: "Descartes" },
-  { text: "Há livros escritos para evitar espaços vazios na estante.", author: "Carlos Drummond de Andrade" },
-  { text: "Um leitor vive mil vidas antes de morrer. O homem que nunca lê vive apenas uma.", author: "George R. R. Martin" },
-  { text: "A vida é a arte do encontro, embora haja tanto desencontro pela vida.", author: "Vinicius de Moraes" },
-  { text: "Ler é sonhar acordado.", author: "Anônimo" },
-  { text: "Os livros são os mais quietos e constantes dos amigos.", author: "Charles W. Eliot" },
-];
-
-function Icon({
-  name,
-  className = "",
-  fill = false,
-}: {
-  name: string;
-  className?: string;
-  fill?: boolean;
-}) {
-  return (
-    <span
-      className={`material-symbols-outlined ${className}`}
-      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
-    >
-      {name}
-    </span>
-  );
-}
 
 function QuickFilterChip({
   label,
@@ -168,9 +127,9 @@ function BookShelfCover({
             </div>
           )}
           <span
-            className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${statusClasses[book.status]}`}
+            className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${BOOK_STATUS_CLASSES_STITCH[book.status]}`}
           >
-            {statusLabels[book.status]}
+            {BOOK_STATUS_LABELS[book.status]}
           </span>
         </div>
       </Link>
@@ -240,8 +199,8 @@ export default function Catalog({
   const [showFilters, setShowFilters] = useState(false);
   const [now] = useState(() => Date.now());
 
-  const quote = literaryQuotes[
-    Math.floor(now / (1000 * 60 * 60 * 24)) % literaryQuotes.length
+  const quote = LITERARY_QUOTES[
+    Math.floor(now / (1000 * 60 * 60 * 24)) % LITERARY_QUOTES.length
   ];
 
   const activeFiltersCount =
