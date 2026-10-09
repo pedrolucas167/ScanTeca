@@ -7,27 +7,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES_STITCH } from "@/lib/constants/book-status";
 import { LITERARY_QUOTES } from "@/lib/constants/literary-quotes";
-
-interface Book {
-  id: string;
-  isbn: string;
-  title: string;
-  author: string;
-  publishedDate: string | null;
-  synopsis: string | null;
-  coverUrl: string | null;
-  status: "READ" | "READING" | "TO_READ" | "WISHLIST";
-  currentPage: number | null;
-  collection: string;
-  notes: string | null;
-  rating: number | null;
-  genre: string | null;
-  pages: number | null;
-  customOrder: number | null;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-}
+import type { Book } from "@/lib/types/book";
 
 const isKnownAuthor = (author: string | null | undefined) => {
   if (!author) return false;

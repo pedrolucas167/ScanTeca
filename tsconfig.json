@@ -23,7 +23,13 @@
     },
     "types": [
       "node"
-    ]
+    ],
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": [
     "next-env.d.ts",
