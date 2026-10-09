@@ -22,6 +22,7 @@ interface Message {
   content: string;
   sources?: Source[];
   retrievalStats?: RetrievalStats;
+  citations?: number[];
 }
 
 interface RetrievalStats {
@@ -519,6 +520,16 @@ export default function OraclePage() {
               updated[updated.length - 1] = {
                 ...updated[updated.length - 1],
                 retrievalStats: json.retrievalStats,
+              };
+              return updated;
+            });
+          }
+          if (json.citations) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                citations: json.citations,
               };
               return updated;
             });
@@ -1568,7 +1579,7 @@ export default function OraclePage() {
                       aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
                       className="transition-opacity duration-300 min-h-[100px]"
                     >
-                      <Markdown content={msg.content} />
+                      <Markdown content={msg.content} sources={msg.sources} citations={msg.citations} />
                       {loading && i === messages.length - 1 && (
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
                       )}

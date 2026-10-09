@@ -1,10 +1,29 @@
 import type { ReactNode } from "react";
 
+interface Source {
+  id: string;
+  title: string;
+  author: string;
+  status?: string;
+  genre?: string | null;
+  relevance?: number | null;
+  matchedBy?: string;
+  evidence?: string | null;
+  sourceType?: "book" | "diary" | "review";
+  external?: boolean;
+}
+
+interface MarkdownProps {
+  content: string;
+  sources?: Source[];
+  citations?: number[];
+}
+
 /**
  * Renderer de Markdown leve para as respostas do Oráculo.
  * Suporta: parágrafos, títulos (#/##/###), listas (-/* e 1.), citações (>),
  * separadores (---), blocos de código (```), e inline: **negrito**, *itálico*,
- * `código`. Tolerante a markdown incompleto durante o streaming.
+ * `código`, e citações [1], [2]. Tolerante a markdown incompleto durante o streaming.
  */
 
 type Block =
@@ -112,9 +131,9 @@ function parseBlocks(content: string): Block[] {
   return blocks;
 }
 
-const INLINE_RE = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`)/g;
+const INLINE_RE = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`|\[\d+\])/g;
 
-function renderInline(text: string): ReactNode[] {
+function renderInline(text: string, sources?: Source[], citations?: number[]): ReactNode[] {
   const parts = text.split(INLINE_RE);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
@@ -137,6 +156,22 @@ function renderInline(text: string): ReactNode[] {
         </code>
       );
     }
+    // Handle citations [1], [2], etc.
+    if (part.startsWith("[") && part.endsWith("]") && /^\[\d+\]$/.test(part)) {
+      const citationNum = parseInt(part.slice(1, -1), 10);
+      const source = sources?.[citationNum - 1];
+      if (source) {
+        return (
+          <sup
+            key={i}
+            className="ml-0.5 cursor-pointer rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
+            title={`${source.title} — ${source.author}`}
+          >
+            {citationNum}
+          </sup>
+        );
+      }
+    }
     return part;
   });
 }
@@ -147,7 +182,7 @@ const HEADING_CLASS: Record<number, string> = {
   3: "mt-3 mb-1.5 text-base font-semibold uppercase tracking-wide text-primary first:mt-0",
 };
 
-export default function Markdown({ content }: { content: string }) {
+export default function Markdown({ content, sources, citations }: MarkdownProps) {
   const blocks = parseBlocks(content);
 
   return (
@@ -167,7 +202,7 @@ export default function Markdown({ content }: { content: string }) {
             const Tag = `h${Math.min(block.level + 2, 6)}` as "h3" | "h4" | "h5";
             return (
               <Tag key={i} className={HEADING_CLASS[block.level]}>
-                {renderInline(block.text)}
+                {renderInline(block.text, sources, citations)}
               </Tag>
             );
           }
@@ -178,13 +213,13 @@ export default function Markdown({ content }: { content: string }) {
                 className="my-2 border-l-2 border-primary/50 pl-3 italic text-on-surface-variant"
               >
                 {block.lines.map((l, j) => (
-                  <p key={j}>{renderInline(l)}</p>
+                  <p key={j}>{renderInline(l, sources, citations)}</p>
                 ))}
               </blockquote>
             );
           case "list": {
             const items = block.items.map((item, j) => (
-              <li key={j}>{renderInline(item)}</li>
+              <li key={j}>{renderInline(item, sources, citations)}</li>
             ));
             return block.ordered ? (
               <ol key={i} className="my-2 list-decimal space-y-1 pl-5">
@@ -203,7 +238,7 @@ export default function Markdown({ content }: { content: string }) {
           case "paragraph":
             return (
               <p key={i} className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0 text-base">
-                {renderInline(block.text)}
+                {renderInline(block.text, sources, citations)}
               </p>
             );
         }

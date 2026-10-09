@@ -891,6 +891,12 @@ REGRAS CRÍTICAS PARA EVITAR ALUCINAÇÕES:
 - Se a evidência for insuficiente, diga honestamente que não sabe; não preencha lacunas com conhecimento geral
 - Se a pergunta for sobre um livro não listado, diga que não tem informações sobre ele no acervo
 
+FORMATAÇÃO DE CITAÇÕES:
+- Quando mencionar informações específicas de uma fonte, inclua o número da fonte entre colchetes, ex: [1], [2]
+- Use citações quando mencionar: sinopses, autores específicos, datas de publicação, gêneros, avaliações, ou conteúdo do diário
+- Não precisa citar informações genéricas ou常识 literária
+- As fontes são numeradas na ordem em que aparecem no contexto
+
 Modo atual: ${mode}.
 Instrução específica: ${modeInstructions[mode]}
 ${scope === "all" ? "\nEscopo ampliado: você pode sugerir livros fora do acervo — eles aparecem marcados como [FORA DO ACERVO] no contexto. Deixe claro ao leitor quando uma sugestão não está na estante dele." : ""}
@@ -1054,6 +1060,17 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           encoder.encode(`data: ${JSON.stringify({ retrievalStats })}\n\n`)
         );
 
+        // Extract citations from the response text
+        const extractCitations = (text: string): number[] => {
+          const citationRegex = /\[(\d+)\]/g;
+          const citations = new Set<number>();
+          let match;
+          while ((match = citationRegex.exec(text)) !== null) {
+            citations.add(parseInt(match[1], 10));
+          }
+          return Array.from(citations).sort((a, b) => a - b);
+        };
+
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -1084,8 +1101,14 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             if (!quality.valid) {
               console.warn("[oracle] response rejected:", quality.reason);
             }
+
+            // Extract and send citations
+            const citations = extractCitations(outputText);
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
+            );
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ citations })}\n\n`)
             );
             const persist: Promise<unknown>[] = [];
             if (quality.valid) {
