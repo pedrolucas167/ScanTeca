@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { TextComposer } from "./TextComposer";
-import BookPagesLoader from "@/components/BookPagesLoader";
+import BookLoader from "@/components/BookPagesLoader";
 
 interface Comment {
   id: string;
@@ -312,8 +312,7 @@ export default function FeedClient() {
         <div className="space-y-5">
           {loading && (
             <div className="flex flex-col items-center justify-center py-12">
-              <BookPagesLoader size="lg" />
-              <p className="mt-4 text-sm text-on-surface-variant">Carregando a rede...</p>
+              <BookLoader size={150} label="Carregando a rede..." />
             </div>
           )}
           {error && <p className="rounded-xl border border-error/30 bg-error-container/20 p-4 text-sm text-error">{error}</p>}
