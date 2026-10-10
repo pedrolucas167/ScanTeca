@@ -12,16 +12,16 @@ import { auth } from "@clerk/nextjs/server";
 import { unstable_cache } from "next/cache";
 import { BookOpen, Heart, Settings, Sparkles, ChevronDown } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import ThemeToggle from "./ThemeToggle";
-import AccentPicker from "./AccentPicker";
-import PwaRegister from "./PwaRegister";
-import UnifiedNotifications from "./UnifiedNotifications";
-import PushOptIn from "./PushOptIn";
-import InstallPrompt from "./InstallPrompt";
-import AdminLink from "./AdminLink";
-import MobileNav from "./MobileNav";
-import RoutePrefetch from "./RoutePrefetch";
-import WebVitals from "./WebVitals";
+import ThemeToggle from "@/components/ui/ThemeToggle";
+import AccentPicker from "@/components/ui/AccentPicker";
+import PwaRegister from "@/components/ui/PwaRegister";
+import UnifiedNotifications from "@/components/ui/UnifiedNotifications";
+import PushOptIn from "@/components/ui/PushOptIn";
+import InstallPrompt from "@/components/ui/InstallPrompt";
+import AdminLink from "@/components/ui/AdminLink";
+import MobileNav from "@/components/ui/MobileNav";
+import RoutePrefetch from "@/components/ui/RoutePrefetch";
+import WebVitals from "@/components/ui/WebVitals";
 import "./globals.css";
 
 const geistSans = Geist({
