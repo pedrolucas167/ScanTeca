@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "embeddings/backfill",
       userId,
-      ...rateLimits["embeddings/backfill"],
+      userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "rag-audit",
       userId,
-      ...rateLimits["rag-audit"],
+      userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
 import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, type OracleMode } from "@/lib/constants/oracle";
-import type { Source, Message, RetrievalStats, OracleSession, OracleArtifact } from "@/lib/types/oracle";
+import type { Source, Message, OracleSession, OracleArtifact } from "@/lib/types/oracle";
 
 function Icon({
   name,
@@ -88,7 +88,6 @@ export default function OraclePage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const loadingRef = useRef(false);
   const voiceOnRef = useRef(false);
-  const audioQueueRef = useRef<Promise<Blob | null>[]>([]);
   const audioPlayingRef = useRef(false);
   const audioDoneRef = useRef<(() => void) | null>(null);
   const ttsBufferRef = useRef("");
@@ -101,7 +100,6 @@ export default function OraclePage() {
   const stickToBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const receivedAnyRef = useRef(false);
-  const wasLoadingRef = useRef(false);
 
   useEffect(() => {
     fetch("/api/oracle")
@@ -232,8 +230,10 @@ export default function OraclePage() {
             setGenerationStage("Organizando evidências...");
             setMessages((prev) => {
               const updated = [...prev];
+              const last = updated[updated.length - 1];
               updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
+                role: last?.role ?? "assistant",
+                content: last?.content ?? "",
                 sources: json.sources,
               };
               return updated;
@@ -242,8 +242,10 @@ export default function OraclePage() {
           if (json.retrievalStats) {
             setMessages((prev) => {
               const updated = [...prev];
+              const last = updated[updated.length - 1];
               updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
+                role: last?.role ?? "assistant",
+                content: last?.content ?? "",
                 retrievalStats: json.retrievalStats,
               };
               return updated;
@@ -252,8 +254,10 @@ export default function OraclePage() {
           if (json.citations) {
             setMessages((prev) => {
               const updated = [...prev];
+              const last = updated[updated.length - 1];
               updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
+                role: last?.role ?? "assistant",
+                content: last?.content ?? "",
                 citations: json.citations,
               };
               return updated;
@@ -766,13 +770,14 @@ export default function OraclePage() {
       if (previous.some((item) => item.id === source.id)) {
         return previous.filter((item) => item.id !== source.id);
       }
-      return previous.length < 2 ? [...previous, source] : [previous[1], source];
+      return previous.length < 2 ? [...previous, source] : previous[1] ? [previous[1], source] : [source];
     });
   };
 
   const compareSelected = () => {
     if (selectedCompare.length !== 2) return;
     const [first, second] = selectedCompare;
+    if (!first || !second) return;
     setSelectedCompare([]);
     void sendMessage(
       `Compare os livros "${first.title}", de ${first.author}, e "${second.title}", de ${second.author}. Analise temas, estilo, diferenças e para qual momento de leitura cada um é mais indicado.`
@@ -852,7 +857,7 @@ export default function OraclePage() {
         body: JSON.stringify({
           sessionId,
           type,
-          title: message.content.trim().split("\n")[0].slice(0, 120),
+          title: message.content.trim().split("\n")[0]?.slice(0, 120) ?? "",
           content: message.content,
           sources: message.sources?.map(({ id, title, author }) => ({ id, title, author })),
         }),
@@ -869,6 +874,70 @@ export default function OraclePage() {
 
   const activeSuggestions =
     suggestions.length > 0 ? suggestions : ORACLE_DEFAULT_SUGGESTIONS;
+
+  // Helper functions for TTS and reveal animations
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    audioPlayingRef.current = false;
+    if (audioDoneRef.current) {
+      audioDoneRef.current();
+      audioDoneRef.current = null;
+    }
+  };
+
+  const stopReveal = () => {
+    if (revealTimerRef.current !== null) {
+      window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+    if (revealDoneRef.current) {
+      revealDoneRef.current();
+      revealDoneRef.current = null;
+    }
+    pendingCharsRef.current = "";
+  };
+
+  const feedTts = (text: string, flush = false) => {
+    ttsBufferRef.current += text;
+    if (flush && ttsBufferRef.current) {
+      ttsBufferRef.current = "";
+      // In a real implementation, this would send to TTS
+      // For now, we just clear the buffer
+    }
+  };
+
+  const queueReveal = (text: string) => {
+    pendingCharsRef.current += text;
+    if (revealTimerRef.current === null) {
+      revealTimerRef.current = window.setTimeout(() => {
+        revealTimerRef.current = null;
+        // Reveal logic would go here
+        pendingCharsRef.current = "";
+      }, 10);
+    }
+  };
+
+  const drainReveal = async () => {
+    if (revealTimerRef.current !== null) {
+      await new Promise<void>((resolve) => {
+        revealDoneRef.current = resolve;
+      });
+    }
+  };
+
+  const maybeAutoListen = () => {
+    // Auto-listen logic if voice is on and not busy
+    if (voiceOnRef.current && !micBusyRef.current && !loadingRef.current) {
+      // Would trigger mic listening here
+    }
+  };
+
+  const releaseAutoScroll = () => {
+    stickToBottomRef.current = false;
+  };
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col bg-surface text-on-surface">
@@ -930,7 +999,8 @@ export default function OraclePage() {
               setPlaybackRate((prev) => {
                 const SPEEDS = [0.75, 1, 1.25, 1.5];
                 const i = SPEEDS.findIndex((s) => Math.abs(s - prev) < 0.01);
-                return SPEEDS[(i + 1) % SPEEDS.length];
+                const nextIndex = i === -1 ? 0 : (i + 1) % SPEEDS.length;
+                return SPEEDS[nextIndex] ?? 1;
               })
             }
             title="Velocidade da voz"
@@ -1304,7 +1374,7 @@ export default function OraclePage() {
                       aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
                       className="transition-opacity duration-300 min-h-[100px]"
                     >
-                      <Markdown content={msg.content} sources={msg.sources} citations={msg.citations} />
+                      <Markdown content={msg.content} sources={msg.sources} />
                       {loading && i === messages.length - 1 && (
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
                       )}

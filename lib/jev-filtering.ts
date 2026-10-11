@@ -199,7 +199,7 @@ function extractStatus(query: string): "READ" | "READING" | "TO_READ" | "WISHLIS
 function extractRating(query: string): { min: number; max?: number } | null {
   // Exact rating
   const exactMatch = query.match(/(\d)\s*(estrela|nota|\/5)/i);
-  if (exactMatch) {
+  if (exactMatch && exactMatch[1]) {
     const rating = parseInt(exactMatch[1]);
     return { min: rating, max: rating };
   }
@@ -227,7 +227,7 @@ function extractRating(query: string): { min: number; max?: number } | null {
 function extractTitleKeywords(query: string): string | null {
   // Look for quoted strings
   const quotedMatch = query.match(/"([^"]+)"/);
-  if (quotedMatch) {
+  if (quotedMatch && quotedMatch[1]) {
     return quotedMatch[1];
   }
 
@@ -247,7 +247,7 @@ function extractTitleKeywords(query: string): string | null {
  */
 function extractCollection(query: string): string | null {
   const collectionMatch = query.match(/(?:coleção|coleçao|pasta|lista)\s+(?:["']?)([^"'\s,]+(?:\s+[^"'\s,]+)*)/i);
-  if (collectionMatch) {
+  if (collectionMatch && collectionMatch[1]) {
     return collectionMatch[1].trim();
   }
   return null;

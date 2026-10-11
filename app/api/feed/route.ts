@@ -24,7 +24,9 @@ export async function GET(request: NextRequest) {
   const rateLimit = await rateLimitGuard(request, {
     route: "feed",
     userId,
-    ...rateLimits.feed,
+    userLimit: rateLimits.feed?.userLimit ?? 10,
+    ipLimit: rateLimits.feed?.ipLimit ?? 20,
+    windowMs: rateLimits.feed?.windowMs,
   });
   if (rateLimit) return rateLimit;
 
@@ -112,7 +114,9 @@ export async function POST(request: NextRequest) {
   const rateLimit = await rateLimitGuard(request, {
     route: "feed",
     userId,
-    ...rateLimits.feed,
+    userLimit: rateLimits.feed?.userLimit ?? 10,
+    ipLimit: rateLimits.feed?.ipLimit ?? 20,
+    windowMs: rateLimits.feed?.windowMs,
   });
   if (rateLimit) return rateLimit;
 

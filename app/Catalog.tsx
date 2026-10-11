@@ -261,7 +261,7 @@ export default function Catalog({
       .sort((a, b) => a - b);
     const monthsSpan =
       readDates.length > 1
-        ? Math.max(1, (now - readDates[0]) / (1000 * 60 * 60 * 24 * 30))
+        ? Math.max(1, (now - (readDates[0] ?? 0)) / (1000 * 60 * 60 * 24 * 30))
         : 1;
     const pace = Math.round((read.length / monthsSpan) * 10) / 10;
 
@@ -673,7 +673,7 @@ export default function Catalog({
         escape(b.isbn),
         escape(b.publishedDate),
         escape(b.genre),
-        escape(statusLabels[b.status] ?? b.status),
+        escape(BOOK_STATUS_LABELS[b.status] ?? b.status),
         escape(b.collection),
         escape(b.rating),
         escape(b.pages),
@@ -709,7 +709,12 @@ export default function Catalog({
       return;
     }
     const reordered = [...filtered];
-    const [moved] = reordered.splice(fromIndex, 1);
+    const moved = reordered[fromIndex];
+    if (!moved) {
+      setDraggedId(null);
+      return;
+    }
+    reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
     const updated = reordered.map((b, i) => ({ ...b, customOrder: i }));
     setBookList((prev) => prev.map((b) => updated.find((u) => u.id === b.id) ?? b));
@@ -1344,8 +1349,8 @@ export default function Catalog({
                     {book.genre ? ` · ${book.genre}` : ""}
                   </p>
                 </div>
-                <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline ${statusClasses[book.status]}`}>
-                  {statusLabels[book.status]}
+                <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline ${BOOK_STATUS_CLASSES_STITCH[book.status]}`}>
+                  {BOOK_STATUS_LABELS[book.status]}
                 </span>
                 {book.rating ? (
                   <span className="hidden shrink-0 items-center gap-0.5 text-xs text-yellow-500 sm:flex">
@@ -1426,11 +1431,11 @@ export default function Catalog({
 
         <section className="relative rounded-lg border border-white/5 bg-surface-container-low/90 p-space-xl backdrop-blur-md">
           <Icon name="format_quote" className="absolute right-4 top-4 select-none text-3xl text-tertiary opacity-30" />
-          <p className="font-quote-md text-quote-md italic leading-relaxed text-on-surface">“{quote.text}”</p>
+          <p className="font-quote-md text-quote-md italic leading-relaxed text-on-surface">“{quote?.text ?? ""}”</p>
           <div className="mt-space-sm flex items-center gap-space-xs">
             <div className="h-0.5 w-6 bg-primary-container" />
             <span className="font-caption text-caption font-semibold uppercase tracking-wider text-outline">
-              {quote.author}
+              {quote?.author ?? ""}
             </span>
           </div>
         </section>

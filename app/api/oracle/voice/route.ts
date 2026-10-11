@@ -89,7 +89,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "oracle",
       userId,
-      ...rateLimits.oracle,
+      userLimit: rateLimits.oracle?.userLimit ?? 10,
+      ipLimit: rateLimits.oracle?.ipLimit ?? 20,
+      windowMs: rateLimits.oracle?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

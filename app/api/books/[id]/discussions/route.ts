@@ -31,7 +31,13 @@ export async function GET(
 ) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const limit = await rateLimitGuard(request, { route: "books/discussions", userId, ...rateLimits["books/discussions"] });
+  const limit = await rateLimitGuard(request, { 
+    route: "books/discussions", 
+    userId, 
+    userLimit: rateLimits["books/discussions"]?.userLimit ?? 10, 
+    ipLimit: rateLimits["books/discussions"]?.ipLimit ?? 20, 
+    windowMs: rateLimits["books/discussions"]?.windowMs 
+  });
   if (limit) return limit;
   const { id } = await params;
   if (!(await accessibleBook(id, userId))) return NextResponse.json({ error: "Livro não encontrado" }, { status: 404 });
@@ -50,7 +56,13 @@ export async function POST(
 ) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const limit = await rateLimitGuard(request, { route: "books/discussions", userId, ...rateLimits["books/discussions"] });
+  const limit = await rateLimitGuard(request, { 
+    route: "books/discussions", 
+    userId, 
+    userLimit: rateLimits["books/discussions"]?.userLimit ?? 10, 
+    ipLimit: rateLimits["books/discussions"]?.ipLimit ?? 20, 
+    windowMs: rateLimits["books/discussions"]?.windowMs 
+  });
   if (limit) return limit;
   const { id } = await params;
   if (!(await accessibleBook(id, userId))) return NextResponse.json({ error: "Livro não encontrado" }, { status: 404 });

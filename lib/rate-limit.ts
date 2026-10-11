@@ -151,8 +151,11 @@ function getClientIP(request: NextRequest): string {
 
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0].trim();
-    if (first) return first;
+    const parts = forwarded.split(",");
+    if (parts[0]) {
+      const first = parts[0].trim();
+      if (first) return first;
+    }
   }
 
   const real = request.headers.get("x-real-ip");

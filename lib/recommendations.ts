@@ -207,10 +207,11 @@ function parseVector(text: string | null | undefined): number[] | null {
 }
 
 function averageVectors(vectors: number[][]): number[] {
-  const dim = vectors[0].length;
+  if (!vectors.length) return [];
+  const dim = vectors[0]?.length ?? 0;
   const avg = new Array(dim).fill(0);
   for (const v of vectors) {
-    for (let i = 0; i < dim; i++) avg[i] += v[i];
+    for (let i = 0; i < dim; i++) avg[i] += v[i] ?? 0;
   }
   return avg.map((s) => s / vectors.length);
 }
@@ -220,9 +221,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
   let a2 = 0;
   let b2 = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    a2 += a[i] * a[i];
-    b2 += b[i] * b[i];
+    const ai = a[i] ?? 0;
+    const bi = b[i] ?? 0;
+    dot += ai * bi;
+    a2 += ai * ai;
+    b2 += bi * bi;
   }
   if (a2 === 0 || b2 === 0) return 0;
   return dot / (Math.sqrt(a2) * Math.sqrt(b2));
@@ -816,9 +819,10 @@ export async function buildRecommendations(
 
   for (let i = 0; i < topRanked.length; i++) {
     const r = topRanked[i];
+    if (!r) continue;
     const info = r.item.volumeInfo;
     const cover = googleBookCover(r.item);
-    const pages = info.pageCount || 0;
+    const pages = info?.pageCount || 0;
     const { book: similarBook } = findMostSimilarBook(
       r.item,
       booksRaw,
@@ -828,13 +832,13 @@ export async function buildRecommendations(
 
     const common = {
       id: `rec-${i}`,
-      title: r.title,
-      author: r.author,
+      title: r.title ?? "",
+      author: r.author ?? "",
       cover: cover || "",
-      score: r.score,
+      score: r.score ?? 0,
       quote: `Pela afinidade com ${topAffinity}`,
-      rating: estimatedRating(r.score),
-      tags: r.tags,
+      rating: estimatedRating(r.score ?? 0),
+      tags: r.tags ?? [],
     };
 
     const primaryRec: PrimaryRecommendation = {
@@ -842,10 +846,10 @@ export async function buildRecommendations(
       edition: googleBookEdition(r.item),
       pages,
       spine: buildSpineEstimate(pages),
-      compat: Math.round(r.score * 100),
-      predictedRating: estimatedRating(r.score),
-      ragQuote: buildRagQuote(r.title, r.author, topAffinity, similarBook),
-      similarity: Math.round(r.score * 1000) / 1000,
+      compat: Math.round((r.score ?? 0) * 100),
+      predictedRating: estimatedRating(r.score ?? 0),
+      ragQuote: buildRagQuote(r.title ?? "", r.author ?? "", topAffinity, similarBook),
+      similarity: Math.round((r.score ?? 0) * 1000) / 1000,
       vectorId: similarBook?.id || `profile-${userId.slice(-8)}`,
     };
 

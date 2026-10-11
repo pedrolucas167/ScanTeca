@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
   const rateLimit = await rateLimitGuard(request, {
     route: "book-clubs",
     userId,
-    ...rateLimits.feed,
+    userLimit: rateLimits.bookClubs?.userLimit ?? 10,
+    ipLimit: rateLimits.bookClubs?.ipLimit ?? 20,
+    windowMs: rateLimits.bookClubs?.windowMs,
   });
   if (rateLimit) return rateLimit;
 
@@ -79,7 +81,9 @@ export async function POST(request: NextRequest) {
   const rateLimit = await rateLimitGuard(request, {
     route: "book-clubs",
     userId,
-    ...rateLimits.feed,
+    userLimit: rateLimits.bookClubs?.userLimit ?? 10,
+    ipLimit: rateLimits.bookClubs?.ipLimit ?? 20,
+    windowMs: rateLimits.bookClubs?.windowMs,
   });
   if (rateLimit) return rateLimit;
 

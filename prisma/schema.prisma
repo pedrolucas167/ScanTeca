@@ -199,6 +199,7 @@ model Book {
   diaryEntries     DiaryEntry[]
   feedPosts        FeedPost[]
   discussions      BookDiscussion[]
+  passages         BookPassage[]
 
   @@unique([isbn, userId])
   @@index([userId])
@@ -495,4 +496,35 @@ model RecommendationFeedback {
   @@unique([userId, normalizedTitle, normalizedAuthor])
   @@index([userId])
   @@index([userId, kind])
+}
+
+model BookPassage {
+  id          String     @id @default(cuid())
+  bookId      String
+  book        Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter     Int?
+  paragraph   Int?
+  textHash    String?
+  annotations Annotation[]
+  createdAt   DateTime   @default(now())
+
+  @@index([bookId, chapter, paragraph])
+}
+
+model Annotation {
+  id        String     @id @default(cuid())
+  passageId String
+  passage   BookPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  userId    String
+  // User é gerenciado pelo Clerk; relação direta via userId sem modelo Prisma
+  content   String     @db.Text
+  position  Float?
+  type      String     @default("comment")
+  sessionId String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([passageId])
+  @@index([userId])
+  @@index([sessionId])
 }

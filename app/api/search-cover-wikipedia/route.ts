@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "search-cover-wikipedia",
       userId,
-      ...rateLimits["search-cover-wikipedia"],
+      userLimit: rateLimits["search-cover-wikipedia"]?.userLimit ?? 10,
+      ipLimit: rateLimits["search-cover-wikipedia"]?.ipLimit ?? 20,
+      windowMs: rateLimits["search-cover-wikipedia"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

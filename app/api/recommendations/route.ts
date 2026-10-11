@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "recommendations",
       userId,
-      ...rateLimits.recommendations,
+      userLimit: rateLimits.recommendations?.userLimit ?? 10,
+      ipLimit: rateLimits.recommendations?.ipLimit ?? 20,
+      windowMs: rateLimits.recommendations?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

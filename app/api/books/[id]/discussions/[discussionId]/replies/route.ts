@@ -17,7 +17,13 @@ export async function POST(
 ) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const limit = await rateLimitGuard(request, { route: "books/discussions", userId, ...rateLimits["books/discussions"] });
+  const limit = await rateLimitGuard(request, { 
+    route: "books/discussions", 
+    userId, 
+    userLimit: rateLimits["books/discussions"]?.userLimit ?? 10, 
+    ipLimit: rateLimits["books/discussions"]?.ipLimit ?? 20, 
+    windowMs: rateLimits["books/discussions"]?.windowMs 
+  });
   if (limit) return limit;
   const { id, discussionId } = await params;
   const discussion = await prisma.bookDiscussion.findFirst({ where: { id: discussionId, bookId: id }, select: { id: true, userId: true } });

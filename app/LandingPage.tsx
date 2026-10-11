@@ -132,11 +132,11 @@ export default function LandingPage() {
             </div>
             <div className="flex min-h-[160px] flex-col justify-center">
               <blockquote className="mb-5 font-quote-lg text-quote-md italic leading-relaxed text-on-surface sm:text-quote-lg">
-                &ldquo;{quote.content}&rdquo;
+                &ldquo;{quote?.content}&rdquo;
               </blockquote>
               <p className="font-body-sm text-body-sm text-outline-variant">
-                — {quote.author},{" "}
-                <span className="italic text-tertiary">{quote.work}</span>
+                — {quote?.author},{" "}
+                <span className="italic text-tertiary">{quote?.work}</span>
               </p>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 pt-4 font-caption text-caption text-on-surface-variant">

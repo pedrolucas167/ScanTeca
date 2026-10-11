@@ -15,7 +15,9 @@ export async function POST(request: NextRequest) {
   // Rota anônima: limita só por IP para evitar flood de métricas falsas.
   const rateLimit = await rateLimitGuard(request, {
     route: "vitals",
-    ...rateLimits.vitals,
+    userLimit: rateLimits.vitals?.userLimit ?? 10,
+    ipLimit: rateLimits.vitals?.ipLimit ?? 20,
+    windowMs: rateLimits.vitals?.windowMs,
   });
   if (rateLimit) return rateLimit;
 

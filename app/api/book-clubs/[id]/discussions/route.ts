@@ -27,7 +27,9 @@ export async function POST(
   const rateLimit = await rateLimitGuard(request, {
     route: "book-clubs",
     userId,
-    ...rateLimits.feed,
+    userLimit: rateLimits.feed?.userLimit ?? 10,
+    ipLimit: rateLimits.feed?.ipLimit ?? 20,
+    windowMs: rateLimits.feed?.windowMs,
   });
   if (rateLimit) return rateLimit;
 
