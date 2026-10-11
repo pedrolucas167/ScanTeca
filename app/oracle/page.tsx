@@ -914,8 +914,21 @@ export default function OraclePage() {
     if (revealTimerRef.current === null) {
       revealTimerRef.current = window.setTimeout(() => {
         revealTimerRef.current = null;
-        // Reveal logic would go here
+        // Update the last assistant message with accumulated text
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant") {
+            updated[updated.length - 1] = {
+              ...last,
+              content: (last.content || "") + pendingCharsRef.current,
+            };
+          }
+          return updated;
+        });
         pendingCharsRef.current = "";
+        revealDoneRef.current?.();
+        revealDoneRef.current = null;
       }, 10);
     }
   };
