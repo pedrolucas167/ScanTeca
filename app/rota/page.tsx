@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { getRouteData } from "@/lib/route-data";
 import RotaNaEstante from "./RotaNaEstante";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Rota na Estante — Scanteca",
   description: "Roteiro de resgate físico dos livros encontrados pelo Oráculo.",
 };

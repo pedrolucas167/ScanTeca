@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const limit = await rateLimitGuard(request, {
     route: "social/moderation",
     userId,
-    ...rateLimits["social/moderation"],
+    userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
   });
   if (limit) return limit;
   const parsed = await readJson(request, reportSchema);

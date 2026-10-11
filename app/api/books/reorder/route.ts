@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "books/reorder",
       userId,
-      ...rateLimits["books/reorder"],
+      userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

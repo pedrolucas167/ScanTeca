@@ -104,7 +104,7 @@ export function extractMainTitle(fullTitle: string | null | undefined): string |
   }
 
   const dashMatch = title.match(/^(.+?)(?:\s+(?:–|—|-))\s+/);
-  if (dashMatch) {
+  if (dashMatch && dashMatch[1]) {
     const main = dashMatch[1].trim();
     if (main.length >= 3) return main;
   }
@@ -155,7 +155,7 @@ export function normalizeGenre(genre: string | null | undefined): string | null 
   const segments = lower.split("/").map((s) => s.trim());
   for (let i = segments.length - 1; i >= 0; i--) {
     const segment = segments[i];
-    if (ENGLISH_TO_PORTUGUESE_GENRE[segment]) {
+    if (segment && ENGLISH_TO_PORTUGUESE_GENRE[segment]) {
       return ENGLISH_TO_PORTUGUESE_GENRE[segment];
     }
   }

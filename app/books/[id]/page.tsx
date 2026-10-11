@@ -7,6 +7,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import { BookReviews } from "./BookReviews";
 import { BookDiscussions } from "./BookDiscussions";
 import ReclubeButton from "./ReclubeButton";
+import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES } from "@/lib/constants/book-status";
 
 export const dynamic = "force-dynamic";
 
@@ -36,21 +37,6 @@ export default async function BookDetailPage({
   if (!book) {
     notFound();
   }
-
-  const statusLabels: Record<string, string> = {
-    READ: "Lido",
-    READING: "Lendo",
-    TO_READ: "A ler",
-    WISHLIST: "Desejo",
-  };
-
-  const statusClasses: Record<string, string> = {
-    READ: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    READING: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-    TO_READ: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    WISHLIST:
-      "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  };
 
   const avgRating =
     book.reviews.length > 0
@@ -108,9 +94,9 @@ export default async function BookDetailPage({
             <div className="flex flex-1 flex-col p-6">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClasses[book.status]}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${BOOK_STATUS_CLASSES[book.status]}`}
                 >
-                  {statusLabels[book.status]}
+                  {BOOK_STATUS_LABELS[book.status]}
                 </span>
                 <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                   {book.collection.name}

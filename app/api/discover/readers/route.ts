@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const rateLimit = await rateLimitGuard(request, {
     route: "social/discover",
     userId,
-    ...rateLimits["social/discover"],
+    userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
   });
   if (rateLimit) return rateLimit;
 

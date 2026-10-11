@@ -16,7 +16,6 @@ interface Source {
 interface MarkdownProps {
   content: string;
   sources?: Source[];
-  citations?: number[];
 }
 
 /**
@@ -41,13 +40,17 @@ function parseBlocks(content: string): Block[] {
 
   while (i < lines.length) {
     const line = lines[i];
+    if (!line) {
+      i++;
+      continue;
+    }
 
     // Bloco de código fenced
     if (line.trimStart().startsWith("```")) {
       const buf: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
-        buf.push(lines[i]);
+      while (i < lines.length && !lines[i]?.trimStart().startsWith("```")) {
+        buf.push(lines[i] ?? "");
         i++;
       }
       i++; // fecha o fence (ou EOF durante stream)
@@ -57,7 +60,7 @@ function parseBlocks(content: string): Block[] {
 
     // Título
     const heading = /^(#{1,3})\s+(.+)$/.exec(line);
-    if (heading) {
+    if (heading && heading[1] && heading[2]) {
       blocks.push({
         type: "heading",
         level: heading[1].length,
@@ -77,8 +80,9 @@ function parseBlocks(content: string): Block[] {
     // Citação (linhas consecutivas com >)
     if (/^\s*>\s?/.test(line)) {
       const buf: string[] = [];
-      while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
-        buf.push(lines[i].replace(/^\s*>\s?/, ""));
+      while (i < lines.length && lines[i] && /^\s*>\s?/.test(lines[i]!)) {
+        const currentLine = lines[i]!;
+        buf.push(currentLine.replace(/^\s*>\s?/, ""));
         i++;
       }
       blocks.push({ type: "quote", lines: buf });
@@ -88,8 +92,9 @@ function parseBlocks(content: string): Block[] {
     // Lista não ordenada
     if (/^\s*[-*]\s+/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+      while (i < lines.length && lines[i] && /^\s*[-*]\s+/.test(lines[i]!)) {
+        const currentLine = lines[i]!;
+        items.push(currentLine.replace(/^\s*[-*]\s+/, ""));
         i++;
       }
       blocks.push({ type: "list", ordered: false, items });
@@ -99,8 +104,9 @@ function parseBlocks(content: string): Block[] {
     // Lista ordenada
     if (/^\s*\d+[.)]\s+/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*\d+[.)]\s+/, ""));
+      while (i < lines.length && lines[i] && /^\s*\d+[.)]\s+/.test(lines[i]!)) {
+        const currentLine = lines[i]!;
+        items.push(currentLine.replace(/^\s*\d+[.)]\s+/, ""));
         i++;
       }
       blocks.push({ type: "list", ordered: true, items });
@@ -117,12 +123,13 @@ function parseBlocks(content: string): Block[] {
     const buf: string[] = [];
     while (
       i < lines.length &&
-      lines[i].trim() &&
+      lines[i] &&
+      lines[i]!.trim() &&
       !/^(#{1,3}\s|```|\s*[-*]\s|\s*\d+[.)]\s|\s*>\s?|\s*(-{3,}|\*{3,}|_{3,})\s*$)/.test(
-        lines[i]
+        lines[i]!
       )
     ) {
-      buf.push(lines[i]);
+      buf.push(lines[i]!);
       i++;
     }
     blocks.push({ type: "paragraph", text: buf.join("\n") });
@@ -133,7 +140,7 @@ function parseBlocks(content: string): Block[] {
 
 const INLINE_RE = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`|\[\d+\])/g;
 
-function renderInline(text: string, sources?: Source[], citations?: number[]): ReactNode[] {
+function renderInline(text: string, sources?: Source[]): ReactNode[] {
   const parts = text.split(INLINE_RE);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
@@ -182,7 +189,7 @@ const HEADING_CLASS: Record<number, string> = {
   3: "mt-3 mb-1.5 text-base font-semibold uppercase tracking-wide text-primary first:mt-0",
 };
 
-export default function Markdown({ content, sources, citations }: MarkdownProps) {
+export default function Markdown({ content, sources }: MarkdownProps) {
   const blocks = parseBlocks(content);
 
   return (
@@ -202,7 +209,7 @@ export default function Markdown({ content, sources, citations }: MarkdownProps)
             const Tag = `h${Math.min(block.level + 2, 6)}` as "h3" | "h4" | "h5";
             return (
               <Tag key={i} className={HEADING_CLASS[block.level]}>
-                {renderInline(block.text, sources, citations)}
+                {renderInline(block.text, sources)}
               </Tag>
             );
           }
@@ -213,13 +220,13 @@ export default function Markdown({ content, sources, citations }: MarkdownProps)
                 className="my-2 border-l-2 border-primary/50 pl-3 italic text-on-surface-variant"
               >
                 {block.lines.map((l, j) => (
-                  <p key={j}>{renderInline(l, sources, citations)}</p>
+                  <p key={j}>{renderInline(l, sources)}</p>
                 ))}
               </blockquote>
             );
           case "list": {
             const items = block.items.map((item, j) => (
-              <li key={j}>{renderInline(item, sources, citations)}</li>
+              <li key={j}>{renderInline(item, sources)}</li>
             ));
             return block.ordered ? (
               <ol key={i} className="my-2 list-decimal space-y-1 pl-5">
@@ -238,7 +245,7 @@ export default function Markdown({ content, sources, citations }: MarkdownProps)
           case "paragraph":
             return (
               <p key={i} className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0 text-base">
-                {renderInline(block.text, sources, citations)}
+                {renderInline(block.text, sources)}
               </p>
             );
         }

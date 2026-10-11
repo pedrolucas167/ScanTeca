@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "scan",
       userId,
-      ...rateLimits.scan,
+      userLimit: rateLimits.scan?.userLimit ?? 10,
+      ipLimit: rateLimits.scan?.ipLimit ?? 20,
+      windowMs: rateLimits.scan?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -230,7 +232,7 @@ export async function POST(request: NextRequest) {
         const res = await fetch(googleUrl);
         if (res.ok) {
           const data = (await res.json()) as GoogleBooksVolume;
-          if (data.items && data.totalItems > 0) {
+          if (data.items && data.totalItems > 0 && data.items[0]?.volumeInfo) {
             const info = data.items[0].volumeInfo;
             bookData = {
               title: cleanTitle(info.title) ?? "Título desconhecido",
@@ -262,7 +264,7 @@ export async function POST(request: NextRequest) {
         const res = await fetch(googleUrl);
         if (res.ok) {
           const data = (await res.json()) as GoogleBooksVolume;
-          if (data.items && data.totalItems > 0) {
+          if (data.items && data.totalItems > 0 && data.items[0]?.volumeInfo) {
             const info = data.items[0].volumeInfo;
             if (!bookData.genre && info.categories?.[0]) {
               bookData.genre = normalizeGenre(info.categories[0]);

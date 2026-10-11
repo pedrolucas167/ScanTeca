@@ -191,7 +191,7 @@ export default function BookPreviewSheet({
 
         <div className="flex flex-col gap-3 pt-2">
           <button
-            onClick={() => onConfirm(statusMap[status])}
+            onClick={() => onConfirm(statusMap[status] ?? "TO_READ")}
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-6 py-3.5 font-label-md text-label-md text-on-primary-container shadow-[0_12px_32px_-8px_rgba(91,80,230,0.4)] transition-all hover:bg-inverse-primary active:scale-[0.98] disabled:opacity-70"
           >

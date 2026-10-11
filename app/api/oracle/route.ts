@@ -370,7 +370,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "oracle",
       userId,
-      ...rateLimits.oracle,
+      userLimit: rateLimits.oracle?.userLimit ?? 10,
+      ipLimit: rateLimits.oracle?.ipLimit ?? 20,
+      windowMs: rateLimits.oracle?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -1066,7 +1068,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           const citations = new Set<number>();
           let match;
           while ((match = citationRegex.exec(text)) !== null) {
-            citations.add(parseInt(match[1], 10));
+            if (match[1]) citations.add(parseInt(match[1], 10));
           }
           return Array.from(citations).sort((a, b) => a - b);
         };

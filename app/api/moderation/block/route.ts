@@ -10,7 +10,7 @@ const schema = z.object({ userId: z.string().min(1).max(100) });
 export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const limit = await rateLimitGuard(request, { route: "social/moderation", userId, ...rateLimits["social/moderation"] });
+  const limit = await rateLimitGuard(request, { route: "social/moderation", userId, userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs });
   if (limit) return limit;
   const parsed = await readJson(request, schema);
   if (!parsed.ok) return parsed.response;

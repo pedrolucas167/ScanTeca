@@ -478,10 +478,11 @@ async function main() {
     });
     if (book.createdAt.getTime() === book.updatedAt.getTime()) created++;
 
-    const [{ has }] = await prisma.$queryRaw<{ has: boolean }[]>`
+    const result = await prisma.$queryRaw<{ has: boolean }[]>`
       SELECT embedding IS NOT NULL AS has FROM "Book" WHERE id = ${book.id}
     `;
-    if (has) {
+    const row = result[0];
+    if (row?.has) {
       skippedEmbeddings++;
       continue;
     }
@@ -553,8 +554,9 @@ async function main() {
     SELECT COUNT(*) AS total, COUNT(embedding) AS indexed
     FROM "Book" WHERE "userId" = ${userId}
   `;
+  const stat = stats[0];
   console.log(
-    `[seed] acervo final: ${stats[0].indexed}/${stats[0].total} livros indexados`
+    `[seed] acervo final: ${stat?.indexed ?? 0}/${stat?.total ?? 0} livros indexados`
   );
 }
 

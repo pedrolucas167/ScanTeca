@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
 
   // Validar tamanho do arquivo (base64)
   const base64Data = image.split(",")[1];
+  if (!base64Data) {
+    return NextResponse.json({ error: "Imagem inválida" }, { status: 400 });
+  }
   const buffer = Buffer.from(base64Data, "base64");
   
   if (buffer.length > MAX_FILE_SIZE) {
@@ -36,8 +39,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar tipo MIME
-  const mimeType = image.split(";")[0].split(":")[1];
-  if (!ALLOWED_TYPES.includes(mimeType)) {
+  const mimeType = image.split(";")[0]?.split(":")[1];
+  if (!mimeType || !ALLOWED_TYPES.includes(mimeType)) {
     return NextResponse.json(
       { error: "Formato não suportado. Use JPEG, PNG ou WebP." },
       { status: 400 }
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Upload nova imagem
-    const imageUrl = await uploadFeedImage(userId, postId, buffer, mimeType);
+    const imageUrl = await uploadFeedImage(userId, postId, buffer, mimeType ?? "image/jpeg");
 
     // Atualizar post
     await prisma.feedPost.update({

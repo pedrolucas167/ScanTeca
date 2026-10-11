@@ -4,41 +4,10 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface Book {
-  id: string;
-  isbn: string;
-  title: string;
-  author: string;
-  publishedDate: string | null;
-  synopsis: string | null;
-  coverUrl: string | null;
-  status: "READ" | "READING" | "TO_READ" | "WISHLIST";
-  currentPage: number | null;
-  collection: string;
-  notes: string | null;
-  rating: number | null;
-  genre: string | null;
-  pages: number | null;
-  customOrder: number | null;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-}
-
-const statusLabels: Record<string, string> = {
-  READ: "Lido",
-  READING: "Lendo",
-  TO_READ: "A ler",
-  WISHLIST: "Desejo",
-};
-
-const statusClasses: Record<string, string> = {
-  READ: "bg-primary-container text-on-primary-container",
-  READING: "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40",
-  TO_READ: "bg-amber-950/80 text-amber-300 border border-amber-500/40",
-  WISHLIST: "bg-secondary-container/30 text-secondary",
-};
+import { Icon } from "@/components/ui/Icon";
+import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES_STITCH } from "@/lib/constants/book-status";
+import { LITERARY_QUOTES } from "@/lib/constants/literary-quotes";
+import type { Book } from "@/lib/types/book";
 
 const isKnownAuthor = (author: string | null | undefined) => {
   if (!author) return false;
@@ -49,36 +18,6 @@ const isKnownAuthor = (author: string | null | undefined) => {
     a !== "[author not identified]"
   );
 };
-
-const literaryQuotes = [
-  { text: "Sempre imaginei que o paraíso fosse uma espécie de biblioteca.", author: "Jorge Luis Borges" },
-  { text: "Um quarto sem livros é como um corpo sem alma.", author: "Cícero" },
-  { text: "A leitura de todos os bons livros é uma conversação com as mais honestas pessoas dos séculos passados.", author: "Descartes" },
-  { text: "Há livros escritos para evitar espaços vazios na estante.", author: "Carlos Drummond de Andrade" },
-  { text: "Um leitor vive mil vidas antes de morrer. O homem que nunca lê vive apenas uma.", author: "George R. R. Martin" },
-  { text: "A vida é a arte do encontro, embora haja tanto desencontro pela vida.", author: "Vinicius de Moraes" },
-  { text: "Ler é sonhar acordado.", author: "Anônimo" },
-  { text: "Os livros são os mais quietos e constantes dos amigos.", author: "Charles W. Eliot" },
-];
-
-function Icon({
-  name,
-  className = "",
-  fill = false,
-}: {
-  name: string;
-  className?: string;
-  fill?: boolean;
-}) {
-  return (
-    <span
-      className={`material-symbols-outlined ${className}`}
-      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
-    >
-      {name}
-    </span>
-  );
-}
 
 function QuickFilterChip({
   label,
@@ -168,9 +107,9 @@ function BookShelfCover({
             </div>
           )}
           <span
-            className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${statusClasses[book.status]}`}
+            className={`absolute left-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${BOOK_STATUS_CLASSES_STITCH[book.status]}`}
           >
-            {statusLabels[book.status]}
+            {BOOK_STATUS_LABELS[book.status]}
           </span>
         </div>
       </Link>
@@ -240,8 +179,8 @@ export default function Catalog({
   const [showFilters, setShowFilters] = useState(false);
   const [now] = useState(() => Date.now());
 
-  const quote = literaryQuotes[
-    Math.floor(now / (1000 * 60 * 60 * 24)) % literaryQuotes.length
+  const quote = LITERARY_QUOTES[
+    Math.floor(now / (1000 * 60 * 60 * 24)) % LITERARY_QUOTES.length
   ];
 
   const activeFiltersCount =
@@ -322,7 +261,7 @@ export default function Catalog({
       .sort((a, b) => a - b);
     const monthsSpan =
       readDates.length > 1
-        ? Math.max(1, (now - readDates[0]) / (1000 * 60 * 60 * 24 * 30))
+        ? Math.max(1, (now - (readDates[0] ?? 0)) / (1000 * 60 * 60 * 24 * 30))
         : 1;
     const pace = Math.round((read.length / monthsSpan) * 10) / 10;
 
@@ -734,7 +673,7 @@ export default function Catalog({
         escape(b.isbn),
         escape(b.publishedDate),
         escape(b.genre),
-        escape(statusLabels[b.status] ?? b.status),
+        escape(BOOK_STATUS_LABELS[b.status] ?? b.status),
         escape(b.collection),
         escape(b.rating),
         escape(b.pages),
@@ -770,7 +709,12 @@ export default function Catalog({
       return;
     }
     const reordered = [...filtered];
-    const [moved] = reordered.splice(fromIndex, 1);
+    const moved = reordered[fromIndex];
+    if (!moved) {
+      setDraggedId(null);
+      return;
+    }
+    reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
     const updated = reordered.map((b, i) => ({ ...b, customOrder: i }));
     setBookList((prev) => prev.map((b) => updated.find((u) => u.id === b.id) ?? b));
@@ -1405,8 +1349,8 @@ export default function Catalog({
                     {book.genre ? ` · ${book.genre}` : ""}
                   </p>
                 </div>
-                <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline ${statusClasses[book.status]}`}>
-                  {statusLabels[book.status]}
+                <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline ${BOOK_STATUS_CLASSES_STITCH[book.status]}`}>
+                  {BOOK_STATUS_LABELS[book.status]}
                 </span>
                 {book.rating ? (
                   <span className="hidden shrink-0 items-center gap-0.5 text-xs text-yellow-500 sm:flex">
@@ -1487,11 +1431,11 @@ export default function Catalog({
 
         <section className="relative rounded-lg border border-white/5 bg-surface-container-low/90 p-space-xl backdrop-blur-md">
           <Icon name="format_quote" className="absolute right-4 top-4 select-none text-3xl text-tertiary opacity-30" />
-          <p className="font-quote-md text-quote-md italic leading-relaxed text-on-surface">“{quote.text}”</p>
+          <p className="font-quote-md text-quote-md italic leading-relaxed text-on-surface">“{quote?.text ?? ""}”</p>
           <div className="mt-space-sm flex items-center gap-space-xs">
             <div className="h-0.5 w-6 bg-primary-container" />
             <span className="font-caption text-caption font-semibold uppercase tracking-wider text-outline">
-              {quote.author}
+              {quote?.author ?? ""}
             </span>
           </div>
         </section>

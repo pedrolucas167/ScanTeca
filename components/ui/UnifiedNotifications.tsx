@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, BellOff, BellRing, Check, Settings } from "lucide-react";
+import { Bell, BellOff, BellRing, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PUSH_CHANGED_EVENT,

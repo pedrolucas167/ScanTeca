@@ -1,0 +1,33 @@
+// Adições ao schema existente — anotações por trecho (Wattpad-style)
+// Relaciona com Book, User (Clerk), e pode ligar a ReadingSession
+
+model BookPassage {
+  id          String     @id @default(cuid())
+  bookId      String
+  book        Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter     Int?
+  paragraph   Int?
+  textHash    String?    // sincroniza com edição do texto
+  annotations Annotation[]
+  createdAt   DateTime   @default(now())
+
+  @@index([bookId, chapter, paragraph])
+}
+
+model Annotation {
+  id        String     @id @default(cuid())
+  passageId String
+  passage   BookPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  content   String     @db.Text
+  position  Float?     // 0.0 a 1.0 dentro do parágrafo
+  type      String     @default("comment") // comment | highlight | reaction
+  sessionId String?    // opcional: liga à leitura atual
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([passageId])
+  @@index([userId])
+  @@index([sessionId])
+}

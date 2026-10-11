@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "oracle/tts",
       userId,
-      ...rateLimits["oracle/tts"],
+      userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

@@ -43,7 +43,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "search-author",
       userId,
-      ...rateLimits["search-author"],
+      userLimit: rateLimits["search-author"]?.userLimit ?? 10,
+      ipLimit: rateLimits["search-author"]?.ipLimit ?? 20,
+      windowMs: rateLimits["search-author"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -81,8 +83,8 @@ export async function POST(request: NextRequest) {
         if (res.ok) {
           const data = (await res.json()) as GoogleBooksVolume;
           if (data.items && data.totalItems > 0) {
-            const info = data.items[0].volumeInfo;
-            if (info.authors?.length) {
+            const info = data.items[0]?.volumeInfo;
+            if (info?.authors?.length) {
               return NextResponse.json({ author: info.authors.join(", ") });
             }
           }

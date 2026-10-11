@@ -35,7 +35,9 @@ export async function PATCH(request: NextRequest, context: Context) {
   const rateLimit = await rateLimitGuard(request, {
     route: "oracle/sessions",
     userId,
-    ...rateLimits["oracle/sessions"],
+    userLimit: rateLimits["oracle/sessions"]?.userLimit ?? 10,
+    ipLimit: rateLimits["oracle/sessions"]?.ipLimit ?? 20,
+    windowMs: rateLimits["oracle/sessions"]?.windowMs,
   });
   if (rateLimit) return rateLimit;
 
@@ -58,7 +60,9 @@ export async function DELETE(request: NextRequest, context: Context) {
   const rateLimit = await rateLimitGuard(request, {
     route: "oracle/sessions",
     userId,
-    ...rateLimits["oracle/sessions"],
+    userLimit: rateLimits["oracle/sessions"]?.userLimit ?? 10,
+    ipLimit: rateLimits["oracle/sessions"]?.ipLimit ?? 20,
+    windowMs: rateLimits["oracle/sessions"]?.windowMs,
   });
   if (rateLimit) return rateLimit;
 

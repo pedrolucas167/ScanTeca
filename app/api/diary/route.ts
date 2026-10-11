@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
   const rateLimit = await rateLimitGuard(request, {
     route: "diary",
     userId,
-    ...rateLimits.diary,
+    userLimit: rateLimits.diary?.userLimit ?? 10,
+    ipLimit: rateLimits.diary?.ipLimit ?? 20,
+    windowMs: rateLimits.diary?.windowMs,
   });
   if (rateLimit) return rateLimit;
 

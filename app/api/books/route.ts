@@ -63,7 +63,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "books",
       userId,
-      ...rateLimits.books,
+      userLimit: rateLimits.books?.userLimit ?? 10,
+      ipLimit: rateLimits.books?.ipLimit ?? 20,
+      windowMs: rateLimits.books?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -228,7 +230,9 @@ export async function PATCH(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "books",
       userId,
-      ...rateLimits.books,
+      userLimit: rateLimits.books?.userLimit ?? 10,
+      ipLimit: rateLimits.books?.ipLimit ?? 20,
+      windowMs: rateLimits.books?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -416,7 +420,9 @@ export async function DELETE(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "books",
       userId,
-      ...rateLimits.books,
+      userLimit: rateLimits.books?.userLimit ?? 10,
+      ipLimit: rateLimits.books?.ipLimit ?? 20,
+      windowMs: rateLimits.books?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "rota",
       userId,
-      ...rateLimits.rota,
+      userLimit: rateLimits.rota?.userLimit ?? 10,
+      ipLimit: rateLimits.rota?.ipLimit ?? 20,
+      windowMs: rateLimits.rota?.windowMs,
     });
     if (rateLimit) return rateLimit;
 

@@ -43,7 +43,9 @@ export async function GET(
     const rateLimit = await rateLimitGuard(request, {
       route: "books/reviews",
       userId,
-      ...rateLimits["books/reviews"],
+      userLimit: rateLimits["books/reviews"]?.userLimit ?? 10,
+      ipLimit: rateLimits["books/reviews"]?.ipLimit ?? 20,
+      windowMs: rateLimits["books/reviews"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -87,7 +89,9 @@ export async function POST(
     const rateLimit = await rateLimitGuard(request, {
       route: "books/reviews",
       userId,
-      ...rateLimits["books/reviews"],
+      userLimit: rateLimits["books/reviews"]?.userLimit ?? 10,
+      ipLimit: rateLimits["books/reviews"]?.ipLimit ?? 20,
+      windowMs: rateLimits["books/reviews"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
