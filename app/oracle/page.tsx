@@ -267,7 +267,18 @@ export default function OraclePage() {
             setGenerationStage("Redigindo uma resposta...");
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
-            queueReveal(json.text);
+            // Update message content directly for real-time display
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last?.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: fullText,
+                };
+              }
+              return updated;
+            });
           }
         } catch {}
       }
@@ -515,12 +526,34 @@ export default function OraclePage() {
             voiceChatDataRef.current.push(json.audio.data);
             if (json.audio.transcript) {
               fullText += json.audio.transcript;
-              queueReveal(json.audio.transcript);
+              // Update message content directly for real-time display
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    content: fullText,
+                  };
+                }
+                return updated;
+              });
             }
           }
           if (json.text) {
             fullText += json.text;
-            queueReveal(json.text);
+            // Update message content directly for real-time display
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last?.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: fullText,
+                };
+              }
+              return updated;
+            });
           }
         } catch {}
       }
