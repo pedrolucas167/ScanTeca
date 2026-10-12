@@ -342,11 +342,21 @@ export default function OraclePage() {
         throw new Error(data?.error || "Erro ao consultar o Oráculo");
       }
 
-      await readOracleStream(res);
-      // Marca o fim do stream antes de drenar: o pump precisa saber que não
-      // chega mais texto para resolver o drain.
+      const fullText = await readOracleStream(res);
+      // Update the final message content with the complete response
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant") {
+          updated[updated.length - 1] = {
+            ...last,
+            content: fullText,
+          };
+        }
+        return updated;
+      });
+      // Marca o fim do stream
       streamDoneRef.current = true;
-      await drainReveal();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // Usuário parou a geração — mantém o que já foi revelado.

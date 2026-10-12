@@ -192,6 +192,11 @@ const HEADING_CLASS: Record<number, string> = {
 };
 
 export default function Markdown({ content, sources }: MarkdownProps) {
+  // Handle empty or incomplete content during streaming
+  if (!content || content.trim() === "") {
+    return null;
+  }
+
   const blocks = parseBlocks(content);
 
   return (
