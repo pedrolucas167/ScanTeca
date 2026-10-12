@@ -265,6 +265,7 @@ export default function OraclePage() {
           }
           if (json.text) {
             setGenerationStage("Redigindo uma resposta...");
+            // eslint-disable-next-line react-hooks/immutability
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
             // Update message content directly for real-time display
@@ -551,6 +552,7 @@ export default function OraclePage() {
             }
           }
           if (json.text) {
+            // eslint-disable-next-line react-hooks/immutability
             fullText += json.text;
             // Update message content directly for real-time display
             setMessages((prev) => {
@@ -949,30 +951,6 @@ export default function OraclePage() {
       ttsBufferRef.current = "";
       // In a real implementation, this would send to TTS
       // For now, we just clear the buffer
-    }
-  };
-
-  const queueReveal = (text: string) => {
-    pendingCharsRef.current += text;
-    if (revealTimerRef.current === null) {
-      revealTimerRef.current = window.setTimeout(() => {
-        revealTimerRef.current = null;
-        // Update the last assistant message with accumulated text
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last?.role === "assistant") {
-            updated[updated.length - 1] = {
-              ...last,
-              content: (last.content || "") + pendingCharsRef.current,
-            };
-          }
-          return updated;
-        });
-        pendingCharsRef.current = "";
-        revealDoneRef.current?.();
-        revealDoneRef.current = null;
-      }, 10);
     }
   };
 
