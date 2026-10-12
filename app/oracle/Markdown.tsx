@@ -53,7 +53,9 @@ function parseBlocks(content: string): Block[] {
         buf.push(lines[i] ?? "");
         i++;
       }
-      i++; // fecha o fence (ou EOF durante stream)
+      if (i < lines.length) {
+        i++; // fecha o fence
+      }
       blocks.push({ type: "code", content: buf.join("\n") });
       continue;
     }
@@ -190,6 +192,11 @@ const HEADING_CLASS: Record<number, string> = {
 };
 
 export default function Markdown({ content, sources }: MarkdownProps) {
+  // Handle empty or incomplete content during streaming
+  if (!content || content.trim() === "") {
+    return null;
+  }
+
   const blocks = parseBlocks(content);
 
   return (

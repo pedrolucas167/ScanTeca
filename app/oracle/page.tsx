@@ -265,9 +265,22 @@ export default function OraclePage() {
           }
           if (json.text) {
             setGenerationStage("Redigindo uma resposta...");
+            // eslint-disable-next-line react-hooks/immutability
+            // eslint-disable-next-line react-hooks/immutability
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
-            queueReveal(json.text);
+            // Update message content directly for real-time display
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last?.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: fullText,
+                };
+              }
+              return updated;
+            });
           }
         } catch {}
       }
@@ -331,11 +344,21 @@ export default function OraclePage() {
         throw new Error(data?.error || "Erro ao consultar o Oráculo");
       }
 
-      await readOracleStream(res);
-      // Marca o fim do stream antes de drenar: o pump precisa saber que não
-      // chega mais texto para resolver o drain.
+      const fullText = await readOracleStream(res);
+      // Update the final message content with the complete response
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant") {
+          updated[updated.length - 1] = {
+            ...last,
+            content: fullText,
+          };
+        }
+        return updated;
+      });
+      // Marca o fim do stream
       streamDoneRef.current = true;
-      await drainReveal();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // Usuário parou a geração — mantém o que já foi revelado.
@@ -514,13 +537,38 @@ export default function OraclePage() {
           if (json.audio?.data) {
             voiceChatDataRef.current.push(json.audio.data);
             if (json.audio.transcript) {
+              // eslint-disable-next-line react-hooks/immutability
               fullText += json.audio.transcript;
-              queueReveal(json.audio.transcript);
+              // Update message content directly for real-time display
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    content: fullText,
+                  };
+                }
+                return updated;
+              });
             }
           }
           if (json.text) {
+            // eslint-disable-next-line react-hooks/immutability
+            // eslint-disable-next-line react-hooks/immutability
             fullText += json.text;
-            queueReveal(json.text);
+            // Update message content directly for real-time display
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last?.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: fullText,
+                };
+              }
+              return updated;
+            });
           }
         } catch {}
       }
@@ -906,30 +954,6 @@ export default function OraclePage() {
       ttsBufferRef.current = "";
       // In a real implementation, this would send to TTS
       // For now, we just clear the buffer
-    }
-  };
-
-  const queueReveal = (text: string) => {
-    pendingCharsRef.current += text;
-    if (revealTimerRef.current === null) {
-      revealTimerRef.current = window.setTimeout(() => {
-        revealTimerRef.current = null;
-        // Update the last assistant message with accumulated text
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last?.role === "assistant") {
-            updated[updated.length - 1] = {
-              ...last,
-              content: (last.content || "") + pendingCharsRef.current,
-            };
-          }
-          return updated;
-        });
-        pendingCharsRef.current = "";
-        revealDoneRef.current?.();
-        revealDoneRef.current = null;
-      }, 10);
     }
   };
 
@@ -1363,7 +1387,7 @@ export default function OraclePage() {
                   )}
                 </div>
                 <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
-                  {loading && i === messages.length - 1 && !msg.content ? (
+                  {loading && i === messages.length - 1 && msg.content === "" ? (
                   <div className="flex items-center gap-2 py-1 min-h-[60px]" aria-label="Oráculo digitando">
                     <div
                       className="flex items-center gap-1.5"
