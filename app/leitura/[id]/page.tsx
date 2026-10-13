@@ -1,28 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
+import { getReadingPage } from "@/modules/reading";
 import { notFound } from "next/navigation";
 
 import { addAnnotation } from "./actions";
 
 export default async function LeituraPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await auth();
-  const book = await prisma.book.findUnique({ where: { id: id } });
-  if (!book) notFound();
-
-  // Trecho exemplo (pode vir de BookPassage no futuro)
-  const passage = await prisma.bookPassage.findFirst({
-    where: { bookId: id },
-    orderBy: { chapter: "asc", paragraph: "asc" },
-  });
-
-  // Anotações do trecho
-  const annotations = passage
-    ? await prisma.annotation.findMany({
-        where: { passageId: passage.id },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+  const { userId } = await auth();
+  if (!userId) notFound();
+  const result = await getReadingPage(userId, id);
+  if (!result) notFound();
+  const { book, passage, annotations } = result;
 
   return (
     <main className="min-h-screen bg-[#111319] text-[#e2e2eb] font-[Inter]">

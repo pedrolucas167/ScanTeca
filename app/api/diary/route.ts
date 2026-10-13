@@ -1,196 +1,36 @@
 import { auth } from "@clerk/nextjs/server";
-import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
-import { diaryToEmbeddingText, generateEmbedding } from "@/lib/embeddings";
-
-const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("start"), bookId: z.string().cuid() }),
-  z.object({ action: z.literal("pause"), sessionId: z.string().cuid(), currentPage: z.number().int().min(0) }),
-  z.object({
-    action: z.literal("entry"),
-    bookId: z.string().cuid(),
-    sessionId: z.string().cuid().nullable().optional(),
-    type: z.enum(["REFLECTION", "QUOTE", "OCR"]),
-    content: z.string().trim().min(1).max(5000),
-    page: z.number().int().min(1).nullable().optional(),
-    tags: z.array(z.string().trim().min(1).max(40)).max(10).default([]),
-  }),
-  z.object({
-    action: z.literal("updateEntry"),
-    entryId: z.string().cuid(),
-    type: z.enum(["REFLECTION", "QUOTE", "OCR"]),
-    content: z.string().trim().min(1).max(5000),
-    page: z.number().int().min(1).nullable().optional(),
-    tags: z.array(z.string().trim().min(1).max(40)).max(10).default([]),
-  }),
-  z.object({ action: z.literal("deleteEntry"), entryId: z.string().cuid() }),
-]);
-
-async function validatePage(userId: string, bookId: string, page: number | null | undefined) {
-  const book = await prisma.book.findFirst({
-    where: { id: bookId, userId },
-    select: { pages: true },
-  });
-  if (!book) return { error: "Livro não encontrado", status: 404 } as const;
-  if (page != null && book.pages != null && page > book.pages) {
-    return { error: `A página não pode ultrapassar ${book.pages}`, status: 400 } as const;
-  }
-  return { book } as const;
-}
+import {
+  diaryCommandSchema, startReadingSession, pauseReadingSession,
+  saveDiaryEntry, deleteDiaryEntry, ReadingError,
+} from "@/modules/reading";
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
-
-  const rateLimit = await rateLimitGuard(request, {
-    route: "diary",
-    userId,
-    userLimit: rateLimits.diary?.userLimit ?? 10,
-    ipLimit: rateLimits.diary?.ipLimit ?? 20,
-    windowMs: rateLimits.diary?.windowMs,
-  });
-  if (rateLimit) return rateLimit;
-
-  const parsed = await readJson(request, schema);
-  if (!parsed.ok) return parsed.response;
-  const input = parsed.data;
-
-  if (input.action === "start") {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const session = await prisma.$transaction(async (tx) => {
-          const book = await tx.book.findFirst({
-            where: { id: input.bookId, userId },
-          });
-          if (!book) return null;
-
-          await tx.readingSession.updateMany({
-            where: { userId, endedAt: null },
-            data: { endedAt: new Date() },
-          });
-          const created = await tx.readingSession.create({
-            data: {
-              userId,
-              bookId: book.id,
-              startedPage: book.currentPage ?? 0,
-              currentPage: book.currentPage ?? 0,
-            },
-          });
-          if (book.status !== "READING") {
-            await tx.book.update({
-              where: { id: book.id },
-              data: {
-                status: "READING",
-                startedAt: book.startedAt ?? new Date(),
-              },
-            });
-          }
-          return created;
-        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-
-        if (!session) {
-          return Response.json({ error: "Livro não encontrado" }, { status: 404 });
-        }
-        return Response.json({ session }, { status: 201 });
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2034" &&
-          attempt < 2
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-    throw new Error("Não foi possível iniciar a sessão");
-  }
-
-  if (input.action === "pause") {
-    const session = await prisma.readingSession.findFirst({ where: { id: input.sessionId, userId, endedAt: null } });
-    if (!session) return Response.json({ error: "Sessão ativa não encontrada" }, { status: 404 });
-    const pageCheck = await validatePage(userId, session.bookId, input.currentPage);
-    if ("error" in pageCheck) return Response.json({ error: pageCheck.error }, { status: pageCheck.status });
-    if (input.currentPage < session.startedPage) {
-      return Response.json({ error: `A página não pode ser menor que ${session.startedPage}, onde a sessão começou` }, { status: 400 });
-    }
-    const endedAt = new Date();
-    const durationSec = Math.max(0, Math.round((endedAt.getTime() - session.startedAt.getTime()) / 1000));
-    const currentPage = input.currentPage;
-    const pages = currentPage - session.startedPage;
-    await prisma.$transaction([
-      prisma.readingSession.update({ where: { id: session.id }, data: { endedAt, durationSec, currentPage } }),
-      prisma.book.update({ where: { id: session.bookId }, data: { currentPage } }),
-      ...(pages > 0 ? [prisma.readingLog.upsert({
-        where: { userId_date: { userId, date: new Date(new Date().toISOString().slice(0, 10)) } },
-        create: { userId, bookId: session.bookId, date: new Date(new Date().toISOString().slice(0, 10)), pages },
-        update: { pages: { increment: pages }, bookId: session.bookId },
-      })] : []),
-    ]);
-    return Response.json({ ok: true, durationSec, pages });
-  }
-
-  if (input.action === "deleteEntry") {
-    const entry = await prisma.diaryEntry.findFirst({ where: { id: input.entryId, userId } });
-    if (!entry) return Response.json({ error: "Anotação não encontrada" }, { status: 404 });
-    await prisma.diaryEntry.delete({ where: { id: entry.id } });
-    return Response.json({ ok: true });
-  }
-
-  if (input.action === "updateEntry") {
-    const entry = await prisma.diaryEntry.findFirst({ where: { id: input.entryId, userId } });
-    if (!entry) return Response.json({ error: "Anotação não encontrada" }, { status: 404 });
-    const pageCheck = await validatePage(userId, entry.bookId, input.page);
-    if ("error" in pageCheck) return Response.json({ error: pageCheck.error }, { status: pageCheck.status });
-    const updated = await prisma.diaryEntry.update({
-      where: { id: entry.id },
-      data: { type: input.type, content: input.content, page: input.page, tags: input.tags },
-      include: { book: { select: { title: true, author: true } } },
+  try {
+    const { userId } = await auth();
+    if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+    const limit = await rateLimitGuard(request, {
+      route: "diary", userId, userLimit: rateLimits.diary?.userLimit ?? 10,
+      ipLimit: rateLimits.diary?.ipLimit ?? 20, windowMs: rateLimits.diary?.windowMs,
     });
-    const embedding = await generateEmbedding(diaryToEmbeddingText({
-      type: updated.type,
-      content: updated.content,
-      page: updated.page,
-      tags: updated.tags,
-      book: { title: updated.book.title, author: updated.book.author },
-    }));
-    if (embedding) {
-      await prisma.$executeRaw`
-        UPDATE "DiaryEntry" SET embedding = ${`[${embedding.join(",")}]`}::vector
-        WHERE id = ${updated.id}
-      `;
+    if (limit) return limit;
+    const parsed = await readJson(request, diaryCommandSchema);
+    if (!parsed.ok) return parsed.response;
+    const input = parsed.data;
+    switch (input.action) {
+      case "start": return Response.json({ session: await startReadingSession(userId, input.bookId) }, { status: 201 });
+      case "pause": return Response.json(await pauseReadingSession(userId, input.sessionId, input.currentPage));
+      case "deleteEntry": return Response.json(await deleteDiaryEntry(userId, input.entryId));
+      case "entry":
+      case "updateEntry": return Response.json({ entry: await saveDiaryEntry(userId, input) }, { status: input.action === "entry" ? 201 : 200 });
     }
-    return Response.json({ entry: updated });
+  } catch (error) {
+    if (error instanceof ReadingError) return Response.json({ error: error.message }, {
+      status: error.code === "NOT_FOUND" ? 404 : error.code === "CONFLICT" ? 409 : 400,
+    });
+    console.error("[diary] Falha na operação:", error);
+    return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-
-  const book = await prisma.book.count({ where: { id: input.bookId, userId } });
-  if (!book) return Response.json({ error: "Livro não encontrado" }, { status: 404 });
-  if (input.sessionId) {
-    const session = await prisma.readingSession.count({ where: { id: input.sessionId, userId, bookId: input.bookId } });
-    if (!session) return Response.json({ error: "Sessão não encontrada" }, { status: 404 });
-  }
-  const pageCheck = await validatePage(userId, input.bookId, input.page);
-  if ("error" in pageCheck) return Response.json({ error: pageCheck.error }, { status: pageCheck.status });
-  const entry = await prisma.diaryEntry.create({
-    data: { userId, bookId: input.bookId, sessionId: input.sessionId, type: input.type, content: input.content, page: input.page, tags: input.tags },
-    include: { book: { select: { title: true, author: true } } },
-  });
-  const embedding = await generateEmbedding(diaryToEmbeddingText({
-    type: entry.type,
-    content: entry.content,
-    page: entry.page,
-    tags: entry.tags,
-    book: entry.book,
-  }));
-  if (embedding) {
-    await prisma.$executeRaw`
-      UPDATE "DiaryEntry" SET embedding = ${`[${embedding.join(",")}]`}::vector
-      WHERE id = ${entry.id}
-    `;
-  }
-  return Response.json({ entry }, { status: 201 });
 }
