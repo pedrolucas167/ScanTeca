@@ -13,6 +13,28 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
   {
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["@/modules/*/*", "**/modules/*/*"],
+          message: "Importe módulos pela API pública: @/modules/<nome>.",
+        }],
+      }],
+    },
+  },
+  {
+    files: ["modules/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["@/modules/*/*", "**/modules/*/*"], message: "Use a API pública do módulo." },
+          { group: ["@/app/**", "next/server", "next/navigation", "@clerk/nextjs/**"], message: "Módulos não dependem da camada HTTP/UI ou de autenticação." },
+        ],
+      }],
+    },
+  },
+  {
     rules: {
       // TypeScript rules
       "@typescript-eslint/no-unused-vars": ["error", { 

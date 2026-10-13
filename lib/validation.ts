@@ -21,17 +21,4 @@ export async function readJson<S extends z.ZodType>(
   return { ok: true, data: parsed.data };
 }
 
-export const bookStatusSchema = z.enum(
-  ["READ", "READING", "TO_READ", "WISHLIST"],
-  "Status inválido"
-);
-
-// Formulários mandam número como string ("" quando vazio) — normaliza pra number|null
-export const optionalNumber = z.preprocess(
-  (v) => {
-    if (v === "" || v === undefined || v === null) return null;
-    if (typeof v === "string") return Number(v);
-    return v;
-  },
-  z.number("Deve ser um número").nullish()
-);
+export { bookStatusSchema, optionalNumber } from "./validation-schemas";
