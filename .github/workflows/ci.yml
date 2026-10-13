@@ -6,6 +6,35 @@ on:
     branches: [main, develop]
 
 jobs:
+  reading-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: scanteca_test
+          POSTGRES_PASSWORD: scanteca_test_local
+          POSTGRES_DB: scanteca_reading_test
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U scanteca_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://scanteca_test:scanteca_test_local@127.0.0.1:55439/scanteca_reading_test
+      SCANTECA_TEST_DATABASE_URL: postgresql://scanteca_test:scanteca_test_local@127.0.0.1:55439/scanteca_reading_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma db push --skip-generate
+      - run: npm run test:integration
+
   build:
     runs-on: ubuntu-latest
     steps:
