@@ -96,7 +96,7 @@ export class ScrapingWorker {
     try {
       let title = "";
       let content = "";
-      let type = job.type || "article";
+      const type = job.type || "article";
 
       if (job.source === "wikipedia") {
         const article = data as { title?: string; content?: string; url?: string };
