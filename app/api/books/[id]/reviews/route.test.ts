@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+vi.mock("@/lib/embeddings", () => ({
+  generateEmbedding: vi.fn().mockResolvedValue(null),
+  reviewToEmbeddingText: vi.fn().mockReturnValue("review"),
+}));
+
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
   currentUser: vi.fn(),

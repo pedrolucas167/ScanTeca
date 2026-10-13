@@ -197,6 +197,10 @@ function extractStatus(query: string): "READ" | "READING" | "TO_READ" | "WISHLIS
  * Extract rating range from query
  */
 function extractRating(query: string): { min: number; max?: number } | null {
+  // Minimum constraints must precede exact ratings ("pelo menos 4 estrelas").
+  const minimumMatch = query.match(/pelo menos\s+(\d)\s*(estrela|nota|\/5)/i);
+  if (minimumMatch?.[1]) return { min: Number(minimumMatch[1]) };
+
   // Exact rating
   const exactMatch = query.match(/(\d)\s*(estrela|nota|\/5)/i);
   if (exactMatch && exactMatch[1]) {
