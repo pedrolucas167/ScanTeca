@@ -139,10 +139,12 @@ export default function OraclePage() {
     try {
       stopAudio();
       setPlayingTtsIndex(index);
+      // Remove citations from text before sending to TTS
+      const textWithoutCitations = text.replace(/\[\d+\]/g, "");
       const res = await fetch("/api/oracle/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: textWithoutCitations }),
       });
       if (!res.ok) {
         setPlayingTtsIndex(null);
@@ -232,8 +234,8 @@ export default function OraclePage() {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               updated[updated.length - 1] = {
+                ...last,
                 role: last?.role ?? "assistant",
-                content: last?.content ?? "",
                 sources: json.sources,
               };
               return updated;
@@ -244,8 +246,8 @@ export default function OraclePage() {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               updated[updated.length - 1] = {
+                ...last,
                 role: last?.role ?? "assistant",
-                content: last?.content ?? "",
                 retrievalStats: json.retrievalStats,
               };
               return updated;
@@ -256,8 +258,8 @@ export default function OraclePage() {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               updated[updated.length - 1] = {
+                ...last,
                 role: last?.role ?? "assistant",
-                content: last?.content ?? "",
                 citations: json.citations,
               };
               return updated;
