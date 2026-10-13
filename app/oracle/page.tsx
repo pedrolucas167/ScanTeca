@@ -236,6 +236,7 @@ export default function OraclePage() {
               updated[updated.length - 1] = {
                 ...last,
                 role: last?.role ?? "assistant",
+                content: last?.content ?? "",
                 sources: json.sources,
               };
               return updated;
@@ -248,6 +249,7 @@ export default function OraclePage() {
               updated[updated.length - 1] = {
                 ...last,
                 role: last?.role ?? "assistant",
+                content: last?.content ?? "",
                 retrievalStats: json.retrievalStats,
               };
               return updated;
@@ -260,6 +262,7 @@ export default function OraclePage() {
               updated[updated.length - 1] = {
                 ...last,
                 role: last?.role ?? "assistant",
+                content: last?.content ?? "",
                 citations: json.citations,
               };
               return updated;
