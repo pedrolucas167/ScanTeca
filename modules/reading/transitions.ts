@@ -15,7 +15,12 @@ export interface ReadingChange {
   startReclube?: boolean;
 }
 
-export class ReadingError extends Error {}
+export class ReadingError extends Error {
+  constructor(message: string, public readonly code: "INVALID_INPUT" | "NOT_FOUND" | "CONFLICT" = "INVALID_INPUT") {
+    super(message);
+    this.name = "ReadingError";
+  }
+}
 
 export function planReadingTransition(
   existing: ReadingState,
