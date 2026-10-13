@@ -1,5 +1,7 @@
 import { scrapingQueue, ScrapingJob, ScrapingResult } from "./scraping-queue";
 import { wikipediaScraper } from "./scrapers/wikipedia";
+import { prisma } from "./prisma";
+import { generateEmbedding, externalDataToEmbeddingText } from "./embeddings";
 
 export class ScrapingWorker {
   private isRunning = false;
@@ -61,6 +63,9 @@ export class ScrapingWorker {
           throw new Error(`Unknown source: ${job.source}`);
       }
 
+      // Save to database with embedding
+      await this.saveToDatabase(job, data);
+
       return {
         jobId: job.id,
         success: true,
@@ -70,7 +75,7 @@ export class ScrapingWorker {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Job ${job.id} failed:`, errorMessage);
-      
+
       await scrapingQueue.failJob(job.id, errorMessage);
 
       return {
@@ -79,6 +84,63 @@ export class ScrapingWorker {
         error: errorMessage,
         completedAt: Date.now(),
       };
+    }
+  }
+
+  private async saveToDatabase(job: ScrapingJob, data: unknown) {
+    if (!job.userId) {
+      console.warn(`Job ${job.id} has no userId, skipping database save`);
+      return;
+    }
+
+    try {
+      let title = "";
+      let content = "";
+      let type = job.type || "article";
+
+      if (job.source === "wikipedia") {
+        const article = data as { title?: string; content?: string; url?: string };
+        title = article.title || job.url;
+        content = article.content || "";
+      }
+
+      if (!title || !content) {
+        console.warn(`Job ${job.id} has no title or content, skipping database save`);
+        return;
+      }
+
+      // Generate embedding
+      const embeddingText = externalDataToEmbeddingText({
+        source: job.source,
+        title,
+        content: content.slice(0, 8000),
+        type,
+      });
+      const embedding = await generateEmbedding(embeddingText);
+
+      // Save to database with embedding using raw query
+      if (embedding) {
+        await prisma.$queryRaw`
+          INSERT INTO "ExternalResearchData" ("id", "userId", "source", "url", "title", "content", "type", "embedding", "scrapedAt", "createdAt", "updatedAt")
+          VALUES (${`ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}, ${job.userId}, ${job.source}, ${job.url}, ${title}, ${content}, ${type}, ${`[${embedding.join(",")}]`}::vector, NOW(), NOW(), NOW())
+        `;
+      } else {
+        await prisma.externalResearchData.create({
+          data: {
+            userId: job.userId,
+            source: job.source,
+            url: job.url,
+            title,
+            content,
+            type,
+          },
+        });
+      }
+
+      console.log(`Job ${job.id} saved to database`);
+    } catch (error) {
+      console.error(`Error saving job ${job.id} to database:`, error);
+      // Don't fail the job if database save fails
     }
   }
 

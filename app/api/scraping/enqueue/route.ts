@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { scrapingQueue } from "@/lib/scraping-queue";
 import { rateLimitGuard } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const rateLimitResult = await rateLimitGuard(request, {
     route: "scraping/enqueue",
-    userId: null, // TODO: Add auth when available
+    userId,
     userLimit: 10,
     ipLimit: 30,
     windowMs: 60_000,
@@ -32,6 +38,7 @@ export async function POST(request: NextRequest) {
       type: type as "book" | "article" | "review" | "metadata",
       priority,
       maxAttempts: 3,
+      userId,
       metadata,
     });
 

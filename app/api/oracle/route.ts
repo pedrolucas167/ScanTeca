@@ -77,6 +77,15 @@ interface ReviewMemory {
   distance: number;
 }
 
+interface ExternalResearchMemory {
+  id: string;
+  source: string;
+  title: string;
+  content: string;
+  type: string;
+  distance: number;
+}
+
 const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.7;
 const MAX_CONTEXT_BOOKS = 4;
@@ -576,7 +585,7 @@ export async function POST(request: NextRequest) {
     }
 
     const vector = `[${questionEmbedding.join(",")}]`;
-    const [similarBooks, semanticDiary, semanticReviews] = await Promise.all([
+    const [similarBooks, semanticDiary, semanticReviews, semanticExternal] = await Promise.all([
       prisma.$queryRaw<SimilarBook[]>`
       SELECT id, title, author, "publishedDate", synopsis, genre,
              status::text as status, rating,
@@ -609,6 +618,15 @@ export async function POST(request: NextRequest) {
         ORDER BY r.embedding <=> ${vector}::vector
         LIMIT ${MAX_RAG_MEMORIES}
       `,
+      prisma.$queryRaw<ExternalResearchMemory[]>`
+        SELECT id, source, title, content, type,
+               embedding <=> ${vector}::vector AS distance
+        FROM "ExternalResearchData"
+        WHERE "userId" = ${userId}
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> ${vector}::vector
+        LIMIT ${MAX_RAG_MEMORIES}
+      `,
     ]);
 
     const relevantBooks = similarBooks.filter(
@@ -619,7 +637,6 @@ export async function POST(request: NextRequest) {
     const metadataFilters = await jevExtractFilters(retrievalQuery);
     const whereClause = filtersToWhereClause(metadataFilters, userId);
 
-    // Escopo ampliado: busca livros fora do acervo no Google Books.
     interface ExternalBook {
       title: string;
       author: string;
@@ -807,6 +824,7 @@ export async function POST(request: NextRequest) {
 
     const relevantDiary = semanticDiary.filter((entry) => Number(entry.distance) < DISTANCE_THRESHOLD);
     const relevantReviews = semanticReviews.filter((review) => Number(review.distance) < DISTANCE_THRESHOLD);
+    const relevantExternal = semanticExternal.filter((data) => Number(data.distance) < DISTANCE_THRESHOLD);
     const diaryIntent = /\b(diário|anotações?|memórias?|registros?|reflexões?)\b/i.test(
       retrievalQuery
     );
@@ -829,6 +847,11 @@ export async function POST(request: NextRequest) {
           .map((review) => `- "${review.bookTitle}" — ${review.bookAuthor}${review.rating ? ` (${review.rating}/5)` : ""}: ${review.content.slice(0, 500)}`)
           .join("\n")}`
       : "";
+    const externalSection = relevantExternal.length
+      ? `\n\nPesquisa externa relevante:\n${relevantExternal
+          .map((data) => `- [${data.source} - ${data.type}] "${data.title}": ${data.content.slice(0, 500)}`)
+          .join("\n")}`
+      : "";
 
     const progressIntent = /\b(lendo|leitura atual|em andamento|progresso|página|paginas|páginas)\b/i.test(
       retrievalQuery
@@ -837,6 +860,7 @@ export async function POST(request: NextRequest) {
       contextBooks.length > 0 ||
       relevantDiary.length > 0 ||
       relevantReviews.length > 0 ||
+      relevantExternal.length > 0 ||
       (diaryIntent && diaryEntries.length > 0) ||
       (progressIntent && readingNow.length > 0) ||
       externalBooks.length > 0;
@@ -847,10 +871,11 @@ export async function POST(request: NextRequest) {
     const retrievalStats = {
       durationMs: Date.now() - retrievalStartedAt,
       vectorCandidates:
-        similarBooks.length + semanticDiary.length + semanticReviews.length,
+        similarBooks.length + semanticDiary.length + semanticReviews.length + semanticExternal.length,
       selectedBooks: contextBooks.length,
       selectedDiary: relevantDiary.length,
       selectedReviews: relevantReviews.length,
+      selectedExternal: relevantExternal.length,
       externalBooks: externalBooks.length,
       scope,
     };
@@ -912,7 +937,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
       })),
       {
         role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}${reviewSection}\n\nPergunta do usuário: ${trimmed}`,
+        content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}${reviewSection}${externalSection}\n\nPergunta do usuário: ${trimmed}`,
       },
     ];
 

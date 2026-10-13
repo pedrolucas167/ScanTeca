@@ -89,3 +89,17 @@ export function reviewToEmbeddingText(review: {
     review.content,
   ].filter(Boolean).join(" — ");
 }
+
+export function externalDataToEmbeddingText(data: {
+  source: string;
+  title: string;
+  content: string;
+  type: string;
+}): string {
+  return [
+    `Fonte: ${data.source}`,
+    `Tipo: ${data.type}`,
+    `Título: ${data.title}`,
+    data.content,
+  ].filter(Boolean).join(" — ");
+}

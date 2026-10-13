@@ -10,6 +10,7 @@ export interface ScrapingJob {
   createdAt: number;
   attempts: number;
   maxAttempts: number;
+  userId?: string;
   metadata?: Record<string, unknown>;
 }
 
