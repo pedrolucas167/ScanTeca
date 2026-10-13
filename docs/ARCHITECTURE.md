@@ -158,14 +158,14 @@ Configurações adicionais para maior segurança de tipos:
 
 - `main`: Branch de produção
 - `develop`: Branch de integração
-- `codex/feat/<modulo>`: Desenvolvimento de cada módulo
-- `codex/fix/<escopo>`: Correções isoladas
-- `codex/refactor/<escopo>`: Refatorações sem mudança funcional
+- `feat/<modulo>`: Desenvolvimento de cada módulo
+- `fix/<escopo>`: Correções isoladas
+- `refactor/<escopo>`: Refatorações sem mudança funcional
 
 Usar uma branch por módulo. Quando houver dependência entre módulos, criar
 branches encadeadas e integrar na ordem da dependência. A primeira extração usa
-`codex/fix/validation-baseline` → `codex/feat/reading-module` →
-`codex/feat/library-module`, preservando a base existente em `fix/build-errors`.
+`fix/validation-baseline` → `feat/reading-module` →
+`feat/library-module`, preservando a base existente em `fix/build-errors`.
 Essa base está à frente de `develop`; sua integração deve ser tratada antes de
 abrir uma comparação final contra `develop` para evitar incluir trabalho anterior.
 
