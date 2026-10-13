@@ -20,6 +20,13 @@ a organização anterior; esta mudança não torna o projeto inteiro modular.
 Escopo, critérios de conclusão, estimativas e limites de validação estão em
 [DEVELOPMENT-ROADMAP.md](./DEVELOPMENT-ROADMAP.md).
 
+Na segunda etapa, sessões, diário e marginalia foram migrados para Leitura.
+As páginas de diário/leitura consultam sua API pública. Pausas são idempotentes
+e conciliam páginas já registradas pelo catálogo; autorização exige propriedade
+do livro e correspondência da sessão/trecho. Dez testes com PostgreSQL isolado
+validaram concorrência, rollback e autorização. Jornada ainda usa consultas e
+cálculos legados. Consulte [READING-VALIDATION.md](./READING-VALIDATION.md).
+
 ## Estrutura de Diretórios
 
 ```

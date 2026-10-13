@@ -9,7 +9,7 @@ incluindo revisão e testes; não são prazos de calendário ou compromissos.
 | Prioridade | Entrega | Esforço restante inicial | Confiança | Critério de aceite |
 | --- | --- | --- | --- | --- |
 | P0 | Base de validação e primeiro corte Biblioteca/Leitura | Implementado neste corte; validações registradas abaixo | Alta para o corte local | Build, testes, lint e smoke HTTP verificáveis |
-| P0 | Completar consistência e autorização de Leitura | 3–5 dias | Média | Sessões, diário e anotações passam pelo módulo; testes com PostgreSQL isolado verificam rollback, concorrência e isolamento de usuários |
+| P0 | Completar consistência e autorização de Leitura | Núcleo de sessões/diário/anotações implementado; 1–3 dias para jornada e revisão autenticada | Média | PostgreSQL isolado validou rollback e concorrência; concluir jornada e smoke autenticado |
 | P1 | Completar Biblioteca | 3–5 dias | Média | Enrich, reorder, consultas e coleções usam a API pública; deduplicação concorrente definida; integrações externas têm limites de tempo |
 | P1 | Oráculo | 5–8 dias | Média-baixa | Separar retrieval, contexto, geração, streaming e persistência; fixtures de qualidade, cancelamento e falhas; medir latência e tokens |
 | P1 | Jobs e notificações | 3–5 dias | Baixa | Worker executável no ambiente de deploy; retirada atômica, retentativas e recuperação; efeitos idempotentes |
@@ -18,6 +18,11 @@ incluindo revisão e testes; não são prazos de calendário ou compromissos.
 
 Reestimar cada linha depois de concluir a anterior. O build local demonstra
 compatibilidade de compilação; não valida integrações autenticadas em produção.
+
+A segunda etapa de Leitura está registrada em
+[READING-VALIDATION.md](./READING-VALIDATION.md): 115 testes unitários e dez testes
+de PostgreSQL real passaram. Os limites do primeiro corte descritos abaixo são
+históricos; a integração de Leitura já avançou, e o smoke autenticado está pendente.
 
 ## Primeiro corte implementado
 
