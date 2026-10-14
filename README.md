@@ -4,6 +4,8 @@ Biblioteca pessoal para catalogar livros por ISBN, acompanhar a jornada de leitu
 
 O projeto é uma **PWA** em português do Brasil. O manifesto define instalação em modo standalone, orientação vertical e as categorias `books`, `utilities` e `lifestyle`.
 
+Para testar Biblioteca e Leitura com sua conta de desenvolvimento, veja [Dados fictícios e PostgreSQL local](docs/DEVELOPMENT-DATA.md).
+
 ## Funcionalidades
 
 - Catálogo pessoal com coleções, status de leitura, notas, avaliações e progresso.
