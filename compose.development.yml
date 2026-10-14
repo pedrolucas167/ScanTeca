@@ -1,0 +1,18 @@
+services:
+  database:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "127.0.0.1:55440:5432"
+    environment:
+      POSTGRES_USER: scanteca_dev
+      POSTGRES_PASSWORD: scanteca_dev_local
+      POSTGRES_DB: scanteca_development
+    volumes:
+      - development_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanteca_dev -d scanteca_development"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  development_database:
