@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetch-with-timeout";
 import {
   isTitleSimilar,
   isAuthorSimilar,
@@ -67,7 +68,7 @@ async function findOpenLibrarySynopsisByIsbn(
   isbn: string
 ): Promise<string | null> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
     );
     if (!res.ok) return null;
@@ -77,7 +78,7 @@ async function findOpenLibrarySynopsisByIsbn(
     const workKey = book?.works?.[0]?.key;
     if (!workKey) return null;
 
-    const workRes = await fetch(`https://openlibrary.org${workKey}.json`);
+    const workRes = await fetchWithTimeout(`https://openlibrary.org${workKey}.json`);
     if (!workRes.ok) return null;
 
     const work = (await workRes.json()) as OpenLibraryWork;
@@ -99,7 +100,7 @@ async function findGoogleBooksSynopsisByIsbn(
     : `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=5`;
 
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return null;
 
     const data = (await res.json()) as GoogleBooksVolume;
@@ -139,7 +140,7 @@ async function findGoogleBooksSynopsisByTitleAuthor(
         : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10${langSuffix}`;
 
       try {
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url);
         if (!res.ok) continue;
 
         const data = (await res.json()) as GoogleBooksVolume;
@@ -184,7 +185,7 @@ async function findOpenLibrarySynopsisByTitleAuthor(
 
   for (const q of queries) {
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`
       );
       if (!res.ok) continue;
@@ -208,7 +209,7 @@ async function findOpenLibrarySynopsisByTitleAuthor(
         const workKey = doc.key;
         if (!workKey) continue;
 
-        const workRes = await fetch(`https://openlibrary.org${workKey}.json`);
+        const workRes = await fetchWithTimeout(`https://openlibrary.org${workKey}.json`);
         if (!workRes.ok) continue;
 
         const work = (await workRes.json()) as OpenLibraryWork;
@@ -247,7 +248,7 @@ async function findWikipediaSynopsis(
       )}&prop=extracts&exintro=1&explaintext=1&exsentences=6&format=json&origin=*&redirects=1`;
 
       try {
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url);
         if (!res.ok) continue;
 
         const data = (await res.json()) as WikipediaExtractResponse;

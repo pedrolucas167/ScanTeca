@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetch-with-timeout";
 import {
   isTitleSimilar,
   isAuthorSimilar,
@@ -80,7 +81,7 @@ export async function findBookCover({
       const url = apiKey
         ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}&maxResults=10&key=${apiKey}`
         : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanedIsbn}&maxResults=10`;
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       if (res.ok) {
         const data = (await res.json()) as GoogleBooksVolume;
         if (data.items && data.totalItems > 0) {
@@ -97,7 +98,7 @@ export async function findBookCover({
     }
 
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanedIsbn}&format=json&jscmd=data`
       );
       if (res.ok) {
@@ -128,7 +129,7 @@ export async function findBookCover({
       const url = apiKey
         ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10&key=${apiKey}`
         : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=10`;
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       if (res.ok) {
         const data = (await res.json()) as GoogleBooksVolume;
         if (data.items && data.totalItems > 0) {
@@ -163,7 +164,7 @@ export async function findBookCover({
     ];
 
     for (const q of searchQueries) {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`
       );
       if (res.ok) {
@@ -195,7 +196,7 @@ export async function findBookCover({
           if (authorMatch) {
             const isbns: string[] = doc?.isbn || [];
             for (const olIsbn of isbns.slice(0, 2)) {
-              const olRes = await fetch(
+              const olRes = await fetchWithTimeout(
                 `https://openlibrary.org/api/books?bibkeys=ISBN:${olIsbn}&format=json&jscmd=data`
               );
               if (olRes.ok) {
@@ -203,7 +204,7 @@ export async function findBookCover({
                 const book = olData[`ISBN:${olIsbn}`];
 
                 if (book?.works?.[0]?.key) {
-                  const workRes = await fetch(
+                  const workRes = await fetchWithTimeout(
                     `https://openlibrary.org${book.works[0].key}.json`
                   );
                   if (workRes.ok) {
@@ -243,7 +244,7 @@ export async function findBookCover({
 
 async function isValidImageUrl(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { method: "HEAD" });
+    const res = await fetchWithTimeout(url, { method: "HEAD" });
     if (!res.ok) return false;
 
     const contentType = res.headers.get("content-type") || "";
@@ -270,7 +271,7 @@ export async function findWikipediaCover(
 
   try {
     const searchTitle = title.trim();
-    const wikiRes = await fetch(
+    const wikiRes = await fetchWithTimeout(
       `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(searchTitle)}&prop=pageimages&format=json&origin=*&pithumbsize=500&redirects=1`
     );
     if (wikiRes.ok) {
@@ -282,7 +283,7 @@ export async function findWikipediaCover(
       }
     }
 
-    const ptWikiRes = await fetch(
+    const ptWikiRes = await fetchWithTimeout(
       `https://pt.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(searchTitle)}&prop=pageimages&format=json&origin=*&pithumbsize=500&redirects=1`
     );
     if (ptWikiRes.ok) {
