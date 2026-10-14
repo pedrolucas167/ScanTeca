@@ -9,6 +9,7 @@ import {
   resolveCollection,
 } from "@/lib/default-collection";
 import { z } from "zod";
+import { yearlyGoalSchema } from "@/modules/reading/client";
 
 const VALID_ACCENTS = ["indigo", "vinho", "floresta", "terracota"] as const;
 
@@ -18,11 +19,7 @@ const settingsSchema = z.object({
     .trim()
     .min(1, "Nome da biblioteca é obrigatório")
     .optional(),
-  yearlyGoal: z
-    .number("Meta anual deve ser um número inteiro positivo")
-    .int("Meta anual deve ser um número inteiro positivo")
-    .min(1, "Meta anual deve ser um número inteiro positivo")
-    .nullish(),
+  yearlyGoal: yearlyGoalSchema,
   accent: z.enum(VALID_ACCENTS, "Tema de acento inválido").optional(),
   shareEnabled: z.boolean("shareEnabled deve ser booleano").optional(),
   oracleProfile: z.string().trim().max(2000, "Memória muito longa").nullable().optional(),
@@ -70,7 +67,9 @@ export async function POST(request: NextRequest) {
     const rateLimit = await rateLimitGuard(request, {
       route: "library-settings",
       userId,
-      userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
+      userLimit: rateLimits["library-settings"]?.userLimit ?? 10,
+      ipLimit: rateLimits["library-settings"]?.ipLimit ?? 20,
+      windowMs: rateLimits["library-settings"]?.windowMs,
     });
     if (rateLimit) return rateLimit;
 
@@ -125,6 +124,7 @@ export async function POST(request: NextRequest) {
         shareId: (createData.shareId as string) || null,
         accentTheme: (createData.accentTheme as string) || null,
         oracleProfile: (createData.oracleProfile as string) || null,
+        yearlyGoal: yearlyGoal ?? null,
       },
     });
 
