@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { readOracleCompletion, saveOracleAnswer } from "@/modules/oracle";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
@@ -103,7 +105,7 @@ async function updateReaderProfile(
   apiKey: string
 ) {
   try {
-    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -506,18 +508,11 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Regenerate: apaga a última resposta do assistente antes de montar o
-    // histórico — a pergunta do usuário já existe e não é recriada.
-    if (regenerate) {
-      const lastAssistant = await prisma.oracleMessage.findFirst({
-        where: { userId, sessionId, role: "assistant" },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-      if (lastAssistant) {
-        await prisma.oracleMessage.delete({ where: { id: lastAssistant.id } });
-      }
-    }
+    // Retain the old answer until its replacement can be saved atomically.
+    const previousAnswer = regenerate ? await prisma.oracleMessage.findFirst({
+      where: { userId, sessionId, role: "assistant" },
+      orderBy: { createdAt: "desc" }, select: { id: true },
+    }) : null;
 
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
@@ -525,7 +520,7 @@ export async function POST(request: NextRequest) {
 
     const [historyDesc, setting, , readingNow, weekLogs, diaryEntries] = await Promise.all([
       prisma.oracleMessage.findMany({
-        where: { userId, sessionId },
+        where: { userId, sessionId, ...(previousAnswer ? { id: { not: previousAnswer.id } } : {}) },
         orderBy: { createdAt: "desc" },
         take: HISTORY_LIMIT,
       }),
@@ -941,8 +936,9 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
       },
     ];
 
-    const llmRes = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    const llmRes = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
+      signal: request.signal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -956,7 +952,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         temperature,
         max_tokens: MAX_TOKENS_CHAT,
       }),
-    });
+    }, 60_000);
 
     if (!llmRes.ok || !llmRes.body) {
       const err = await llmRes.text();
@@ -968,40 +964,8 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
     }
 
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = llmRes.body!.getReader();
-        let buffer = "";
-        let fullText = "";
-        const processPayload = (payload: string) => {
-          if (!payload || payload === "[DONE]") return;
-          try {
-            const json = JSON.parse(payload);
-            const content = json.choices?.[0]?.delta?.content;
-            if (typeof content === "string") {
-              fullText += content;
-            } else if (Array.isArray(content)) {
-              fullText += content
-                .filter(
-                  (part: unknown): part is { text: string } =>
-                    typeof part === "object" &&
-                    part !== null &&
-                    "text" in part &&
-                    typeof (part as { text?: unknown }).text === "string"
-                )
-                .map((part) => part.text)
-                .join("");
-            }
-          } catch (error) {
-            console.warn("[oracle] invalid SSE payload:", {
-              error,
-              payload: payload.slice(0, 200),
-            });
-          }
-        };
-
         const sources: {
           id: string;
           title: string;
@@ -1099,82 +1063,38 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         };
 
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              if (buffer.trim()) {
-                processPayload(buffer.trim().replace(/^data:\s*/, ""));
-              }
-              break;
-            }
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const payload = trimmed.slice(5).trim();
-              processPayload(payload);
-            }
+          const fullText = await readOracleCompletion(llmRes.body!);
+          const quality = validateOracleResponse(fullText);
+          const outputText = quality.valid
+            ? fullText.trim()
+            : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
+          if (!quality.valid) {
+            console.warn("[oracle] response rejected:", quality.reason);
           }
-        } finally {
-          try {
-            const quality = validateOracleResponse(fullText);
-            const outputText = quality.valid
-              ? fullText.trim()
-              : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
-            if (!quality.valid) {
-              console.warn("[oracle] response rejected:", quality.reason);
-            }
 
-            // Extract and send citations
-            const citations = extractCitations(outputText);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
-            );
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ citations })}\n\n`)
-            );
-            const persist: Promise<unknown>[] = [];
-            if (quality.valid) {
-              persist.push(
-                prisma.oracleMessage.create({
-                  data: {
-                    userId,
-                    sessionId,
-                    role: "assistant",
-                    content: outputText,
-                    sources,
-                  },
-                })
-              );
-            }
+          request.signal.throwIfAborted();
+          if (quality.valid) {
+            await saveOracleAnswer({ userId, sessionId, mode, content: outputText,
+              sources, replacesId: previousAnswer?.id });
             if (conversationHistory.length >= 4) {
-              persist.push(
-                updateReaderProfile(
-                  userId,
-                  setting?.oracleProfile,
-                  trimmed,
-                  outputText,
-                  apiKey
-                )
-              );
+              await updateReaderProfile(userId, setting?.oracleProfile, trimmed, outputText, apiKey);
             }
-            persist.push(
-              prisma.oracleSession.update({
-                where: { id: sessionId },
-                data: { mode },
-              })
-            );
-            await Promise.all(persist);
-          } catch (err) {
-            console.error("[oracle] memory persist error:", err);
           }
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
+          // Extract and send citations
+          const citations = extractCitations(outputText);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
+          );
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ citations })}\n\n`)
+          );
+        } catch (err) {
+          console.error("[oracle] completion failed:", err);
+          controller.error(new Error("Não foi possível concluir a resposta. Tente novamente."));
+          return;
         }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
       },
     });
 
