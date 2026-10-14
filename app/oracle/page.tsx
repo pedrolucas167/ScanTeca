@@ -299,6 +299,7 @@ export default function OraclePage() {
     opts?: { regenerate?: boolean }
   ) => {
     if (!question || loadingRef.current) return;
+    const previousMessages = opts?.regenerate ? messages : null;
     loadingRef.current = true;
     streamDoneRef.current = false;
     receivedAnyRef.current = false;
@@ -365,7 +366,13 @@ export default function OraclePage() {
       // Marca o fim do stream
       streamDoneRef.current = true;
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
+      if (previousMessages) {
+        stopReveal();
+        setMessages(previousMessages);
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          setError("Não foi possível gerar novamente. A resposta anterior foi preservada.");
+        }
+      } else if (err instanceof DOMException && err.name === "AbortError") {
         // Usuário parou a geração — mantém o que já foi revelado.
         streamDoneRef.current = true;
         await drainReveal();
