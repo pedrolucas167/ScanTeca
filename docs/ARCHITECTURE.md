@@ -33,6 +33,13 @@ também a entrada pública `@/modules/reading/client`, própria para componentes
 cliente e sem dependência de persistência. Consulte
 [JOURNEY-VALIDATION.md](./JOURNEY-VALIDATION.md) para regras e limites históricos.
 
+Na continuação de Biblioteca, scanner, enriquecimento, reordenação, coleções,
+configurações e consultas de catálogo/detalhe migraram para sua API pública.
+Scanner e cadastro compartilham deduplicação transacional por usuário; renomeação
+de biblioteca/coleção é atômica, e enriquecimento preserva edições concorrentes.
+Providers continuam adaptadores reutilizados em `lib/`, agora com timeout por
+requisição. Consulte [LIBRARY-VALIDATION.md](./LIBRARY-VALIDATION.md).
+
 ## Estrutura de Diretórios
 
 ```

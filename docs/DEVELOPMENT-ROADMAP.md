@@ -10,7 +10,7 @@ incluindo revisão e testes; não são prazos de calendário ou compromissos.
 | --- | --- | --- | --- | --- |
 | P0 | Base de validação e primeiro corte Biblioteca/Leitura | Implementado neste corte; validações registradas abaixo | Alta para o corte local | Build, testes, lint e smoke HTTP verificáveis |
 | P0 | Completar consistência e autorização de Leitura | Migração técnica de sessões/diário/anotações/Jornada concluída; revisão autenticada pendente | Alta nos cenários testados; média na interface | PostgreSQL validou rollback, concorrência, privacidade e estatísticas; concluir revisão autenticada |
-| P1 | Completar Biblioteca | 3–5 dias | Média | Enrich, reorder, consultas e coleções usam a API pública; deduplicação concorrente definida; integrações externas têm limites de tempo |
+| P1 | Completar Biblioteca | Fluxos principais implementados; revisão autenticada e providers reais pendentes | Alta nos cenários testados | Scanner/enrich/reorder/consultas/coleções usam módulo; concorrência passou em PostgreSQL; timeouts por chamada definidos |
 | P1 | Oráculo | 5–8 dias | Média-baixa | Separar retrieval, contexto, geração, streaming e persistência; fixtures de qualidade, cancelamento e falhas; medir latência e tokens |
 | P1 | Jobs e notificações | 3–5 dias | Baixa | Worker executável no ambiente de deploy; retirada atômica, retentativas e recuperação; efeitos idempotentes |
 | P2 | Comunidade | 4–7 dias | Média-baixa | Política única de visibilidade, bloqueios e autorização usada em feed, perfis, clubes e discussões |
@@ -28,6 +28,12 @@ A terceira etapa migrou Jornada privada/pública, calendário e metas:
 [JOURNEY-VALIDATION.md](./JOURNEY-VALIDATION.md). Resultado: 143 testes unitários e
 11 de PostgreSQL passando, com build e TypeScript validados. A próxima frente
 arquitetural é completar Biblioteca; revisão visual autenticada permanece um gate.
+
+A continuação de Biblioteca está em [LIBRARY-VALIDATION.md](./LIBRARY-VALIDATION.md):
+154 testes unitários e 23 de PostgreSQL passaram, com cadastro concorrente,
+scanner, enriquecimento, coleções e catálogo compartilhado cobertos. A próxima
+frente arquitetural passa a ser Oráculo; revisão autenticada e operação dos
+providers continuam gates próprios, sem pressupor validação de produção.
 
 ## Primeiro corte implementado
 
