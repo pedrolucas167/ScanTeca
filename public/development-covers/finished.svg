@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <rect width="400" height="600" fill="#183e35"/>
+  <rect x="22" y="22" width="356" height="556" rx="2" fill="none" stroke="#c6b77b"/>
+  <text x="200" y="65" text-anchor="middle" fill="#c6b77b" font-family="sans-serif" font-size="12" letter-spacing="4">ACERVO IMAGINÁRIO</text>
+  <path d="M200 390V245M200 330Q120 330 120 260Q190 260 200 330M200 295Q275 295 275 220Q210 220 200 295" fill="#8fa778" stroke="#c6b77b" stroke-width="3"/>
+  <path d="M85 398Q145 375 200 400Q255 375 315 398V420Q255 397 200 425Q145 397 85 420Z" fill="#efe4bd"/>
+  <text x="200" y="143" text-anchor="middle" fill="#f5ebcf" font-family="Georgia,serif" font-size="36">O Jardim</text>
+  <text x="200" y="187" text-anchor="middle" fill="#f5ebcf" font-family="Georgia,serif" font-size="36">das Páginas</text>
+  <text x="200" y="510" text-anchor="middle" fill="#f5ebcf" font-family="sans-serif" font-size="15" letter-spacing="2">AUTORIA FICTÍCIA</text>
+  <text x="200" y="551" text-anchor="middle" fill="#c6b77b" font-family="sans-serif" font-size="10" letter-spacing="2">EDIÇÃO DE DESENVOLVIMENTO</text>
+</svg>

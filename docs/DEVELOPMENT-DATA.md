@@ -22,7 +22,7 @@ As variáveis acima valem para esse terminal e seus processos filhos. Elas subst
 
 ## Cenários
 
-- Catálogo: quatro livros fictícios, um em cada status, distribuídos em duas coleções.
+- Catálogo: quatro livros fictícios com capas SVG locais, um em cada status, distribuídos em duas coleções. Repetir o seed preenche apenas capas ausentes, preservando capas personalizadas.
 - Leitura: livro na página 40 de 200 e sessão encerrada; inicie uma nova sessão pela interface.
 - Jornada: um livro concluído, atividade no dia anterior à primeira carga e meta 12 em configurações novas.
 - Diário: reflexão com página, tags e sessão vinculada; uso no RAG desativado.

@@ -27,7 +27,7 @@ export function fixtureId(userId: string, key: string) {
   return `dev_fixture_${createHash("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32)}`;
 }
 
-/** Insert-only fixtures: rerunning preserves edits made while exercising the UI. */
+/** Reruns preserve edits and fill missing demonstration covers. */
 export async function seedDevelopment(prisma: PrismaClient, userId: string, now = new Date()) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   const today = new Date(`${day}T00:00:00.000Z`);
@@ -42,10 +42,12 @@ export async function seedDevelopment(prisma: PrismaClient, userId: string, now 
     const collections = await Promise.all(["Ficção de teste", "Referência de teste"].map(name =>
       tx.collection.upsert({ where: { userId_name: { userId, name } }, update: {}, create: { userId, name } })));
     for (const book of developmentBooks) {
+      const coverUrl = `/development-covers/${book.key}.svg`;
       await tx.book.upsert({
         where: { id: id(book.key) }, update: {},
         create: {
           id: id(book.key), userId, isbn: `DEV-FIXTURE-${book.key}`, title: book.title,
+          coverUrl,
           author: "Autoria fictícia", synopsis: "Livro fictício para validação dos fluxos de desenvolvimento.",
           collectionId: collections[book.key === "wishlist" ? 1 : 0]!.id,
           status: book.status, pages: book.pages, currentPage: book.currentPage, readCount: book.readCount,
@@ -54,6 +56,10 @@ export async function seedDevelopment(prisma: PrismaClient, userId: string, now 
           rating: book.status === "READ" ? 4 : null,
           notes: "Nota privada fictícia: não deve aparecer no catálogo compartilhado.",
         },
+      });
+      await tx.book.updateMany({
+        where: { id: id(book.key), userId, OR: [{ coverUrl: null }, { coverUrl: "" }] },
+        data: { coverUrl },
       });
     }
     await tx.readingSession.upsert({
