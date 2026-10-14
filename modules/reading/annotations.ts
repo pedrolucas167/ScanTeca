@@ -40,7 +40,7 @@ export async function addPassageComment(userId: string, input: { bookId: string;
 export async function getReadingPage(userId: string, bookId: string) {
   const book = await prisma.book.findFirst({ where: { id: bookId, userId } });
   if (!book) return null;
-  const passage = await prisma.bookPassage.findFirst({ where: { bookId }, orderBy: { chapter: "asc", paragraph: "asc" } });
+  const passage = await prisma.bookPassage.findFirst({ where: { bookId }, orderBy: [{ chapter: "asc" }, { paragraph: "asc" }] });
   const annotations = passage ? await prisma.annotation.findMany({
     where: { passageId: passage.id, userId }, orderBy: { createdAt: "desc" },
   }) : [];

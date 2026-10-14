@@ -50,6 +50,16 @@ afterAll(async () => {
 });
 
 describe("Leitura em PostgreSQL isolado", () => {
+  it("abre a primeira passagem por capítulo e parágrafo para o proprietário", async () => {
+    await prisma.bookPassage.create({ data: { bookId, chapter: 2, paragraph: 1 } });
+    await prisma.bookPassage.create({ data: { bookId, chapter: 1, paragraph: 3 } });
+    const first = await prisma.bookPassage.create({ data: { bookId, chapter: 1, paragraph: 1 } });
+    await addPassageComment(owner, { bookId, passageId: first.id, content: "Comentário do proprietário" });
+    const result = await getReadingPage(owner, bookId);
+    expect(result?.passage?.id).toBe(first.id);
+    expect(result?.annotations).toHaveLength(1);
+    expect(result?.annotations[0]?.content).toBe("Comentário do proprietário");
+  });
   it("inícios simultâneos preservam uma sessão ativa", async () => {
     const sessions = await Promise.all([startReadingSession(owner, bookId), startReadingSession(owner, bookId)]);
     expect(sessions[0].id).toBe(sessions[1].id);
