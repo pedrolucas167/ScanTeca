@@ -2,7 +2,11 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({ prisma: { librarySetting: { findUnique: vi.fn(), upsert: vi.fn() } } }));
+vi.mock("@/lib/prisma", () => {
+  const prisma = { librarySetting: { findUnique: vi.fn(), upsert: vi.fn() }, $transaction: vi.fn() };
+  prisma.$transaction.mockImplementation(async callback => callback(prisma));
+  return { prisma };
+});
 vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn(), rateLimits: { "library-settings": { userLimit: 30, ipLimit: 60, windowMs: 60000 } } }));
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +16,7 @@ const request = (yearlyGoal: unknown) => new NextRequest("http://localhost/api/l
   method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ yearlyGoal }),
 });
 beforeEach(() => {
-  vi.resetAllMocks();
+  vi.clearAllMocks();
   vi.mocked(auth).mockResolvedValue({ userId: "u1" } as never);
   vi.mocked(rateLimitGuard).mockResolvedValue(null);
   vi.mocked(prisma.librarySetting.upsert).mockResolvedValue({ yearlyGoal: 24 } as never);

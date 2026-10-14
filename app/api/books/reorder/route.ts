@@ -1,67 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
-import { z } from "zod";
-
-const reorderSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        customOrder: z.number().int().min(0),
-      })
-    )
-    .min(1)
-    .max(500),
-});
+import { libraryHttpError } from "@/lib/library-http-error";
+import { reorderSchema, reorderBooks } from "@/modules/library";
 
 export async function PATCH(request: NextRequest) {
   try {
     const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
-
-    const rateLimit = await rateLimitGuard(request, {
-      route: "books/reorder",
-      userId,
-      userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
+    if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const limits = rateLimits["books/reorder"];
+    const limited = await rateLimitGuard(request, {
+      route: "books/reorder", userId,
+      userLimit: limits?.userLimit ?? 10, ipLimit: limits?.ipLimit ?? 20, windowMs: limits?.windowMs,
     });
-    if (rateLimit) return rateLimit;
-
+    if (limited) return limited;
     const parsed = await readJson(request, reorderSchema);
     if (!parsed.ok) return parsed.response;
-    const { items } = parsed.data;
-
-    // Garante que todos os livros pertencem ao usuário antes de atualizar
-    const owned = await prisma.book.count({
-      where: { userId, id: { in: items.map((i) => i.id) } },
-    });
-    if (owned !== items.length) {
-      return NextResponse.json(
-        { error: "Um ou mais livros não foram encontrados" },
-        { status: 404 }
-      );
-    }
-
-    await prisma.$transaction(
-      items.map((item) =>
-        prisma.book.update({
-          where: { id: item.id },
-          data: { customOrder: item.customOrder },
-        })
-      )
-    );
-
-    return NextResponse.json({ updated: items.length });
-  } catch (error) {
-    console.error("Erro em PATCH /api/books/reorder:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
+    return NextResponse.json(await reorderBooks(userId, parsed.data));
+  } catch (error) { return libraryHttpError(error, "books/reorder"); }
 }

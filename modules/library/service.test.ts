@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 
 const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(),
-  transaction: vi.fn(), executeRaw: vi.fn(),
+  transaction: vi.fn(), executeRaw: vi.fn(), txExecuteRaw: vi.fn(),
   txFind: vi.fn(), txUpdate: vi.fn(), logFind: vi.fn(), logUpsert: vi.fn(),
   embedding: vi.fn(), cover: vi.fn(), synopsis: vi.fn(), originalYear: vi.fn(),
   similar: vi.fn(), collection: vi.fn(), invalidate: vi.fn(), notify: vi.fn(),
@@ -16,13 +16,10 @@ vi.mock("@/lib/embeddings", () => ({ generateEmbedding: mocks.embedding, bookToE
 vi.mock("@/lib/book-cover", () => ({ findBookCover: mocks.cover }));
 vi.mock("@/lib/synopsis", () => ({ findSynopsis: mocks.synopsis, cleanSynopsis: (value: string) => value || null }));
 vi.mock("@/lib/original-date", () => ({ findOriginalPublishYear: mocks.originalYear, extractYear: () => null }));
-vi.mock("@/lib/default-collection", () => ({ resolveCollection: mocks.collection }));
+vi.mock("./collections", () => ({ resolveCollection: mocks.collection }));
 vi.mock("@/lib/recommendations-cache", () => ({ invalidateRecommendationsCache: mocks.invalidate }));
 vi.mock("@/lib/push", () => ({ notifyGoalIfReached: mocks.notify }));
-vi.mock("@/lib/book-metadata", async importOriginal => ({
-  ...await importOriginal<typeof import("@/lib/book-metadata")>(),
-  findExistingBookByTitleAuthor: mocks.similar,
-}));
+vi.mock("./duplicates", () => ({ findExistingBookByTitleAuthor: mocks.similar }));
 
 import { createBook, updateBook, deleteBook } from "./service";
 import { bookCreateSchema, bookUpdateSchema } from "./contracts";
@@ -33,8 +30,9 @@ const book = {
   readCount: 0, reclubeCount: 0, collection: { name: "Estante" },
 };
 const tx = {
-  book: { findFirst: mocks.txFind, update: mocks.txUpdate },
+  book: { findFirst: mocks.txFind, update: mocks.txUpdate, findUnique: mocks.findUnique, create: mocks.create },
   readingLog: { findUnique: mocks.logFind, upsert: mocks.logUpsert },
+  $executeRaw: mocks.txExecuteRaw,
 };
 
 beforeEach(() => {
@@ -49,6 +47,13 @@ beforeEach(() => {
 });
 
 describe("Biblioteca", () => {
+  it("traduz contenção do lock de cadastro para conflito recuperável", async () => {
+    mocks.transaction.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("lock timeout", {
+      code: "P2010", clientVersion: "6.19.3", meta: { code: "55P03" },
+    }));
+    await expect(createBook("u1", bookCreateSchema.parse({ title: "Duna" }), { metadataReady: true }))
+      .rejects.toMatchObject({ code: "CONFLICT" });
+  });
   it("devolve duplicata por ISBN sem enriquecer ou criar outro livro", async () => {
     mocks.findUnique.mockResolvedValue(book);
     const result = await createBook("u1", bookCreateSchema.parse({ title: "Duna", isbn: book.isbn }));

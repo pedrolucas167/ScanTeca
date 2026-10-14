@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { BookStatus, Prisma } from "@prisma/client";
-import type { Book } from "@prisma/client";
 import { planReadingTransition, recordDailyProgress, ReadingError } from "@/modules/reading";
 import { findBookCover } from "@/lib/book-cover";
 import { findSynopsis, cleanSynopsis } from "@/lib/synopsis";
 import { findOriginalPublishYear, extractYear } from "@/lib/original-date";
-import { generateEmbedding, bookToEmbeddingText } from "@/lib/embeddings";
-import { resolveCollection } from "@/lib/default-collection";
+import { resolveCollection } from "./collections";
+import { findExistingBookByTitleAuthor } from "./duplicates";
+import { refreshBookEmbedding } from "./indexing";
 import { notifyGoalIfReached } from "@/lib/push";
 import { invalidateRecommendationsCache } from "@/lib/recommendations-cache";
 import {
@@ -15,7 +15,6 @@ import {
   normalizeAuthor,
   normalizeGenre,
   upgradeCoverUrl,
-  findExistingBookByTitleAuthor,
   isUnknownTitle,
 } from "@/lib/book-metadata";
 import type { CreateBookInput, UpdateBookInput } from "./contracts";
@@ -29,22 +28,7 @@ function serializeBook<T extends { collection: { name: string } }>(book: T) {
   return { ...book, collection: book.collection.name };
 }
 
-async function refreshBookEmbedding(book: Book) {
-  try {
-    const embedding = await generateEmbedding(bookToEmbeddingText(book));
-    if (!embedding) return;
-    const vector = `[${embedding.join(",")}]`;
-    await prisma.$executeRaw`
-      UPDATE "Book" SET embedding = ${vector}::vector WHERE id = ${book.id} AND "userId" = ${book.userId}
-    `;
-  } catch (error) {
-    // The book is already committed. Indexing failure must not invite a retry
-    // of a successful write; /api/embeddings/backfill can rebuild the index.
-    console.error("[library] Falha ao atualizar embedding:", error);
-  }
-}
-
-export async function createBook(userId: string, input: CreateBookInput) {
+export async function createBook(userId: string, input: CreateBookInput, options: { metadataReady?: boolean } = {}) {
   const { isbn, title, author, publishedDate, synopsis, coverUrl, status, collection, notes, rating, genre, pages, customOrder } = input;
 
   const cleanedIsbn = cleanIsbn(isbn);
@@ -95,7 +79,7 @@ export async function createBook(userId: string, input: CreateBookInput) {
   // Busca capa: se o usuário forneceu uma URL, fazemos o upgrade; caso contrário,
   // buscamos uma capa confiável a partir de ISBN/título/autor.
   let effectiveCoverUrl: string | null = upgradeCoverUrl(coverUrl);
-  if (!effectiveCoverUrl) {
+  if (!effectiveCoverUrl && !options.metadataReady) {
     effectiveCoverUrl = await findBookCover({
       title: cleanedTitle,
       author: authorParam,
@@ -105,7 +89,7 @@ export async function createBook(userId: string, input: CreateBookInput) {
 
   // Sinopse: limpa a fornecida ou busca.
   let effectiveSynopsis: string | null = cleanSynopsis(synopsis);
-  if (!effectiveSynopsis) {
+  if (!effectiveSynopsis && !options.metadataReady) {
     effectiveSynopsis = await findSynopsis({
       title: cleanedTitle,
       author: authorParam,
@@ -116,7 +100,7 @@ export async function createBook(userId: string, input: CreateBookInput) {
   const effectiveGenre = normalizeGenre(genre);
 
   let effectivePublishedDate: string | null = publishedDate || null;
-  const originalYear = await findOriginalPublishYear({
+  const originalYear = options.metadataReady ? null : await findOriginalPublishYear({
     title: cleanedTitle,
     author: authorParam,
     isbn: cleanedIsbn || undefined,
@@ -128,27 +112,45 @@ export async function createBook(userId: string, input: CreateBookInput) {
     }
   }
 
-  const bookCollection = await resolveCollection(userId, collection);
-
-  const book = await prisma.book.create({
-    data: {
-      isbn: cleanedIsbn || `MANUAL-${crypto.randomUUID()}`,
-      title: cleanedTitle,
-      author: normalizedAuthor || "Autor desconhecido",
-      publishedDate: effectivePublishedDate,
-      synopsis: effectiveSynopsis,
-      coverUrl: effectiveCoverUrl || null,
-      status: status || BookStatus.TO_READ,
-      collectionId: bookCollection.id,
-      notes: notes || null,
-      rating: rating ?? null,
-      genre: effectiveGenre,
-      pages: pages || null,
-      customOrder: customOrder ?? null,
-      userId,
-    },
-    include: withCollection,
+  const result = await prisma.$transaction(async tx => {
+    // Every catalog creation path shares a per-user transaction lock. Network
+    // lookups run before acquiring it. ReadCommitted sees the prior creator's commit.
+    await tx.$executeRaw`SET LOCAL lock_timeout = '3s'`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
+    const exact = cleanedIsbn ? await tx.book.findUnique({
+      where: { isbn_userId: { isbn: cleanedIsbn, userId } }, include: withCollection,
+    }) : null;
+    const duplicate = exact ?? await findExistingBookByTitleAuthor(userId, cleanedTitle, normalizedAuthor, tx);
+    if (duplicate) return { book: duplicate, created: false };
+    const bookCollection = await resolveCollection(userId, collection, tx);
+    const book = await tx.book.create({
+      data: {
+        isbn: cleanedIsbn || `MANUAL-${crypto.randomUUID()}`,
+        title: cleanedTitle,
+        author: normalizedAuthor || "Autor desconhecido",
+        publishedDate: effectivePublishedDate,
+        synopsis: effectiveSynopsis,
+        coverUrl: effectiveCoverUrl || null,
+        status: status || BookStatus.TO_READ,
+        collectionId: bookCollection.id,
+        notes: notes || null,
+        rating: rating ?? null,
+        genre: effectiveGenre,
+        pages: pages || null,
+        customOrder: customOrder ?? null,
+        userId,
+      },
+      include: withCollection,
+    });
+    return { book, created: true };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 10000 }).catch(error => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2010" && error.meta?.code === "55P03") {
+      throw new LibraryError("CONFLICT", "Outro cadastro está em andamento. Tente novamente.");
+    }
+    throw error;
   });
+  const { book } = result;
+  if (!result.created) return { book: serializeBook(book), message: "Livro já cadastrado", created: false };
 
   await refreshBookEmbedding(book);
 

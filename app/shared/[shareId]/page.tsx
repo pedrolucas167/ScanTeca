@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getSharedCatalog } from "@/modules/library";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { BookOpen, Star } from "lucide-react";
@@ -28,33 +28,9 @@ export default async function SharedCatalogPage({
 }) {
   const { shareId } = await params;
 
-  const setting = await prisma.librarySetting.findUnique({
-    where: { shareId },
-  });
-
-  if (!setting || !setting.shareEnabled) {
-    notFound();
-  }
-
-  const books = await prisma.book.findMany({
-    where: { userId: setting.userId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      collection: { select: { name: true } },
-      reviews: {
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          content: true,
-          rating: true,
-          userName: true,
-          createdAt: true,
-        },
-      },
-    },
-  });
-
-  const readCount = books.filter((b) => b.status === "READ").length;
+  const result = await getSharedCatalog(shareId);
+  if (!result) notFound();
+  const { setting, books, readCount } = result;
 
   return (
     <div className="flex flex-1 flex-col">

@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
+import { getCatalog } from "@/modules/library";
 import Catalog from "./Catalog";
 import LandingPage from "./LandingPage";
 
@@ -12,23 +12,7 @@ export default async function Home() {
     return <LandingPage />;
   }
 
-  const [books, setting] = await Promise.all([
-    prisma.book.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      include: { collection: { select: { name: true } } },
-    }),
-    prisma.librarySetting.upsert({
-      where: { userId },
-      update: {},
-      create: {
-        userId,
-        name: "Minha Biblioteca",
-      },
-    }),
-  ]);
-
-  const bookList = books.map((b) => ({ ...b, collection: b.collection.name }));
+  const { books: bookList, setting } = await getCatalog(userId);
 
   return (
     <Catalog
