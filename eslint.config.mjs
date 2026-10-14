@@ -17,7 +17,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{
-          group: ["@/modules/*/*", "**/modules/*/*"],
+          group: ["@/modules/*/*", "**/modules/*/*", "!@/modules/reading/client"],
           message: "Importe módulos pela API pública: @/modules/<nome>.",
         }],
       }],
@@ -28,7 +28,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [
-          { group: ["@/modules/*/*", "**/modules/*/*"], message: "Use a API pública do módulo." },
+          { group: ["@/modules/*/*", "**/modules/*/*", "!@/modules/reading/client"], message: "Use a API pública do módulo." },
           { group: ["@/app/**", "next/server", "next/navigation", "@clerk/nextjs/**"], message: "Módulos não dependem da camada HTTP/UI ou de autenticação." },
         ],
       }],

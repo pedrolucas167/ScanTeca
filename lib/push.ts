@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
+import { getAnnualGoalStatus } from "@/modules/reading";
 
 export interface PushPayload {
   title: string;
@@ -103,25 +104,9 @@ export async function sendPush(
  * contador do ano fica exatamente igual à meta (uma vez só).
  */
 export async function notifyGoalIfReached(userId: string): Promise<void> {
-  const year = new Date().getFullYear();
-  const yearStart = new Date(year, 0, 1);
-  const [readThisYear, setting] = await Promise.all([
-    prisma.book.count({
-      where: {
-        userId,
-        status: "READ",
-        OR: [
-          { finishedAt: { gte: yearStart } },
-          { finishedAt: null, createdAt: { gte: yearStart } },
-        ],
-      },
-    }),
-    prisma.librarySetting.findUnique({
-      where: { userId },
-      select: { yearlyGoal: true },
-    }),
-  ]);
-  const goal = setting?.yearlyGoal;
+  const now = new Date();
+  const year = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(now));
+  const { completed: readThisYear, target: goal } = await getAnnualGoalStatus(userId, now);
   if (!goal || readThisYear !== goal) return;
   await sendPush(
     {

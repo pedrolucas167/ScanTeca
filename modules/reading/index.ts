@@ -6,3 +6,5 @@ export { startReadingSession, pauseReadingSession } from "./sessions";
 export { saveDiaryEntry, deleteDiaryEntry } from "./diary";
 export { createAnnotation, addPassageComment, getReadingPage } from "./annotations";
 export { getDiaryPage } from "./queries";
+export { getJourney, getSharedJourney, getAnnualGoalStatus } from "./journey";
+export { HEAT_WEEKS } from "./journey-metrics";

@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getJourney, HEAT_WEEKS } from "@/modules/reading";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -26,130 +26,17 @@ const statusLabels: Record<string, string> = {
   WISHLIST: "Desejo",
 };
 
-function daysBetween(a: Date, b: Date) {
-  return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000));
-}
-
 export default async function JornadaPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const [books, setting, logs] = await Promise.all([
-    prisma.book.findMany({
-      where: { userId },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        title: true,
-        author: true,
-        coverUrl: true,
-        status: true,
-        pages: true,
-        currentPage: true,
-        startedAt: true,
-        finishedAt: true,
-        createdAt: true,
-      },
-    }),
-    prisma.librarySetting.findUnique({
-      where: { userId },
-      select: { yearlyGoal: true, shareEnabled: true, shareId: true },
-    }),
-    prisma.readingLog.findMany({
-      where: { userId },
-      select: { id: true, date: true, pages: true, note: true, bookId: true },
-    }),
-  ]);
-
-  const now = new Date();
-  const year = now.getFullYear();
-
-  const reading = books.filter((b) => b.status === "READING");
-  const read = books.filter((b) => b.status === "READ");
-  const readThisYear = read.filter((b) => {
-    const d = b.finishedAt ?? b.createdAt;
-    return d.getFullYear() === year;
-  });
-  const queue = books
-    .filter((b) => b.status === "TO_READ")
-    .slice(0, 6);
-
-  const pagesRead =
-    read.reduce((s, b) => s + (b.pages ?? 0), 0) +
-    reading.reduce((s, b) => s + (b.currentPage ?? 0), 0);
-
-  const paced = read.filter((b) => b.startedAt && b.finishedAt && b.pages);
-  const pace =
-    paced.length > 0
-      ? Math.round(
-          paced.reduce(
-            (s, b) => s + b.pages! / daysBetween(b.startedAt!, b.finishedAt!),
-            0
-          ) / paced.length
-        )
-      : null;
-
-  const avgDays =
-    paced.length > 0
-      ? Math.round(
-          paced.reduce(
-            (s, b) => s + daysBetween(b.startedAt!, b.finishedAt!),
-            0
-          ) / paced.length
-        )
-      : null;
-
-  const logDays = new Set(logs.map((l) => l.date.toISOString().slice(0, 10)));
-  let streak = 0;
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  if (!logDays.has(cursor.toISOString().slice(0, 10))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  while (logDays.has(cursor.toISOString().slice(0, 10))) {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  const sortedDays = [...logDays].sort();
-  let bestStreak = 0;
-  let run = 0;
-  let prevDay: string | null = null;
-  for (const d of sortedDays) {
-    if (prevDay) {
-      const diff =
-        (new Date(d).getTime() - new Date(prevDay).getTime()) / 86400000;
-      run = diff === 1 ? run + 1 : 1;
-    } else {
-      run = 1;
-    }
-    bestStreak = Math.max(bestStreak, run);
-    prevDay = d;
-  }
-
+  const { reading, readThisYear, queue, setting, year, pagesRead, pace, avgDays,
+    streak, bestStreak, heatmap, recentNotes } = await getJourney(userId);
   const badges = [
     { days: 7, label: "Semana de fogo", icon: Flame },
     { days: 30, label: "Mês imparável", icon: Medal },
     { days: 100, label: "Centurião", icon: Trophy },
   ];
-
-  const HEAT_WEEKS = 15;
-  const pagesByDay = new Map<string, number>();
-  for (const l of logs) {
-    const key = l.date.toISOString().slice(0, 10);
-    pagesByDay.set(key, (pagesByDay.get(key) ?? 0) + l.pages);
-  }
-  const heatEnd = new Date();
-  heatEnd.setHours(0, 0, 0, 0);
-  heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay()));
-  const heatStart = new Date(heatEnd);
-  heatStart.setDate(heatStart.getDate() - (HEAT_WEEKS * 7 - 1));
-
-  const bookTitleById = new Map(books.map((b) => [b.id, b.title]));
-  const recentNotes = logs
-    .filter((l) => l.note)
-    .sort((a, b) => b.date.getTime() - a.date.getTime())
-    .slice(0, 5);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -280,11 +167,7 @@ export default async function JornadaPage() {
           </h2>
           <div className="overflow-x-auto">
             <div className="grid w-max grid-flow-col grid-rows-7 gap-[3px]">
-              {Array.from({ length: HEAT_WEEKS * 7 }).map((_, i) => {
-                const d = new Date(heatStart);
-                d.setDate(d.getDate() + i);
-                const key = d.toISOString().slice(0, 10);
-                const p = pagesByDay.get(key) ?? 0;
+              {heatmap.map(({ day: key, label, pages: p }) => {
                 const cls =
                   p === 0
                     ? "bg-zinc-100 dark:bg-zinc-800"
@@ -296,7 +179,7 @@ export default async function JornadaPage() {
                 return (
                   <div
                     key={key}
-                    title={`${d.toLocaleDateString("pt-BR")}: ${p} ${p === 1 ? "página" : "páginas"}`}
+                    title={`${label}: ${p} ${p === 1 ? "página" : "páginas"}`}
                     className={`h-3 w-3 rounded-sm ${cls}`}
                   />
                 );
@@ -320,10 +203,8 @@ export default async function JornadaPage() {
                   className="border-l-2 border-indigo-300 pl-3 dark:border-indigo-700"
                 >
                   <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                    {l.date.toLocaleDateString("pt-BR")}
-                    {l.bookId && bookTitleById.get(l.bookId)
-                      ? ` · ${bookTitleById.get(l.bookId)}`
-                      : ""}
+                    {l.label}
+                    {l.bookTitle ? ` · ${l.bookTitle}` : ""}
                   </p>
                   <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-300">
                     {l.note}
@@ -369,17 +250,7 @@ export default async function JornadaPage() {
               </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {reading.map((b) => {
-                const pct =
-                  b.pages && b.currentPage
-                    ? Math.min(100, Math.round((b.currentPage / b.pages) * 100))
-                    : 0;
-                const days = b.startedAt ? daysBetween(b.startedAt, now) : null;
-                const etaDays =
-                  b.pages && b.currentPage && b.currentPage > 0 && days
-                    ? Math.ceil(
-                        (b.pages - b.currentPage) / (b.currentPage / days)
-                      )
-                    : null;
+                const { percentage: pct, days, etaDays } = b.progress;
                 return (
                   <Link
                     key={b.id}

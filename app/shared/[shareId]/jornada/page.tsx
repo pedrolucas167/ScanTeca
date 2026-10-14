@@ -1,12 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { getSharedJourney, HEAT_WEEKS } from "@/modules/reading";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { BookOpen, BookMarked, Flame, Target } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-
-const HEAT_WEEKS = 15;
 
 export default async function SharedJornadaPage({
   params,
@@ -15,68 +13,9 @@ export default async function SharedJornadaPage({
 }) {
   const { shareId } = await params;
 
-  const setting = await prisma.librarySetting.findUnique({
-    where: { shareId },
-  });
-
-  if (!setting || !setting.shareEnabled) {
-    notFound();
-  }
-
-  const [books, logs] = await Promise.all([
-    prisma.book.findMany({
-      where: { userId: setting.userId },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.readingLog.findMany({
-      where: { userId: setting.userId },
-      select: { date: true, pages: true },
-    }),
-  ]);
-
-  const now = new Date();
-  const year = now.getFullYear();
-
-  const reading = books.filter((b) => b.status === "READING");
-  const readThisYear = books.filter((b) => {
-    if (b.status !== "READ") return false;
-    const d = b.finishedAt ?? b.createdAt;
-    return d.getFullYear() === year;
-  });
-
-  const weekAgo = new Date(now);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekPages = logs
-    .filter((l) => l.date >= weekAgo)
-    .reduce((s, l) => s + l.pages, 0);
-
-  const logDays = new Set(logs.map((l) => l.date.toISOString().slice(0, 10)));
-  let streak = 0;
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  if (!logDays.has(cursor.toISOString().slice(0, 10))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  while (logDays.has(cursor.toISOString().slice(0, 10))) {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  const pagesByDay = new Map<string, number>();
-  for (const l of logs) {
-    const key = l.date.toISOString().slice(0, 10);
-    pagesByDay.set(key, (pagesByDay.get(key) ?? 0) + l.pages);
-  }
-  const heatEnd = new Date();
-  heatEnd.setHours(0, 0, 0, 0);
-  heatEnd.setDate(heatEnd.getDate() + (6 - heatEnd.getDay()));
-  const heatStart = new Date(heatEnd);
-  heatStart.setDate(heatStart.getDate() - (HEAT_WEEKS * 7 - 1));
-
-  const goalPct =
-    setting.yearlyGoal && setting.yearlyGoal > 0
-      ? Math.min(100, Math.round((readThisYear.length / setting.yearlyGoal) * 100))
-      : null;
+  const result = await getSharedJourney(shareId);
+  if (!result) notFound();
+  const { setting, year, reading, readThisYear, streak, weekPages, goalPct, heatmap } = result;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -169,11 +108,7 @@ export default async function SharedJornadaPage({
           </h2>
           <div className="overflow-x-auto">
             <div className="grid w-max grid-flow-col grid-rows-7 gap-[3px]">
-              {Array.from({ length: HEAT_WEEKS * 7 }).map((_, i) => {
-                const d = new Date(heatStart);
-                d.setDate(d.getDate() + i);
-                const key = d.toISOString().slice(0, 10);
-                const p = pagesByDay.get(key) ?? 0;
+              {heatmap.map(({ day: key, label, pages: p }) => {
                 const cls =
                   p === 0
                     ? "bg-zinc-100 dark:bg-zinc-800"
@@ -185,7 +120,7 @@ export default async function SharedJornadaPage({
                 return (
                   <div
                     key={key}
-                    title={`${d.toLocaleDateString("pt-BR")}: ${p} ${p === 1 ? "página" : "páginas"}`}
+                    title={`${label}: ${p} ${p === 1 ? "página" : "páginas"}`}
                     className={`h-3 w-3 rounded-sm ${cls}`}
                   />
                 );
@@ -206,13 +141,7 @@ export default async function SharedJornadaPage({
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {reading.map((b) => {
-                const pct =
-                  b.pages && b.currentPage
-                    ? Math.min(
-                        100,
-                        Math.round((b.currentPage / b.pages) * 100)
-                      )
-                    : 0;
+                const pct = b.progress.percentage;
                 return (
                   <div
                     key={b.id}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Target, Pencil, Check, X } from "lucide-react";
+import { calculateGoalProgress } from "@/modules/reading/client";
 
 export default function GoalCard({
   initialGoal,
@@ -36,8 +37,7 @@ export default function GoalCard({
     }
   };
 
-  const pct =
-    goal && goal > 0 ? Math.min(100, Math.round((readCount / goal) * 100)) : 0;
+  const pct = calculateGoalProgress(readCount, goal).percentage ?? 0;
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">

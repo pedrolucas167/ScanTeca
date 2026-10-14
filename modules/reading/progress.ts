@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { readingDay, dayDate } from "./calendar";
 
 // Receives the caller's transaction so book and daily log commit together.
 export async function recordDailyProgress(
@@ -7,11 +8,7 @@ export async function recordDailyProgress(
 ) {
   if (input.pages <= 0) return;
   // A Date column stores a calendar day; use the product's timezone, not the host's.
-  const dateParts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(new Date());
-  const part = (name: string) => dateParts.find(p => p.type === name)!.value;
-  const date = new Date(`${part("year")}-${part("month")}-${part("day")}T00:00:00.000Z`);
+  const date = dayDate(readingDay(new Date()));
   const note = input.note?.trim() || null;
   const where = { userId_date: { userId: input.userId, date } };
   const existing = note ? await tx.readingLog.findUnique({ where }) : null;
