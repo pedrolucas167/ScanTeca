@@ -192,6 +192,7 @@ async function directChatResponse(question: string, apiKey: string) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ transcript: question })}\n\n`));
         const reader = res.body!.getReader();
         let buffer = "";
         const processPayload = (payload: string) => {
@@ -255,7 +256,7 @@ async function directChatResponse(question: string, apiKey: string) {
   }
 }
 
-async function toolExecutionResponse(routing: RoutingDecision) {
+async function toolExecutionResponse(routing: RoutingDecision, transcript: string) {
   // TODO: Implement tool execution logic
   // For now, return a message indicating the feature is coming soon
   const toolMessages: Record<string, string> = {
@@ -270,6 +271,7 @@ async function toolExecutionResponse(routing: RoutingDecision) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ transcript })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
@@ -285,13 +287,14 @@ async function toolExecutionResponse(routing: RoutingDecision) {
   });
 }
 
-function groundedFallbackResponse(sessionId: string | null) {
+function groundedFallbackResponse(sessionId: string | null, transcript: string) {
   const encoder = new TextEncoder();
   const message =
     "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.";
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sessionId })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ transcript })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: [] })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -462,7 +465,7 @@ export async function POST(request: NextRequest) {
 
     // Tool execution for specific actions
     if (shouldExecuteTool(routing)) {
-      return toolExecutionResponse(routing);
+      return toolExecutionResponse(routing, trimmed);
     }
     let sessionId = requestedSessionId ?? null;
     let currentRequestMessageId: string | null = null;
@@ -860,7 +863,7 @@ export async function POST(request: NextRequest) {
       (progressIntent && readingNow.length > 0) ||
       externalBooks.length > 0;
     if (!hasGrounding) {
-      return groundedFallbackResponse(sessionId);
+      return groundedFallbackResponse(sessionId, trimmed);
     }
 
     const retrievalStats = {
