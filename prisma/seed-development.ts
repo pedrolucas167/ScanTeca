@@ -1,5 +1,4 @@
 import nextEnv from "@next/env";
-import { PrismaClient } from "@prisma/client";
 import { developmentBooks, developmentSeedConfig, seedDevelopment } from "./development-fixtures";
 
 nextEnv.loadEnvConfig(process.cwd(), true);
@@ -13,6 +12,8 @@ async function main() {
     process.stdout.write("[seed:dev] Nenhuma conexão ou gravação. Use --apply para criar os dados.\n");
     return;
   }
+  // Prisma loads .env at import time; Next's development overrides must win first.
+  const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient({ datasourceUrl: config.databaseUrl });
   try {
     await seedDevelopment(prisma, config.userId);
