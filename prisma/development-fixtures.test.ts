@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { developmentSeedConfig, fixtureId } from "./development-fixtures";
+import { diaryCommandSchema } from "@/modules/reading";
 
 const local = "postgresql://dev:dev@127.0.0.1:55440/scanteca_development";
 describe("proteções do seed de desenvolvimento", () => {
+  it("gera IDs aceitos pelos comandos reais do diário", () => {
+    expect(diaryCommandSchema.safeParse({ action: "start", bookId: fixtureId("user_test", "reading") }).success).toBe(true);
+    expect(diaryCommandSchema.safeParse({ action: "updateEntry", entryId: fixtureId("user_test", "diary"), type: "REFLECTION", content: "Teste" }).success).toBe(true);
+  });
   it("exige destino e usuário explícitos mesmo com DATABASE_URL disponível", () => {
     expect(() => developmentSeedConfig({ DATABASE_URL: local })).toThrow();
     expect(() => developmentSeedConfig({ SEED_DATABASE_URL: local })).toThrow();

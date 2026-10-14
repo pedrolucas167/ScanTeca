@@ -24,7 +24,7 @@ export const developmentBooks = [
 ] as const;
 
 export function fixtureId(userId: string, key: string) {
-  return `dev_fixture_${createHash("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32)}`;
+  return `c${createHash("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 24)}`;
 }
 
 /** Reruns preserve edits and fill missing demonstration covers. */
@@ -38,6 +38,18 @@ export async function seedDevelopment(prisma: PrismaClient, userId: string, now 
   return prisma.$transaction(async tx => {
     // Serialize simultaneous runs for this account, including date-unique logs.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`development-fixtures:${userId}`}))`;
+    // Upgrade only this account's old fixtures. FK relations cascade on ID updates.
+    const legacyId = (key: string) => `dev_fixture_${createHash("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32)}`;
+    for (const book of developmentBooks) {
+      await tx.book.updateMany({ where: { id: legacyId(book.key), userId }, data: { id: id(book.key) } });
+      await tx.readingLog.updateMany({ where: { bookId: legacyId(book.key), userId }, data: { bookId: id(book.key) } });
+    }
+    await tx.readingSession.updateMany({ where: { id: legacyId("session"), userId }, data: { id: id("session") } });
+    await tx.annotation.updateMany({ where: { sessionId: legacyId("session"), userId }, data: { sessionId: id("session") } });
+    await tx.diaryEntry.updateMany({ where: { id: legacyId("diary"), userId }, data: { id: id("diary") } });
+    await tx.bookPassage.updateMany({ where: { id: legacyId("passage"), book: { userId } }, data: { id: id("passage") } });
+    await tx.annotation.updateMany({ where: { id: legacyId("annotation"), userId }, data: { id: id("annotation") } });
+    await tx.readingLog.updateMany({ where: { id: legacyId("log"), userId }, data: { id: id("log") } });
     await tx.librarySetting.upsert({ where: { userId }, update: {}, create: { userId, name: "Biblioteca de desenvolvimento", yearlyGoal: 12 } });
     const collections = await Promise.all(["Ficção de teste", "Referência de teste"].map(name =>
       tx.collection.upsert({ where: { userId_name: { userId, name } }, update: {}, create: { userId, name } })));
