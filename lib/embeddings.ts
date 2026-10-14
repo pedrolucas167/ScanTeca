@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./fetch-with-timeout";
+
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const EMBEDDING_MODEL = "openai/text-embedding-3-small";
 
@@ -12,7 +14,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   if (!input) return null;
 
   try {
-    const res = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/embeddings`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -87,5 +89,19 @@ export function reviewToEmbeddingText(review: {
     `Autor: ${review.book.author}`,
     review.rating ? `Avaliação: ${review.rating}/5` : "",
     review.content,
+  ].filter(Boolean).join(" — ");
+}
+
+export function externalDataToEmbeddingText(data: {
+  source: string;
+  title: string;
+  content: string;
+  type: string;
+}): string {
+  return [
+    `Fonte: ${data.source}`,
+    `Tipo: ${data.type}`,
+    `Título: ${data.title}`,
+    data.content,
   ].filter(Boolean).join(" — ");
 }

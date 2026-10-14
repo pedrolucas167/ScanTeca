@@ -1,104 +1,48 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    book: { count: vi.fn(), update: vi.fn() },
-    $transaction: vi.fn(),
-  },
+vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn(), rateLimits: {
+  "books/reorder": { userLimit: 10, ipLimit: 30, windowMs: 60000 },
+} }));
+vi.mock("@/modules/library", async importOriginal => ({
+  ...await importOriginal<typeof import("@/modules/library")>(), reorderBooks: vi.fn(),
 }));
-vi.mock("@/lib/rate-limit", () => ({
-  rateLimitGuard: vi.fn(),
-  rateLimits: {
-    "books/reorder": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
-  },
-}));
-
-import { PATCH } from "./route";
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
 import { rateLimitGuard } from "@/lib/rate-limit";
-
-const authMock = vi.mocked(auth);
-const countMock = vi.mocked(prisma.book.count);
-const updateMock = vi.mocked(prisma.book.update);
-const transactionMock = vi.mocked(prisma.$transaction);
-const guardMock = vi.mocked(rateLimitGuard);
-
-function makeRequest(body: unknown) {
-  return new NextRequest("http://localhost/api/books/reorder", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-const items = [
-  { id: "b1", customOrder: 0 },
-  { id: "b2", customOrder: 1 },
-];
-
-describe("PATCH /api/books/reorder", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authMock.mockResolvedValue({ userId: "u1" } as never);
-    guardMock.mockResolvedValue(null);
-  });
-
-  it("retorna 401 sem autenticação", async () => {
-    authMock.mockResolvedValue({ userId: null } as never);
-
-    const res = await PATCH(makeRequest({ items }));
-
-    expect(res.status).toBe(401);
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("propaga a resposta do rate limit", async () => {
-    guardMock.mockResolvedValue(
-      NextResponse.json({ error: "Muitas requisições" }, { status: 429 })
-    );
-
-    const res = await PATCH(makeRequest({ items }));
-
-    expect(res.status).toBe(429);
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("retorna 400 com body inválido", async () => {
-    const res = await PATCH(makeRequest({ items: [{ id: "b1" }] }));
-
-    expect(res.status).toBe(400);
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("retorna 404 quando algum livro não pertence ao usuário", async () => {
-    countMock.mockResolvedValue(1); // só 1 dos 2 é do usuário
-
-    const res = await PATCH(makeRequest({ items }));
-
-    expect(res.status).toBe(404);
-    expect(countMock).toHaveBeenCalledWith({
-      where: { userId: "u1", id: { in: ["b1", "b2"] } },
-    });
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("atualiza todos os itens numa transação", async () => {
-    countMock.mockResolvedValue(2);
-    updateMock.mockImplementation((args) => args as never);
-    transactionMock.mockResolvedValue([] as never);
-
-    const res = await PATCH(makeRequest({ items }));
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ updated: 2 });
-    expect(updateMock).toHaveBeenCalledTimes(2);
-    expect(updateMock).toHaveBeenCalledWith({
-      where: { id: "b1" },
-      data: { customOrder: 0 },
-    });
-    expect(transactionMock).toHaveBeenCalledTimes(1);
-  });
+import { reorderBooks, LibraryError } from "@/modules/library";
+import { PATCH } from "./route";
+const items = [{ id: "b1", customOrder: 0 }, { id: "b2", customOrder: 1 }];
+const request = (value: unknown) => new NextRequest("http://localhost/api/books/reorder", {
+  method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: value }),
+});
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(auth).mockResolvedValue({ userId: "u1" } as never);
+  vi.mocked(rateLimitGuard).mockResolvedValue(null);
+});
+it("rejeita anônimo", async () => {
+  vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+  expect((await PATCH(request(items))).status).toBe(401);
+  expect(reorderBooks).not.toHaveBeenCalled();
+});
+it("aplica o rate limit específico antes da operação", async () => {
+  vi.mocked(rateLimitGuard).mockResolvedValue(NextResponse.json({}, { status: 429 }));
+  expect((await PATCH(request(items))).status).toBe(429);
+  expect(rateLimitGuard).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userLimit: 10, ipLimit: 30 }));
+  expect(reorderBooks).not.toHaveBeenCalled();
+});
+it.each([{ value: [{ id: "b1" }] }, { value: [items[0], items[0]] }])("rejeita entrada inválida ou duplicada", async ({ value }) => {
+  expect((await PATCH(request(value))).status).toBe(400);
+  expect(reorderBooks).not.toHaveBeenCalled();
+});
+it("traduz livro de outro usuário para 404", async () => {
+  vi.mocked(reorderBooks).mockRejectedValue(new LibraryError("NOT_FOUND", "Livro não encontrado"));
+  expect((await PATCH(request(items))).status).toBe(404);
+});
+it("preserva o payload e a identidade", async () => {
+  vi.mocked(reorderBooks).mockResolvedValue({ updated: 2 });
+  const response = await PATCH(request(items));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ updated: 2 });
+  expect(reorderBooks).toHaveBeenCalledWith("u1", { items });
 });

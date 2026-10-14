@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getBookDetail } from "@/modules/library";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Star } from "lucide-react";
@@ -24,15 +24,7 @@ export default async function BookDetailPage({
 
   const { id } = await params;
 
-  const book = await prisma.book.findFirst({
-    where: { id, userId },
-    include: {
-      reviews: {
-        orderBy: { createdAt: "desc" },
-      },
-      collection: { select: { name: true } },
-    },
-  });
+  const book = await getBookDetail(userId, id);
 
   if (!book) {
     notFound();

@@ -2,6 +2,44 @@
 
 Este documento descreve os padrões de arquitetura e convenções utilizados no projeto ScanTeca para garantir consistência e manutenibilidade.
 
+## Migração incremental para módulos (13/10/2026)
+
+O projeto é um monólito Next.js em migração. O primeiro corte está em
+`modules/library` (operações de livros) e `modules/reading` (transições e registro
+de progresso). Os consumidores importam somente `@/modules/library` ou
+`@/modules/reading`; cada `index.ts` define sua API pública. O ESLint restringe
+imports internos e dependências diretas dos módulos em HTTP/UI/Clerk.
+
+`app/api/books/route.ts` autentica, limita requisições, valida entradas e traduz
+resultados/erros para HTTP. Biblioteca coordena persistência e chama Leitura
+pela API pública. A atualização de livro e diário usa uma transação serializável;
+chamadas externas ficam fora dela. Adaptadores existentes em `lib/` continuam
+sendo reutilizados durante a migração. As outras páginas e APIs ainda seguem
+a organização anterior; esta mudança não torna o projeto inteiro modular.
+
+Escopo, critérios de conclusão, estimativas e limites de validação estão em
+[DEVELOPMENT-ROADMAP.md](./DEVELOPMENT-ROADMAP.md).
+
+Na segunda etapa, sessões, diário e marginalia foram migrados para Leitura.
+As páginas de diário/leitura consultam sua API pública. Pausas são idempotentes
+e conciliam páginas já registradas pelo catálogo; autorização exige propriedade
+do livro e correspondência da sessão/trecho. Dez testes com PostgreSQL isolado
+validaram concorrência, rollback e autorização. Jornada ainda usa consultas e
+cálculos legados. Consulte [READING-VALIDATION.md](./READING-VALIDATION.md).
+
+Na terceira etapa, Jornada privada e pública passaram a consultar Leitura e
+compartilhar regras puras de calendário, estatísticas e metas. O módulo tem
+também a entrada pública `@/modules/reading/client`, própria para componentes
+cliente e sem dependência de persistência. Consulte
+[JOURNEY-VALIDATION.md](./JOURNEY-VALIDATION.md) para regras e limites históricos.
+
+Na continuação de Biblioteca, scanner, enriquecimento, reordenação, coleções,
+configurações e consultas de catálogo/detalhe migraram para sua API pública.
+Scanner e cadastro compartilham deduplicação transacional por usuário; renomeação
+de biblioteca/coleção é atômica, e enriquecimento preserva edições concorrentes.
+Providers continuam adaptadores reutilizados em `lib/`, agora com timeout por
+requisição. Consulte [LIBRARY-VALIDATION.md](./LIBRARY-VALIDATION.md).
+
 ## Estrutura de Diretórios
 
 ```
@@ -139,9 +177,17 @@ Configurações adicionais para maior segurança de tipos:
 ### Branches
 
 - `main`: Branch de produção
-- `refactor/*`: Branches de refatoração
-- `feature/*`: Branches de novas funcionalidades
-- `fix/*`: Branches de correções de bugs
+- `develop`: Branch de integração
+- `feat/<modulo>`: Desenvolvimento de cada módulo
+- `fix/<escopo>`: Correções isoladas
+- `refactor/<escopo>`: Refatorações sem mudança funcional
+
+Usar uma branch por módulo. Quando houver dependência entre módulos, criar
+branches encadeadas e integrar na ordem da dependência. A primeira extração usa
+`fix/validation-baseline` → `feat/reading-module` →
+`feat/library-module`, preservando a base existente em `fix/build-errors`.
+Essa base está à frente de `develop`; sua integração deve ser tratada antes de
+abrir uma comparação final contra `develop` para evitar incluir trabalho anterior.
 
 ### Commits
 
@@ -153,6 +199,10 @@ fix: corrigir bug Y
 refactor: melhorar organização de código Z
 docs: atualizar documentação
 ```
+
+Separar commits por mudança coerente, usando Conventional Commits (`feat:`,
+`fix:`, `refactor:`, `test:`, `docs:`, `chore:`). Não adicionar trailers
+`Co-authored-by` ou qualquer atribuição de coautoria aos commits.
 
 ## Próximos Passos
 

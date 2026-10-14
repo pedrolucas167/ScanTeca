@@ -48,6 +48,9 @@ CLAUDE.md
 # Jev integration documentation (local only)
 JEV_INTEGRATION.md
 lib/jev-*.test.ts
+!lib/jev-filtering.test.ts
+!lib/jev-routing.test.ts
+!lib/jev-reranking.test.ts
 
 # vercel
 .vercel

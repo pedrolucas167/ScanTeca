@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <rect width="400" height="600" fill="#e8d6b2"/>
+  <path d="M0 430Q85 392 155 430Q270 385 400 430V600H0Z" fill="#234b57"/>
+  <path d="M176 402L185 255H215L230 402Z" fill="#b7513e"/>
+  <path d="M178 250V225H222V250ZM172 219L200 195L228 219Z" fill="#234b57"/>
+  <path d="M189 227L60 280V195ZM211 227L350 280V195Z" fill="#f8f0d6"/>
+  <path d="M105 360H158V395H105ZM105 360L132 381L158 360" fill="none" stroke="#234b57" stroke-width="3"/>
+  <text x="200" y="58" text-anchor="middle" fill="#234b57" font-family="sans-serif" font-size="12" letter-spacing="4">ACERVO IMAGINÁRIO</text>
+  <text x="200" y="128" text-anchor="middle" fill="#234b57" font-family="Georgia,serif" font-size="42">Cartas</text>
+  <text x="200" y="176" text-anchor="middle" fill="#234b57" font-family="Georgia,serif" font-size="42">do Farol</text>
+  <text x="200" y="516" text-anchor="middle" fill="#f8f0d6" font-family="sans-serif" font-size="15" letter-spacing="2">AUTORIA FICTÍCIA</text>
+  <text x="200" y="560" text-anchor="middle" fill="#e8d6b2" font-family="sans-serif" font-size="10" letter-spacing="2">EDIÇÃO DE DESENVOLVIMENTO</text>
+</svg>

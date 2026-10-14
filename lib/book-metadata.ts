@@ -1,5 +1,3 @@
-import { prisma } from "./prisma";
-
 export function normalize(text: string): string[] {
   return text
     .toLowerCase()
@@ -231,37 +229,4 @@ export function isBookSimilar(
   if (isUnknownAuthor(aAuthor) || isUnknownAuthor(bAuthor)) return true;
 
   return isAuthorSimilar(aAuthor, bAuthor);
-}
-
-/** Busca no acervo do usuário um livro provavelmente duplicado. */
-export async function findExistingBookByTitleAuthor(
-  userId: string,
-  title: string,
-  author: string | null | undefined
-) {
-  const qTitle = title.toLowerCase().trim();
-  const qAuthor = (author || "").toLowerCase().trim();
-
-  const books = await prisma.book.findMany({
-    where: { userId },
-    select: {
-      id: true,
-      title: true,
-      author: true,
-      isbn: true,
-      coverUrl: true,
-      publishedDate: true,
-      collection: { select: { name: true } },
-    },
-  });
-
-  for (const book of books) {
-    if (
-      isBookSimilar(qTitle, qAuthor, book.title || "", book.author || null)
-    ) {
-      return book;
-    }
-  }
-
-  return null;
 }

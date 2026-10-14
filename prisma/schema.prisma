@@ -528,3 +528,21 @@ model Annotation {
   @@index([userId])
   @@index([sessionId])
 }
+
+model ExternalResearchData {
+  id          String   @id @default(cuid())
+  userId      String
+  source      String   // wikipedia, goodreads, etc.
+  url         String
+  title       String
+  content     String   @db.Text
+  type        String   // article, review, metadata
+  embedding   Unsupported("vector(1536)")?
+  scrapedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([source])
+  @@index([type])
+}

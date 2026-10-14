@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <rect width="400" height="600" fill="#683d4b"/>
+  <g stroke="#ba8f84" fill="none" opacity=".6"><circle cx="200" cy="340" r="100"/><ellipse cx="200" cy="340" rx="55" ry="100"/><path d="M100 340H300M115 290H285M115 390H285M200 240V440"/></g>
+  <path d="M164 256L203 279L190 310L223 336L192 351L177 388L149 373L156 332L132 309ZM246 359L265 388L244 413L229 396Z" fill="#e1b76e"/>
+  <path d="M312 235V280M292 257H334M312 239L318 252L312 275L307 260Z" fill="#f6e5c9" stroke="#f6e5c9"/>
+  <text x="200" y="60" text-anchor="middle" fill="#e1b76e" font-family="sans-serif" font-size="12" letter-spacing="4">ACERVO IMAGINÁRIO</text>
+  <text x="200" y="129" text-anchor="middle" fill="#f6e5c9" font-family="Georgia,serif" font-size="40">Atlas de</text>
+  <text x="200" y="174" text-anchor="middle" fill="#f6e5c9" font-family="Georgia,serif" font-size="32">Lugares Inventados</text>
+  <text x="200" y="516" text-anchor="middle" fill="#f6e5c9" font-family="sans-serif" font-size="15" letter-spacing="2">AUTORIA FICTÍCIA</text>
+  <text x="200" y="560" text-anchor="middle" fill="#e1b76e" font-family="sans-serif" font-size="10" letter-spacing="2">EDIÇÃO DE DESENVOLVIMENTO</text>
+</svg>

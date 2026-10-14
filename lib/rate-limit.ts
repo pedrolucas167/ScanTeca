@@ -221,3 +221,53 @@ export async function rateLimitGuard(
 
   return null;
 }
+
+// Domain-based rate limiting for web scraping
+export interface DomainRateLimitConfig {
+  requestsPerSecond: number;
+  requestsPerMinute: number;
+  burstAllowance?: number;
+}
+
+export const domainRateLimits: Record<string, DomainRateLimitConfig> = {
+  wikipedia: { requestsPerSecond: 1, requestsPerMinute: 60, burstAllowance: 5 },
+  goodreads: { requestsPerSecond: 0.5, requestsPerMinute: 30, burstAllowance: 3 },
+  google_books: { requestsPerSecond: 0.3, requestsPerMinute: 20, burstAllowance: 2 },
+  default: { requestsPerSecond: 0.5, requestsPerMinute: 30, burstAllowance: 3 },
+};
+
+export async function checkDomainRateLimit(
+  domain: string
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const store = getStore();
+  const config = domainRateLimits[domain] ?? domainRateLimits.default;
+  const now = Date.now();
+
+  // Check per-second limit
+  const secondKey = `domain:${domain}:sec:${Math.floor(now / 1000)}`;
+  const secondCheck = await store.check(secondKey, 1000, config?.requestsPerSecond ?? 0.5);
+  if (!secondCheck.success) {
+    return { allowed: false, retryAfter: secondCheck.retryAfter };
+  }
+
+  // Check per-minute limit
+  const minuteKey = `domain:${domain}:min:${Math.floor(now / 60000)}`;
+  const minuteCheck = await store.check(minuteKey, 60000, config?.requestsPerMinute ?? 30);
+  if (!minuteCheck.success) {
+    return { allowed: false, retryAfter: minuteCheck.retryAfter };
+  }
+
+  return { allowed: true };
+}
+
+// Extract domain from URL for rate limiting
+export function extractDomain(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    // Remove www. prefix
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return "unknown";
+  }
+}

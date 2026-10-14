@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetch-with-timeout";
 import {
   isTitleSimilar,
   isAuthorSimilar,
@@ -38,7 +39,7 @@ export async function findOriginalPublishYear({
   // ISBN → edição exata → work → ano da primeira publicação
   if (cleanedIsbn) {
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://openlibrary.org/search.json?isbn=${encodeURIComponent(
           cleanedIsbn
         )}&fields=first_publish_year&limit=1`
@@ -64,7 +65,7 @@ export async function findOriginalPublishYear({
     if (normalAuthor) params.set("author", normalAuthor);
     params.set("fields", "title,author_name,first_publish_year");
 
-    const res = await fetch(`https://openlibrary.org/search.json?${params}`);
+    const res = await fetchWithTimeout(`https://openlibrary.org/search.json?${params}`);
     if (!res.ok) return null;
 
     const data = (await res.json()) as OpenLibrarySearchResponse;
