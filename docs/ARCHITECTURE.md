@@ -27,6 +27,12 @@ do livro e correspondência da sessão/trecho. Dez testes com PostgreSQL isolado
 validaram concorrência, rollback e autorização. Jornada ainda usa consultas e
 cálculos legados. Consulte [READING-VALIDATION.md](./READING-VALIDATION.md).
 
+Na terceira etapa, Jornada privada e pública passaram a consultar Leitura e
+compartilhar regras puras de calendário, estatísticas e metas. O módulo tem
+também a entrada pública `@/modules/reading/client`, própria para componentes
+cliente e sem dependência de persistência. Consulte
+[JOURNEY-VALIDATION.md](./JOURNEY-VALIDATION.md) para regras e limites históricos.
+
 ## Estrutura de Diretórios
 
 ```

@@ -9,7 +9,7 @@ incluindo revisão e testes; não são prazos de calendário ou compromissos.
 | Prioridade | Entrega | Esforço restante inicial | Confiança | Critério de aceite |
 | --- | --- | --- | --- | --- |
 | P0 | Base de validação e primeiro corte Biblioteca/Leitura | Implementado neste corte; validações registradas abaixo | Alta para o corte local | Build, testes, lint e smoke HTTP verificáveis |
-| P0 | Completar consistência e autorização de Leitura | Núcleo de sessões/diário/anotações implementado; 1–3 dias para jornada e revisão autenticada | Média | PostgreSQL isolado validou rollback e concorrência; concluir jornada e smoke autenticado |
+| P0 | Completar consistência e autorização de Leitura | Migração técnica de sessões/diário/anotações/Jornada concluída; revisão autenticada pendente | Alta nos cenários testados; média na interface | PostgreSQL validou rollback, concorrência, privacidade e estatísticas; concluir revisão autenticada |
 | P1 | Completar Biblioteca | 3–5 dias | Média | Enrich, reorder, consultas e coleções usam a API pública; deduplicação concorrente definida; integrações externas têm limites de tempo |
 | P1 | Oráculo | 5–8 dias | Média-baixa | Separar retrieval, contexto, geração, streaming e persistência; fixtures de qualidade, cancelamento e falhas; medir latência e tokens |
 | P1 | Jobs e notificações | 3–5 dias | Baixa | Worker executável no ambiente de deploy; retirada atômica, retentativas e recuperação; efeitos idempotentes |
@@ -23,6 +23,11 @@ A segunda etapa de Leitura está registrada em
 [READING-VALIDATION.md](./READING-VALIDATION.md): 115 testes unitários e dez testes
 de PostgreSQL real passaram. Os limites do primeiro corte descritos abaixo são
 históricos; a integração de Leitura já avançou, e o smoke autenticado está pendente.
+
+A terceira etapa migrou Jornada privada/pública, calendário e metas:
+[JOURNEY-VALIDATION.md](./JOURNEY-VALIDATION.md). Resultado: 143 testes unitários e
+11 de PostgreSQL passando, com build e TypeScript validados. A próxima frente
+arquitetural é completar Biblioteca; revisão visual autenticada permanece um gate.
 
 ## Primeiro corte implementado
 
