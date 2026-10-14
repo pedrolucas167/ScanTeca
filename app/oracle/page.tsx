@@ -36,6 +36,7 @@ export default function OraclePage() {
   const [generationStage, setGenerationStage] = useState("Consultando sua estante...");
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(() => {
@@ -298,7 +299,7 @@ export default function OraclePage() {
     question: string,
     opts?: { regenerate?: boolean }
   ) => {
-    if (!question || loadingRef.current) return;
+    if (!question || loadingRef.current || recording || transcribing) return;
     const previousMessages = opts?.regenerate ? messages : null;
     loadingRef.current = true;
     streamDoneRef.current = false;
@@ -396,67 +397,31 @@ export default function OraclePage() {
   const sendAudio = async (blob: Blob) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    streamDoneRef.current = false;
-    receivedAnyRef.current = false;
-    setFailedSend(null);
-
-    stopAudio();
-    stopReveal();
-    stickToBottomRef.current = true;
+    setTranscribing(true);
     setError(null);
-    setGenerationStage("Transcrevendo áudio...");
-    setLoading(true);
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: "🎤 Transcrevendo áudio..." },
-      { role: "assistant", content: "" },
-    ]);
-
+    setFailedSend(null);
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = () => reject(r.error);
-        r.readAsDataURL(blob);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
       });
-      const base64 = dataUrl.split(",")[1];
-      const format = blob.type.split("/")[1]?.split(";")[0] || "webm";
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      const res = await fetch("/api/oracle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audio: { data: base64, format }, mode, sessionId, temperature, scope }),
-        signal: controller.signal,
+      const res = await fetch("/api/oracle/transcribe", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: { data: dataUrl.split(",")[1],
+          format: blob.type.split("/")[1]?.split(";")[0] || "webm" } }),
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "Erro ao consultar o Oráculo");
-      }
-
-      await readOracleStream(res);
-      streamDoneRef.current = true;
-      await drainReveal();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não consegui transcrever o áudio.");
+      setInput(previous => [previous.trimEnd(), data.transcript].filter(Boolean).join(" "));
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        streamDoneRef.current = true;
-        await drainReveal();
-      } else {
-        stopReveal();
-        setError(err instanceof Error ? err.message : "Erro de rede");
-        setMessages((prev) => prev.slice(0, -2));
-        setFailedSend({ kind: "audio", blob, voice: false });
-      }
+      setError(err instanceof Error ? err.message : "Não consegui transcrever o áudio.");
+      setFailedSend({ kind: "audio", blob, voice: false });
     } finally {
-      abortRef.current = null;
       loadingRef.current = false;
-      streamDoneRef.current = true;
-      setLoading(false);
-      setGenerationStage("Consultando sua estante...");
-      maybeAutoListen();
+      setTranscribing(false);
+      inputRef.current?.focus();
     }
   };
 
@@ -757,7 +722,7 @@ export default function OraclePage() {
       mediaRecorderRef.current?.stop();
       return;
     }
-    if (micBusyRef.current) return;
+    if (micBusyRef.current || loadingRef.current) return;
     micBusyRef.current = true;
     try {
       stopAudio();
@@ -777,8 +742,7 @@ export default function OraclePage() {
         const blob = new Blob(chunksRef.current, { type: mime });
         chunksRef.current = [];
         if (blob.size > 0) {
-          if (voiceOnRef.current) void sendVoice(blob);
-          else void sendAudio(blob);
+          void sendAudio(blob);
         }
       };
       mediaRecorderRef.current = rec;
@@ -1760,6 +1724,9 @@ export default function OraclePage() {
             </div>
           )}
 
+          <p role="status" className="text-xs text-outline">
+            {transcribing ? "Transcrevendo áudio…" : recording ? "Gravando áudio…" : "Revise o texto antes de enviar ao Oráculo."}
+          </p>
           <form
             onSubmit={handleSubmit}
             className="relative flex items-end gap-1.5 rounded-[28px] border border-outline-variant/50 bg-surface-container/95 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
@@ -1795,18 +1762,18 @@ export default function OraclePage() {
               }}
               placeholder={
                 recording
-                  ? "Gravando... toque no microfone para enviar"
+                  ? "Gravando... toque no microfone para transcrever"
                   : "Pergunte ao seu acervo físico..."
               }
-              disabled={loading}
+              disabled={loading || transcribing || recording}
               className="max-h-32 flex-1 resize-none self-center border-0 bg-transparent px-1 py-1.5 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 focus:outline-none focus:ring-0 disabled:opacity-60"
             />
             {micSupported && (
               <button
                 type="button"
                 onClick={handleMic}
-                disabled={loading}
-                title={recording ? "Parar e enviar" : "Falar com o Oráculo"}
+                disabled={loading || transcribing}
+                title={recording ? "Parar e transcrever" : "Gravar áudio para revisar"}
                 className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors active:scale-90 disabled:opacity-50 ${
                   recording
                     ? "animate-pulse bg-error text-white"
@@ -1828,7 +1795,8 @@ export default function OraclePage() {
             ) : (
               <button
                 type="submit"
-                disabled={!input.trim()}
+                disabled={!input.trim() || recording || transcribing}
+                title="Enviar mensagem"
                 className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-white shadow-[0_0_16px_rgba(91,80,230,0.5)] transition-all hover:bg-inverse-primary active:scale-95 disabled:opacity-50"
               >
                 <Icon name="arrow_upward" className="text-lg" />
