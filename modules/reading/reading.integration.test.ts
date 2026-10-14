@@ -23,6 +23,7 @@ import { createAnnotation, addPassageComment, getReadingPage } from "./annotatio
 import { saveDiaryEntry, deleteDiaryEntry } from "./diary";
 import { updateBook } from "@/modules/library";
 import { bookUpdateSchema } from "@/modules/library";
+import { getJourney, getSharedJourney, getAnnualGoalStatus } from "./journey";
 
 const owner = "reading-integration-owner";
 let bookId: string;
@@ -33,6 +34,7 @@ beforeEach(async () => {
   await prisma.book.deleteMany({ where: { userId: { startsWith: "reading-integration-" } } });
   await prisma.readingLog.deleteMany({ where: { userId: { startsWith: "reading-integration-" } } });
   await prisma.collection.deleteMany({ where: { userId: { startsWith: "reading-integration-" } } });
+  await prisma.librarySetting.deleteMany({ where: { userId: { startsWith: "reading-integration-" } } });
   const collection = await prisma.collection.create({ data: { userId: owner, name: "Teste" } });
   const book = await prisma.book.create({ data: {
     userId: owner, collectionId: collection.id, isbn: "9788535902778", title: "Livro de teste",
@@ -134,5 +136,23 @@ describe("Leitura em PostgreSQL isolado", () => {
     await expect(saveDiaryEntry(owner, { action: "entry", bookId: otherBook.id, sessionId: session.id, type: "QUOTE", content: "x", tags: [] }))
       .rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await prisma.diaryEntry.count()).toBe(0);
+  });
+
+  it("jornadas privada, pública e meta concordam no banco sem expor notas", async () => {
+    const now = new Date("2027-01-01T02:45:00Z");
+    await prisma.book.update({ where: { id: bookId }, data: {
+      status: "READ", finishedAt: new Date("2027-01-01T02:00:00Z"), notes: "Nota privada do livro",
+    } });
+    await prisma.librarySetting.create({ data: { userId: owner, yearlyGoal: 1, shareId: "reading-integration-share", shareEnabled: true } });
+    await prisma.readingLog.create({ data: { userId: owner, bookId, date: new Date("2026-12-31T00:00:00Z"), pages: 20, note: "Nota privada do diário" } });
+    const personal = await getJourney(owner, now);
+    const shared = await getSharedJourney("reading-integration-share", now);
+    expect(personal).toMatchObject({ year: 2026, streak: 1, weekPages: 20, goal: { reached: true } });
+    expect(personal.recentNotes[0]?.note).toBe("Nota privada do diário");
+    expect(shared).toMatchObject({ year: 2026, streak: 1, weekPages: 20, goalPct: 100 });
+    expect(JSON.stringify(shared)).not.toContain("Nota privada");
+    expect(await getAnnualGoalStatus(owner, now)).toEqual({ completed: 1, target: 1 });
+    await prisma.librarySetting.update({ where: { userId: owner }, data: { shareEnabled: false } });
+    expect(await getSharedJourney("reading-integration-share", now)).toBeNull();
   });
 });
