@@ -120,13 +120,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         />
         <ClerkProvider localization={ptBR} appearance={clerkAppearance}>
           <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
-            <nav className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 px-3 sm:px-5">
-              <div className="flex min-w-0 flex-1 items-center gap-3 xl:gap-6">
+            <nav className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-5 md:h-16 md:flex-nowrap md:py-0">
+              <div className="flex min-w-0 basis-full items-center gap-3 md:basis-auto md:flex-1 xl:gap-6">
                 <Link href="/" className="group flex shrink-0 items-center gap-2">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-md shadow-indigo-600/20 transition-transform duration-200 group-hover:scale-105">
                     <BookOpen className="h-5 w-5 text-white" />
                   </div>
-                  <div className="hidden flex-col sm:flex">
+                  <div className="flex flex-col">
                     <span className="text-lg font-bold leading-none tracking-tight text-foreground">
                       Scanteca
                     </span>
@@ -135,7 +135,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     </span>
                   </div>
                 </Link>
-                <div className="hidden min-w-0 items-center gap-1 lg:flex lg:[&>a]:whitespace-nowrap lg:[&>a]:px-2 lg:[&>a]:text-xs xl:[&>a]:px-2.5 xl:[&>a]:text-sm">
+                <div className="hidden min-w-0 items-center gap-1 xl:flex xl:[&>a]:whitespace-nowrap xl:[&>a]:px-2.5 xl:[&>a]:text-sm">
                   <Link
                     href="/"
                     className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -206,11 +206,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     </div>
                   </div>
                 </div>
+                <div className="ml-auto xl:hidden">
+                  <MobileNav />
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+              <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1 md:w-auto md:shrink-0 md:flex-nowrap md:gap-2">
                 <Link
-                  href="/scanner"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 sm:px-5 sm:py-2.5"
+                  href="/scanner" aria-label="Adicionar livro"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 sm:px-4"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -233,12 +236,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </Link>
                 <Show when="signed-out">
                   <SignInButton mode="modal">
-                    <button className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800">
+                    <button className="min-h-11 min-w-11 rounded-md px-1.5 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground sm:px-3 dark:text-zinc-400 dark:hover:bg-zinc-800">
                       Entrar
                     </button>
                   </SignInButton>
                   <SignUpButton mode="modal">
-                    <button className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:px-5 sm:py-2.5 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
+                    <button className="min-h-11 rounded-full bg-zinc-900 px-1.5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:px-4 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
                       Cadastrar
                     </button>
                   </SignUpButton>
@@ -250,7 +253,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   <AdminLink />
                   <UserButton />
                 </Show>
-                <MobileNav />
               </div>
             </nav>
           </header>

@@ -17,7 +17,7 @@ export default function ThemeToggle() {
       type="button"
       onClick={toggle}
       title="Alternar entre modo claro e escuro"
-      className="rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+      className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
     >
       <Moon className="h-4 w-4 dark:hidden" />
       <Sun className="hidden h-4 w-4 dark:block" />
