@@ -9,6 +9,8 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { ptBR } from "@clerk/localizations";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import { unstable_cache } from "next/cache";
 import { BookOpen, Heart, Sparkles, ChevronDown } from "lucide-react";
 import { prisma } from "@/lib/prisma";
@@ -116,7 +118,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');var el=document.documentElement;if(el.dataset.accent){localStorage.setItem('accent',el.dataset.accent)}else{var a=localStorage.getItem('accent');if(a)el.dataset.accent=a}}catch(e){}",
           }}
         />
-        <ClerkProvider>
+        <ClerkProvider localization={ptBR} appearance={clerkAppearance}>
           <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
             <nav className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 px-3 sm:px-5">
               <div className="flex min-w-0 flex-1 items-center gap-3 xl:gap-6">
