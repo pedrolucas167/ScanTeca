@@ -7,12 +7,20 @@
 :root {
   --background: #fafafa;
   --foreground: #171717;
+  --auth-surface: #ffffff;
+  --auth-muted: #f4f4f5;
+  --auth-muted-foreground: #71717a;
+  --auth-border: #e4e4e7;
   color-scheme: light;
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --auth-surface: #09090b;
+  --auth-muted: #18181b;
+  --auth-muted-foreground: #a1a1aa;
+  --auth-border: #27272a;
   color-scheme: dark;
 }
 

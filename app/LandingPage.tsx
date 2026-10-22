@@ -69,7 +69,7 @@ export default function LandingPage() {
     <div className="flex flex-1 flex-col bg-surface text-on-surface">
       {/* 1. Hero */}
       <section className="relative mx-auto w-full max-w-6xl px-6 pb-20 pt-16 md:px-12 md:pt-20">
-        <div className="pointer-events-none absolute left-1/2 top-10 h-[320px] w-[540px] -translate-x-1/2 rounded-full bg-primary-container/15 blur-[120px]" />
+        <div className="pointer-events-none absolute left-1/2 top-10 h-[320px] w-full max-w-[540px] -translate-x-1/2 rounded-full bg-primary-container/15 blur-[120px]" />
         <div className="relative mx-auto mb-14 flex max-w-4xl flex-col items-center text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary-container/10 px-4 py-1.5 font-label-sm text-label-sm text-tertiary shadow-sm">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
@@ -85,17 +85,17 @@ export default function LandingPage() {
             para o código de barras, descubra a real estatura do seu acervo e
             dialogue com seus livros usando inteligência artificial semântica.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
+          <div className="flex w-full flex-col items-stretch justify-center gap-4 sm:w-auto sm:flex-row sm:flex-wrap">
             <Link
               href="/sign-up"
-              className="flex items-center gap-2.5 rounded-full bg-primary-container px-7 py-3.5 font-label-md text-label-md text-white shadow-lg shadow-primary-container/35 transition-all hover:bg-inverse-primary active:scale-[0.98]"
+              className="flex min-h-11 items-center justify-center gap-2.5 rounded-full bg-primary-container px-4 py-3.5 font-label-md text-label-md text-white shadow-lg shadow-primary-container/35 transition-all hover:bg-inverse-primary active:scale-[0.98] sm:px-7"
             >
               <Icon name="menu_book" className="text-lg" fill />
               <span>Começar Minha Estante Grátis</span>
             </Link>
             <Link
               href="/manifesto"
-              className="flex items-center gap-2 rounded-full border border-outline-variant/50 bg-surface-container px-7 py-3.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container-high active:scale-[0.98]"
+              className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-outline-variant/50 bg-surface-container px-4 py-3.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container-high active:scale-[0.98] sm:px-7"
             >
               <Icon name="auto_stories" className="text-lg text-secondary" />
               <span>Leia o Manifesto</span>
@@ -107,7 +107,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12">
           {/* Quote card com abas */}
           <div className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-lg border border-outline-variant/30 p-6 sm:p-8 lg:col-span-7">
-            <div className="mb-6 flex items-center justify-between border-b border-outline-variant/20 pb-4">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-4">
               <div className="flex items-center gap-2">
                 <Icon name="format_quote" className="text-2xl text-primary" />
                 <span className="font-caption text-caption uppercase tracking-wider text-outline">
@@ -119,7 +119,7 @@ export default function LandingPage() {
                   <button
                     key={q.tab}
                     onClick={() => setQuoteIdx(i)}
-                    className={`rounded-full px-3 py-1 font-caption text-caption transition-all ${
+                    className={`min-h-11 rounded-full px-3 py-1 font-caption text-caption transition-all ${
                       i === quoteIdx
                         ? "active-quote-tab"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -153,7 +153,7 @@ export default function LandingPage() {
           {/* Scan widget */}
           <div className="relative flex flex-col justify-between rounded-lg border border-outline-variant/30 bg-surface-container p-6 sm:p-8 lg:col-span-5">
             <div>
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                   <span className="font-label-sm text-label-sm text-on-surface">
@@ -183,7 +183,7 @@ export default function LandingPage() {
                       Jean-Paul Sartre
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 font-caption text-caption text-outline">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-caption text-caption text-outline">
                     <span>216 págs</span>
                     <span>•</span>
                     <span>Nova Fronteira</span>
@@ -192,7 +192,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              <div className="mb-4 grid grid-cols-2 gap-2 font-caption text-caption">
+              <div className="mb-4 grid grid-cols-1 gap-2 font-caption text-caption min-[400px]:grid-cols-2">
                 <div className="flex flex-col rounded-md border border-outline-variant/20 bg-surface-container-low p-2.5">
                   <span className="text-outline">ISBN-13</span>
                   <span className="font-mono font-medium text-on-surface">
@@ -207,7 +207,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between font-caption text-caption text-primary">
+            <div className="flex flex-wrap items-center justify-between gap-2 font-caption text-caption text-primary">
               <span className="flex items-center gap-1">
                 <Icon name="psychology" className="text-sm" />
                 Vetorizado no Oráculo IA

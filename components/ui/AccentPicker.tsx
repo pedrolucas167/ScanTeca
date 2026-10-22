@@ -57,7 +57,7 @@ export default function AccentPicker() {
         onClick={() => setOpen((v) => !v)}
         title="Cor de destaque da interface"
         aria-expanded={open}
-        className="rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
       >
         <Palette className="h-4 w-4" />
       </button>
@@ -68,7 +68,7 @@ export default function AccentPicker() {
               key={a.id}
               type="button"
               onClick={() => pick(a.id)}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <span
                 className="h-3.5 w-3.5 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/20"
