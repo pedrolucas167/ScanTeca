@@ -5,6 +5,7 @@ import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 import { createSocialNotification } from "@/lib/social-notifications";
+import { accessibleBook } from "@/lib/book-access";
 
 const replySchema = z.object({
   content: z.string().trim().min(1).max(2000),
@@ -26,6 +27,7 @@ export async function POST(
   });
   if (limit) return limit;
   const { id, discussionId } = await params;
+  if (!(await accessibleBook(id, userId))) return NextResponse.json({ error: "Livro não encontrado" }, { status: 404 });
   const discussion = await prisma.bookDiscussion.findFirst({ where: { id: discussionId, bookId: id }, select: { id: true, userId: true } });
   if (!discussion) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   const parsed = await readJson(request, replySchema);

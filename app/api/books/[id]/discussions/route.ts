@@ -4,26 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
+import { accessibleBook } from "@/lib/book-access";
 
 const discussionSchema = z.object({
   title: z.string().trim().min(3).max(120),
   content: z.string().trim().min(1).max(2000),
   quote: z.string().trim().max(1000).optional(),
 });
-
-async function accessibleBook(bookId: string, userId: string) {
-  const book = await prisma.book.findUnique({
-    where: { id: bookId },
-    select: { id: true, userId: true },
-  });
-  if (!book) return null;
-  if (book.userId === userId) return book;
-  const shared = await prisma.librarySetting.findFirst({
-    where: { userId: book.userId, shareEnabled: true },
-    select: { id: true },
-  });
-  return shared ? book : null;
-}
 
 export async function GET(
   request: NextRequest,
