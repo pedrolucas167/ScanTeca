@@ -23,6 +23,24 @@ Não existe transação distribuída entre Redis e PostgreSQL.
 Ao atualizar o worker, encerre as instâncias da versão anterior antes de iniciar a
 nova: a versão antiga não conhece tokens e não pode participar do protocolo de lease.
 
+### Pontos de entrada da aplicação
+
+`POST /api/scraping/enqueue` agenda uma execução com `after` do Next após retornar
+201. Cada callback cria um worker próprio, de modo que requisições concorrentes
+disputam os claims no Redis, sem perder agendamentos por um flag local de ocupado.
+`GET /api/cron/scraping` executa outro job e também aciona recuperação de leases;
+exige `Authorization: Bearer <CRON_SECRET>` (401 sem configuração ou sem credencial).
+O cron está declarado em `vercel.json` para 13:00 UTC diariamente. Ambos os handlers
+limitam a função a 60 segundos; interrupções são tratadas pelo protocolo de lease.
+
+Backoff representa o instante mínimo para retry, não uma promessa de execução nesse
+instante: sem novos enqueues nem worker persistente, retries e backlog avançam no cron
+diário, um job por chamada. Para maior vazão, um scheduler externo pode chamar a rota
+protegida com frequência maior, ou um processo duradouro pode usar `start()`; não
+instale timers de polling em uma função serverless. Esta configuração só entra em
+operação depois de revisão e deploy da branch; os testes locais não comprovam que
+o cron está ativo em produção.
+
 ## Clubes
 
 Entrar, sair e editar um clube usam transação Serializable com até três tentativas

@@ -35,13 +35,18 @@ export class ScrapingWorker {
   }
 
   private async processNextJob() {
-    if (this.busy) return;
+    return this.runOnce();
+  }
+
+  // Entrada limitada para after()/cron; não instala timers de polling em serverless.
+  async runOnce(): Promise<"busy" | "idle" | "completed" | "retry" | "failed" | "lost" | "error"> {
+    if (this.busy) return "busy";
     this.busy = true;
     let heartbeat: NodeJS.Timeout | undefined;
     try {
       const job = await scrapingQueue.dequeue();
       if (!job) {
-        return;
+        return "idle";
       }
       heartbeat = setInterval(() => {
         void scrapingQueue.renewJob(job.id, job.claimToken).catch(error => {
@@ -52,15 +57,14 @@ export class ScrapingWorker {
       console.log(`Processing job ${job.id}: ${job.url} (${job.source})`);
 
       const result = await this.executeJob(job);
-      if (result.success) {
-        await scrapingQueue.completeJob(job.id, result, job.claimToken);
-      } else {
-        await scrapingQueue.failJob(job.id, result.error ?? "Falha no scraping", job.claimToken);
-      }
-
-      console.log(`Job ${job.id} completed successfully`);
+      const accepted = result.success
+        ? await scrapingQueue.completeJob(job.id, result, job.claimToken)
+        : await scrapingQueue.failJob(job.id, result.error ?? "Falha no scraping", job.claimToken);
+      if (!accepted) return "lost";
+      return result.success ? "completed" : job.attempts < job.maxAttempts ? "retry" : "failed";
     } catch (error) {
       console.error("Error processing job:", error);
+      return "error";
     } finally {
       if (heartbeat) clearInterval(heartbeat);
       this.busy = false;

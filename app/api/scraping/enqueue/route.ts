@@ -1,7 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { scrapingQueue } from "@/lib/scraping-queue";
 import { rateLimitGuard } from "@/lib/rate-limit";
+import { ScrapingWorker } from "@/lib/scraping-worker";
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const { userId } = await auth();
@@ -42,6 +45,7 @@ export async function POST(request: NextRequest) {
       metadata,
     });
 
+    after(async () => { await new ScrapingWorker().runOnce(); });
     return NextResponse.json({ jobId, status: "enqueued" }, { status: 201 });
   } catch (error) {
     console.error("Failed to enqueue scraping job:", error);
