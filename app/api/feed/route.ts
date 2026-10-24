@@ -5,6 +5,7 @@ import { readJson } from "@/lib/validation";
 import { z } from "zod";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { moderateContent } from "@/lib/moderation";
+import { visibleFeedPostIds } from "@/lib/feed-access";
 
 const postSchema = z.object({
   content: z.string().trim().min(1).max(1000),
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     include: {
       book: { select: { title: true, author: true, coverUrl: true } },
       quotedPost: {
-        select: { id: true, userName: true, content: true },
+        select: { id: true, userId: true, userName: true, content: true, moderationStatus: true },
       },
       comments: {
         orderBy: { createdAt: "asc" },
@@ -48,33 +49,10 @@ export async function GET(request: NextRequest) {
       bookmarks: { where: { userId }, select: { id: true } },
     },
   });
-  const authorIds = [...new Set(posts.map((post) => post.userId))];
-  const [profiles, follows] = await Promise.all([
-    prisma.socialProfile.findMany({
-      where: { userId: { in: authorIds } },
-      select: { userId: true, visibility: true },
-    }),
-    prisma.socialFollow.findMany({
-      where: { followerId: userId, followingId: { in: authorIds } },
-      select: { followingId: true },
-    }),
-  ]);
-  const blocks = await prisma.socialBlock.findMany({
-    where: { blockerId: userId },
-    select: { blockedId: true },
-  });
-  const profileByUserId = new Map(profiles.map((profile) => [profile.userId, profile.visibility]));
-  const followedIds = new Set(follows.map((follow) => follow.followingId));
-  const blockedIds = new Set(blocks.map((block) => block.blockedId));
-  const visiblePosts = posts.filter((post) => {
-    if (blockedIds.has(post.userId)) return false;
-    if (post.userId === userId) return true;
-    // Only show approved posts from other users
-    if (post.moderationStatus !== "APPROVED") return false;
-    const visibility = profileByUserId.get(post.userId) || "PUBLIC";
-    return visibility === "PUBLIC" || (visibility === "FOLLOWERS" && followedIds.has(post.userId));
-  });
-
+  const visibleIds = await visibleFeedPostIds(userId, posts.flatMap(post =>
+    post.quotedPost ? [post, post.quotedPost] : [post]
+  ));
+  const visiblePosts = posts.filter(post => visibleIds.has(post.id));
   return NextResponse.json({
     posts: visiblePosts.map((post) => ({
       id: post.id,
@@ -87,7 +65,7 @@ export async function GET(request: NextRequest) {
       label: post.label,
       text: post.content,
       imageUrl: post.imageUrl,
-      quotedPost: post.quotedPost ? {
+      quotedPost: post.quotedPost && visibleIds.has(post.quotedPost.id) ? {
         id: post.quotedPost.id,
         author: post.quotedPost.userName || "Leitor anônimo",
         text: post.quotedPost.content,
@@ -132,6 +110,15 @@ export async function POST(request: NextRequest) {
     if (!book) return NextResponse.json({ error: "Livro não encontrado" }, { status: 404 });
   }
 
+  if (parsed.data.quotedPostId) {
+    const quoted = await prisma.feedPost.findUnique({
+      where: { id: parsed.data.quotedPostId },
+      select: { id: true, userId: true, moderationStatus: true },
+    });
+    if (!quoted || !(await visibleFeedPostIds(userId, [quoted])).has(quoted.id)) {
+      return NextResponse.json({ error: "Publicação não encontrada" }, { status: 404 });
+    }
+  }
   // Run content moderation
   const moderation = await moderateContent(parsed.data.content);
   const moderationStatus = moderation.approved ? "APPROVED" : moderation.flagged ? "FLAGGED" : "REJECTED";
@@ -151,11 +138,13 @@ export async function POST(request: NextRequest) {
     include: { 
       book: { select: { title: true, author: true, coverUrl: true } },
       quotedPost: {
-        select: { id: true, userName: true, content: true },
+        select: { id: true, userId: true, userName: true, content: true, moderationStatus: true },
       },
     },
   });
 
+  // Revalida a citação após moderação/gravação: a visibilidade pode ter mudado.
+  const visibleIds = await visibleFeedPostIds(userId, post.quotedPost ? [post.quotedPost] : []);
   return NextResponse.json({
     post: {
       id: post.id,
@@ -168,7 +157,7 @@ export async function POST(request: NextRequest) {
       label: post.label,
       text: post.content,
       imageUrl: post.imageUrl,
-      quotedPost: post.quotedPost ? {
+      quotedPost: post.quotedPost && visibleIds.has(post.quotedPost.id) ? {
         id: post.quotedPost.id,
         author: post.quotedPost.userName || "Leitor anônimo",
         text: post.quotedPost.content,
