@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { buildRecommendations } from "@/lib/recommendations";
 import {
-  getCachedRecommendations,
+  getRecommendationsSnapshot,
   setCachedRecommendations,
 } from "@/lib/recommendations-cache";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
@@ -23,15 +23,15 @@ export async function GET(request: NextRequest) {
     });
     if (rateLimit) return rateLimit;
 
-    const cached = await getCachedRecommendations(userId);
-    if (cached) {
-      return NextResponse.json(cached, {
+    const snapshot = await getRecommendationsSnapshot(userId);
+    if (snapshot.payload) {
+      return NextResponse.json(snapshot.payload, {
         headers: { "X-Cache": "HIT" },
       });
     }
 
     const data = await buildRecommendations(userId);
-    await setCachedRecommendations(userId, data);
+    await setCachedRecommendations(userId, data, snapshot.version);
     return NextResponse.json(data, {
       headers: { "X-Cache": "MISS" },
     });
