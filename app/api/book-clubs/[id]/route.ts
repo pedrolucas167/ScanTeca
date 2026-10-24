@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { readJson } from "@/lib/validation";
 import { z } from "zod";
+import { BookClubError, changeMembership, updateBookClub } from "@/modules/book-clubs";
 
 const bookClubUpdateSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
@@ -110,51 +111,19 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const club = await prisma.bookClub.findUnique({
-    where: { id },
-    include: {
-      members: {
-        where: { userId },
-      },
-    },
-  });
-
-  if (!club) {
-    return NextResponse.json({ error: "Clube não encontrado" }, { status: 404 });
-  }
-
-  const member = club.members[0];
-  if (!member || (member.role !== "OWNER" && member.role !== "ADMIN")) {
-    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
-  }
-
   const parsed = await readJson(request, bookClubUpdateSchema);
   if (!parsed.ok) return parsed.response;
-
-  const data: Record<string, unknown> = {};
-  if (parsed.data.name !== undefined) data.name = parsed.data.name;
-  if (parsed.data.description !== undefined) data.description = parsed.data.description;
-  if (parsed.data.imageUrl !== undefined) data.imageUrl = parsed.data.imageUrl;
-  if (parsed.data.maxMembers !== undefined) data.maxMembers = parsed.data.maxMembers;
-  if (parsed.data.isPrivate !== undefined) data.isPrivate = parsed.data.isPrivate;
-
-  const updatedClub = await prisma.bookClub.update({
-    where: { id },
-    data,
-  });
-
-  return NextResponse.json({
-    club: {
-      id: updatedClub.id,
-      name: updatedClub.name,
-      description: updatedClub.description,
-      imageUrl: updatedClub.imageUrl,
-      maxMembers: updatedClub.maxMembers,
-      isPrivate: updatedClub.isPrivate,
-    },
-  });
+  try {
+    const club = await updateBookClub(id, userId, parsed.data);
+    return NextResponse.json({ club: {
+      id: club.id, name: club.name, description: club.description,
+      imageUrl: club.imageUrl, maxMembers: club.maxMembers, isPrivate: club.isPrivate,
+    } });
+  } catch (error) {
+    if (error instanceof BookClubError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
 }
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -167,66 +136,14 @@ export async function POST(
   const parsed = await readJson(request, bookClubJoinSchema);
   if (!parsed.ok) return parsed.response;
 
-  const club = await prisma.bookClub.findUnique({
-    where: { id },
-    include: {
-      members: true,
-    },
-  });
-
-  if (!club) {
-    return NextResponse.json({ error: "Clube não encontrado" }, { status: 404 });
+  try {
+    const message = await changeMembership(id, userId, parsed.data.action);
+    return NextResponse.json({ message });
+  } catch (error) {
+    if (error instanceof BookClubError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
   }
-
-  if (parsed.data.action === "join") {
-    if (club.members.some((m) => m.userId === userId)) {
-      return NextResponse.json({ error: "Já é membro" }, { status: 400 });
-    }
-
-    if (club.maxMembers && club.members.length >= club.maxMembers) {
-      return NextResponse.json({ error: "Clube cheio" }, { status: 400 });
-    }
-
-    if (club.isPrivate) {
-      return NextResponse.json({ error: "Clube privado - requer convite" }, { status: 403 });
-    }
-
-    await prisma.bookClubMember.create({
-      data: {
-        clubId: id,
-        userId,
-        role: "MEMBER",
-      },
-    });
-
-    return NextResponse.json({ message: "Entrou no clube com sucesso" });
-  }
-
-  if (parsed.data.action === "leave") {
-    const member = club.members.find((m) => m.userId === userId);
-    if (!member) {
-      return NextResponse.json({ error: "Não é membro" }, { status: 400 });
-    }
-
-    if (member.role === "OWNER") {
-      return NextResponse.json({ error: "Dono não pode sair" }, { status: 400 });
-    }
-
-    await prisma.bookClubMember.delete({
-      where: {
-        clubId_userId: {
-          clubId: id,
-          userId,
-        },
-      },
-    });
-
-    return NextResponse.json({ message: "Saiu do clube com sucesso" });
-  }
-
-  return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
 }
-
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

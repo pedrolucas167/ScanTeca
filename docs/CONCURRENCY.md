@@ -23,6 +23,14 @@ Não existe transação distribuída entre Redis e PostgreSQL.
 Ao atualizar o worker, encerre as instâncias da versão anterior antes de iniciar a
 nova: a versão antiga não conhece tokens e não pode participar do protocolo de lease.
 
+## Clubes
+
+Entrar, sair e editar um clube usam transação Serializable com até três tentativas
+em conflitos P2034. Uma atualização na linha do clube antes das leituras serializa
+as decisões de capacidade e permissão. A contagem vem de COUNT, sem carregar toda
+a lista de membros. Reduzir maxMembers abaixo da ocupação atual retorna 400;
+esgotar os retries retorna 409. Criação continua inserindo clube e dono juntos.
+
 ## Testes isolados
 
 Os testes `*.integration.test.ts` usam PostgreSQL em `127.0.0.1:55439`, base
