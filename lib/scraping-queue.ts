@@ -1,5 +1,7 @@
-import { Redis } from "@upstash/redis";
+import type { Redis } from "@upstash/redis";
 import { getRedis } from "./redis";
+import { randomUUID } from "node:crypto";
+import { CLAIM_JOB, COMPLETE_JOB, FAIL_JOB, RENEW_JOB } from "./scraping-queue-scripts";
 
 export interface ScrapingJob {
   id: string;
@@ -22,20 +24,31 @@ export interface ScrapingResult {
   completedAt: number;
 }
 
+export interface ClaimedScrapingJob extends ScrapingJob {
+  claimToken: string;
+  leaseUntil: number;
+}
+
 const QUEUE_KEY = "scraping:queue";
 const PROCESSING_KEY = "scraping:processing";
 const RESULTS_KEY = "scraping:results";
 
-class ScrapingQueue {
+const QUEUE_KEYS = [QUEUE_KEY, PROCESSING_KEY, RESULTS_KEY, "scraping:leases", "scraping:delayed", "scraping:scan-cursor"];
+
+export class ScrapingQueue {
   private redis: Redis | null = null;
 
-  constructor() {
-    this.redis = getRedis();
+  constructor(redis: Redis | null = getRedis(), readonly leaseMs = 120_000) {
+    this.redis = redis;
   }
 
   async enqueue(job: Omit<ScrapingJob, "id" | "createdAt" | "attempts">): Promise<string> {
     if (!this.redis) {
       throw new Error("Redis not available for scraping queue");
+    }
+
+    if (!Number.isFinite(job.priority) || !Number.isInteger(job.maxAttempts) || job.maxAttempts < 1) {
+      throw new Error("Invalid scraping job priority or maxAttempts");
     }
 
     const jobWithId: ScrapingJob = {
@@ -54,81 +67,29 @@ class ScrapingQueue {
     return jobWithId.id;
   }
 
-  async dequeue(): Promise<ScrapingJob | null> {
-    if (!this.redis) {
-      throw new Error("Redis not available for scraping queue");
-    }
-
-    // Get highest priority job (lowest score)
-    const result = await this.redis.zrange(QUEUE_KEY, 0, 0, { withScores: true });
-
-    if (!result || result.length === 0) {
-      return null;
-    }
-
-    const jobData = result[0] as string;
-    const job: ScrapingJob = JSON.parse(jobData);
-
-    // Remove from queue
-    await this.redis.zrem(QUEUE_KEY, jobData);
-
-    // Move to processing set
-    await this.redis.hset(PROCESSING_KEY, { [job.id]: JSON.stringify(job) });
-
-    return job;
+  async dequeue(): Promise<ClaimedScrapingJob | null> {
+    const value = await this.client().eval<[string, number], ClaimedScrapingJob | string | null>(
+      CLAIM_JOB, QUEUE_KEYS, [randomUUID(), this.leaseMs]
+    );
+    return typeof value === "string" ? JSON.parse(value) : value;
   }
 
-  async completeJob(jobId: string, result: ScrapingResult): Promise<void> {
-    if (!this.redis) {
-      throw new Error("Redis not available for scraping queue");
-    }
-
-    // Remove from processing
-    await this.redis.hdel(PROCESSING_KEY, jobId);
-
-    // Store result with TTL (24 hours)
-    await this.redis.hset(RESULTS_KEY, { [jobId]: JSON.stringify(result) });
-    await this.redis.expire(RESULTS_KEY, 86400);
+  async completeJob(jobId: string, result: ScrapingResult, claimToken: string): Promise<boolean> {
+    return (await this.client().eval(COMPLETE_JOB, QUEUE_KEYS, [jobId, claimToken, JSON.stringify(result)])) === 1;
   }
 
-  async failJob(jobId: string, error: string): Promise<void> {
-    if (!this.redis) {
-      throw new Error("Redis not available for scraping queue");
-    }
-
-    const jobData = await this.redis.hget(PROCESSING_KEY, jobId);
-    if (!jobData) return;
-
-    const job: ScrapingJob = JSON.parse(jobData as string);
-    job.attempts++;
-
-    // Remove from processing
-    await this.redis.hdel(PROCESSING_KEY, jobId);
-
-    // Requeue if max attempts not reached
-    if (job.attempts < job.maxAttempts) {
-      // Exponential backoff: delay increases with attempts
-      const backoffMs = Math.min(1000 * Math.pow(2, job.attempts), 60000);
-      await new Promise((resolve) => setTimeout(resolve, backoffMs));
-      
-      await this.redis.zadd(QUEUE_KEY, {
-        score: -job.priority,
-        member: JSON.stringify(job),
-      });
-    } else {
-      // Store failed result
-      await this.redis.hset(RESULTS_KEY, {
-        [jobId]: JSON.stringify({
-          jobId,
-          success: false,
-          error,
-          completedAt: Date.now(),
-        } as ScrapingResult),
-      });
-      await this.redis.expire(RESULTS_KEY, 86400);
-    }
+  async failJob(jobId: string, error: string, claimToken: string): Promise<boolean> {
+    return (await this.client().eval(FAIL_JOB, QUEUE_KEYS, [jobId, claimToken, error])) === 1;
   }
 
+  async renewJob(jobId: string, claimToken: string): Promise<boolean> {
+    return (await this.client().eval(RENEW_JOB, QUEUE_KEYS, [jobId, claimToken, this.leaseMs])) === 1;
+  }
+
+  private client(): Redis {
+    if (!this.redis) throw new Error("Redis not available for scraping queue");
+    return this.redis;
+  }
   async getResult(jobId: string): Promise<ScrapingResult | null> {
     if (!this.redis) {
       throw new Error("Redis not available for scraping queue");
@@ -137,7 +98,7 @@ class ScrapingQueue {
     const resultData = await this.redis.hget(RESULTS_KEY, jobId);
     if (!resultData) return null;
 
-    return JSON.parse(resultData as string) as ScrapingResult;
+    return typeof resultData === "string" ? JSON.parse(resultData) as ScrapingResult : resultData as ScrapingResult;
   }
 
   async getQueueSize(): Promise<number> {

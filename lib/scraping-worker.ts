@@ -1,4 +1,4 @@
-import { scrapingQueue, ScrapingJob, ScrapingResult } from "./scraping-queue";
+import { scrapingQueue, ScrapingJob, ScrapingResult, ClaimedScrapingJob } from "./scraping-queue";
 import { wikipediaScraper } from "./scrapers/wikipedia";
 import { prisma } from "./prisma";
 import { generateEmbedding, externalDataToEmbeddingText } from "./embeddings";
@@ -6,6 +6,7 @@ import { generateEmbedding, externalDataToEmbeddingText } from "./embeddings";
 export class ScrapingWorker {
   private isRunning = false;
   private interval: NodeJS.Timeout | null = null;
+  private busy = false;
 
   async start(pollIntervalMs = 5000) {
     if (this.isRunning) {
@@ -34,24 +35,39 @@ export class ScrapingWorker {
   }
 
   private async processNextJob() {
+    if (this.busy) return;
+    this.busy = true;
+    let heartbeat: NodeJS.Timeout | undefined;
     try {
       const job = await scrapingQueue.dequeue();
       if (!job) {
         return;
       }
+      heartbeat = setInterval(() => {
+        void scrapingQueue.renewJob(job.id, job.claimToken).catch(error => {
+          console.error(`Falha ao renovar lease de ${job.id}:`, error);
+        });
+      }, scrapingQueue.leaseMs / 3);
 
       console.log(`Processing job ${job.id}: ${job.url} (${job.source})`);
 
       const result = await this.executeJob(job);
-      await scrapingQueue.completeJob(job.id, result);
+      if (result.success) {
+        await scrapingQueue.completeJob(job.id, result, job.claimToken);
+      } else {
+        await scrapingQueue.failJob(job.id, result.error ?? "Falha no scraping", job.claimToken);
+      }
 
       console.log(`Job ${job.id} completed successfully`);
     } catch (error) {
       console.error("Error processing job:", error);
+    } finally {
+      if (heartbeat) clearInterval(heartbeat);
+      this.busy = false;
     }
   }
 
-  private async executeJob(job: ScrapingJob): Promise<ScrapingResult> {
+  private async executeJob(job: ClaimedScrapingJob): Promise<ScrapingResult> {
     try {
       let data: unknown;
 
@@ -76,8 +92,6 @@ export class ScrapingWorker {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Job ${job.id} failed:`, errorMessage);
 
-      await scrapingQueue.failJob(job.id, errorMessage);
-
       return {
         jobId: job.id,
         success: false,
@@ -87,7 +101,7 @@ export class ScrapingWorker {
     }
   }
 
-  private async saveToDatabase(job: ScrapingJob, data: unknown) {
+  private async saveToDatabase(job: ClaimedScrapingJob, data: unknown) {
     if (!job.userId) {
       console.warn(`Job ${job.id} has no userId, skipping database save`);
       return;
@@ -117,16 +131,25 @@ export class ScrapingWorker {
         type,
       });
       const embedding = await generateEmbedding(embeddingText);
+      if (!await scrapingQueue.renewJob(job.id, job.claimToken)) {
+        throw new Error("Lease perdido antes da gravação");
+      }
+      // A recuperação é at-least-once: o mesmo job sempre grava o mesmo ID.
+      const id = `scraping_${job.id}`;
 
       // Save to database with embedding using raw query
       if (embedding) {
         await prisma.$queryRaw`
           INSERT INTO "ExternalResearchData" ("id", "userId", "source", "url", "title", "content", "type", "embedding", "scrapedAt", "createdAt", "updatedAt")
-          VALUES (${`ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}, ${job.userId}, ${job.source}, ${job.url}, ${title}, ${content}, ${type}, ${`[${embedding.join(",")}]`}::vector, NOW(), NOW(), NOW())
+          VALUES (${id}, ${job.userId}, ${job.source}, ${job.url}, ${title}, ${content}, ${type}, ${`[${embedding.join(",")}]`}::vector, NOW(), NOW(), NOW())
+          ON CONFLICT ("id") DO NOTHING
         `;
       } else {
-        await prisma.externalResearchData.create({
-          data: {
+        await prisma.externalResearchData.upsert({
+          where: { id },
+          update: {},
+          create: {
+            id,
             userId: job.userId,
             source: job.source,
             url: job.url,
@@ -140,7 +163,7 @@ export class ScrapingWorker {
       console.log(`Job ${job.id} saved to database`);
     } catch (error) {
       console.error(`Error saving job ${job.id} to database:`, error);
-      // Don't fail the job if database save fails
+      throw error;
     }
   }
 
