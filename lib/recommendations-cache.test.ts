@@ -1,80 +1,38 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-const getRedisMock = vi.fn();
-vi.mock("./redis", () => ({
-  getRedis: () => getRedisMock(),
-}));
-
-import {
-  getCachedRecommendations,
-  setCachedRecommendations,
-  invalidateRecommendationsCache,
-} from "./recommendations-cache";
-
-const payload = {
-  primary: null,
-  queue: [],
-  profile: {
-    affinity: [],
-    feedbackCount: 0,
-    recommendationFeedbackCount: 0,
-    calibration: 0,
-  },
-  books: [],
-};
-
-describe("recommendations-cache", () => {
-  beforeEach(() => {
-    getRedisMock.mockReset();
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+const mocks = vi.hoisted(() => ({ getRedis: vi.fn() }));
+vi.mock("./redis", () => ({ getRedis: mocks.getRedis }));
+import { getCachedRecommendations, getRecommendationsSnapshot, setCachedRecommendations, invalidateRecommendationsCache } from "./recommendations-cache";
+const payload = { primary: null, queue: [], profile: { affinity: [], feedbackCount: 0, recommendationFeedbackCount: 0, calibration: 0 }, books: [] };
+beforeEach(() => { mocks.getRedis.mockReset(); });
+afterEach(() => vi.restoreAllMocks());
+describe("recommendations-cache fallback", () => {
+  it("sem Redis gera sem cache e nunca publica sem token", async () => {
+    mocks.getRedis.mockReturnValue(null);
+    expect(await getRecommendationsSnapshot("u")).toEqual({ payload: null, version: null });
+    expect(await getCachedRecommendations("u")).toBeNull();
+    expect(await setCachedRecommendations("u", payload, null)).toBe(false);
+    await expect(invalidateRecommendationsCache("u")).resolves.toBeUndefined();
   });
-
-  it("degrada para null quando Redis não está configurado", async () => {
-    getRedisMock.mockReturnValue(null);
-
-    await expect(getCachedRecommendations("u1")).resolves.toBeNull();
-    await expect(setCachedRecommendations("u1", payload)).resolves.toBeUndefined();
-    await expect(invalidateRecommendationsCache("u1")).resolves.toBeUndefined();
-  });
-
-  it("lê o payload cacheado com a chave recs:{userId}", async () => {
-    const get = vi.fn().mockResolvedValue(payload);
-    getRedisMock.mockReturnValue({ get });
-
-    const result = await getCachedRecommendations("u1");
-
-    expect(get).toHaveBeenCalledWith("recs:u1");
-    expect(result).toEqual(payload);
-  });
-
-  it("grava com TTL de 1h", async () => {
-    const set = vi.fn().mockResolvedValue("OK");
-    getRedisMock.mockReturnValue({ set });
-
-    await setCachedRecommendations("u1", payload);
-
-    expect(set).toHaveBeenCalledWith("recs:u1", payload, { ex: 3600 });
-  });
-
-  it("invalida a chave do usuário", async () => {
-    const del = vi.fn().mockResolvedValue(1);
-    getRedisMock.mockReturnValue({ del });
-
-    await invalidateRecommendationsCache("u1");
-
-    expect(del).toHaveBeenCalledWith("recs:u1");
-  });
-
-  it("é fail-safe: erros do Redis não propagam", async () => {
-    const failing = {
-      get: vi.fn().mockRejectedValue(new Error("redis down")),
-      set: vi.fn().mockRejectedValue(new Error("redis down")),
-      del: vi.fn().mockRejectedValue(new Error("redis down")),
-    };
-    getRedisMock.mockReturnValue(failing);
+  it("falha de leitura não ganha um token de publicação posteriormente", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-
-    await expect(getCachedRecommendations("u1")).resolves.toBeNull();
-    await expect(setCachedRecommendations("u1", payload)).resolves.toBeUndefined();
-    await expect(invalidateRecommendationsCache("u1")).resolves.toBeUndefined();
+    const evaluate = vi.fn().mockRejectedValueOnce(new Error("Redis down"));
+    mocks.getRedis.mockReturnValue({ eval: evaluate });
+    const snapshot = await getRecommendationsSnapshot("u");
+    expect(snapshot.version).toBeNull();
+    evaluate.mockResolvedValue(1);
+    expect(await setCachedRecommendations("u", payload, snapshot.version)).toBe(false);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+  });
+  it("erros de publicação e invalidação não propagam", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.getRedis.mockReturnValue({ eval: vi.fn().mockRejectedValue(new Error("Redis down")) });
+    expect(await setCachedRecommendations("u", payload, "generation")).toBe(false);
+    await expect(invalidateRecommendationsCache("u")).resolves.toBeUndefined();
+  });
+  it("aceita a desserialização automática do Upstash e valores JSON brutos", async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce(["version", payload]).mockResolvedValueOnce(["version", JSON.stringify(payload)]);
+    mocks.getRedis.mockReturnValue({ eval: evaluate });
+    expect(await getCachedRecommendations("u")).toEqual(payload);
+    expect(await getCachedRecommendations("u")).toEqual(payload);
   });
 });

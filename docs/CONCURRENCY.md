@@ -31,6 +31,22 @@ as decisões de capacidade e permissão. A contagem vem de COUNT, sem carregar t
 a lista de membros. Reduzir maxMembers abaixo da ocupação atual retorna 400;
 esgotar os retries retorna 409. Criação continua inserindo clube e dono juntos.
 
+## Recomendações
+
+A rota lê payload e geração juntos antes de gerar recomendações. Publicação compara
+o token de geração e grava payload/TTL em um único script. Invalidação troca o token
+e remove o payload atomicamente. Tokens aleatórios evitam reutilizar uma versão após
+expiração: publicação sem a chave de geração também é rejeitada. Cache dura uma hora;
+geração dura duas horas e é renovada em uma publicação válida.
+
+Sem Redis, com falha na leitura ou sem token, a rota gera a resposta sem publicar no
+cache. Falhas de publicação/invalidação são registradas e não falham a operação de
+negócio, preservando o fallback existente. Uma invalidação que não chega ao Redis por
+indisponibilidade de rede não pode garantir frescor entre instâncias; nesse caso,
+um payload anterior continua limitado pelo TTL. Não há promessa de atomicidade entre
+o commit SQL e a invalidação Redis. Uma resposta já em geração pode refletir o estado
+anterior, mas não poderá repovoar o cache após uma invalidação confirmada.
+
 ## Testes isolados
 
 Os testes `*.integration.test.ts` usam PostgreSQL em `127.0.0.1:55439`, base
