@@ -34,11 +34,12 @@ const PROCESSING_KEY = "scraping:processing";
 const RESULTS_KEY = "scraping:results";
 
 const QUEUE_KEYS = [QUEUE_KEY, PROCESSING_KEY, RESULTS_KEY, "scraping:leases", "scraping:delayed", "scraping:scan-cursor"];
+type QueueRedis = Pick<Redis, "eval" | "zadd" | "hget" | "zcard" | "hlen">;
 
 export class ScrapingQueue {
-  private redis: Redis | null = null;
+  private redis: QueueRedis | null = null;
 
-  constructor(redis: Redis | null = getRedis(), readonly leaseMs = 120_000) {
+  constructor(redis: QueueRedis | null = getRedis(), readonly leaseMs = 120_000) {
     this.redis = redis;
   }
 
@@ -86,7 +87,7 @@ export class ScrapingQueue {
     return (await this.client().eval(RENEW_JOB, QUEUE_KEYS, [jobId, claimToken, this.leaseMs])) === 1;
   }
 
-  private client(): Redis {
+  private client(): QueueRedis {
     if (!this.redis) throw new Error("Redis not available for scraping queue");
     return this.redis;
   }

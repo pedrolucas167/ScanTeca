@@ -16,6 +16,28 @@ async function releaseBackoff() {
   await command("EVAL", "for _,v in ipairs(redis.call('ZRANGE', KEYS[1], 0, -1)) do redis.call('ZADD', KEYS[1], 0, v) end return 1", 1, "scraping:delayed");
 }
 describe("fila com Redis real", () => {
+  it("reproduz claim duplicado com ZRANGE/ZREM separados", async () => {
+    await queue.enqueue(input);
+    const readers = await Promise.all([command("ZRANGE", "scraping:queue", 0, 0), command("ZRANGE", "scraping:queue", 0, 0)]) as string[][];
+    expect(readers[0]![0]).toBe(readers[1]![0]);
+    const removals = await Promise.all(readers.map(values => command("ZREM", "scraping:queue", values[0]!)));
+    expect(removals.sort()).toEqual([0, 1]);
+    // O consumidor antigo entregava o job lido mesmo quando ZREM retornava zero.
+  });
+  it("resposta perdida após claim não perde o job", async () => {
+    const id = await queue.enqueue(input);
+    const lostReply = { ...client, eval: async (...args: Parameters<typeof client.eval>) => {
+      await client.eval(...args);
+      throw new Error("Connection lost after commit");
+    } };
+    await expect(new ScrapingQueue(lostReply).dequeue()).rejects.toThrow("Connection lost");
+    expect(await queue.getQueueSize()).toBe(0);
+    expect(await queue.getProcessingCount()).toBe(1);
+    await expireClaim(id);
+    await queue.dequeue();
+    await releaseBackoff();
+    expect(await queue.dequeue()).toMatchObject({ id, attempts: 2 });
+  });
   it("dois workers não recebem o mesmo job", async () => {
     await queue.enqueue(input);
     const claims = await Promise.all(Array.from({ length: 8 }, () => queue.dequeue()));
