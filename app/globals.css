@@ -11,6 +11,10 @@
   --auth-muted: #f4f4f5;
   --auth-muted-foreground: #71717a;
   --auth-border: #e4e4e7;
+  --auth-input-surface: #fafafa;
+  --auth-control-border: #71717a;
+  --auth-focus: var(--color-indigo-600);
+  --auth-link: var(--color-indigo-700);
   color-scheme: light;
 }
 
@@ -21,7 +25,21 @@
   --auth-muted: #18181b;
   --auth-muted-foreground: #a1a1aa;
   --auth-border: #27272a;
+  --auth-input-surface: #18181b;
+  --auth-control-border: #71717a;
+  --auth-focus: var(--color-indigo-300);
+  --auth-link: var(--color-indigo-300);
   color-scheme: dark;
+}
+
+/* Classes públicas do Clerk: a base do SDK zera bordas após mesclar appearance. */
+.cl-rootBox :is(.cl-formFieldInput, .cl-socialButtonsBlockButton, .cl-socialButtonsIconButton) {
+  border: 1px solid var(--auth-control-border);
+  box-shadow: none;
+}
+
+.cl-rootBox .cl-formFieldInput[aria-invalid="true"] {
+  border-color: var(--clerk-color-danger, #dc2626);
 }
 
 @theme inline {
