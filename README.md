@@ -113,6 +113,9 @@ Abra [http://localhost:3000](http://localhost:3000).
 
 Veja [Cobertura de testes e CI](docs/TEST-COVERAGE.md) para o escopo, os relatórios e a execução completa.
 
+O [guia de CI e deploy](docs/CI-DEPLOY-RUNBOOK.md) descreve o preparo de um clone novo,
+os testes de navegador isolados, os segredos necessários e a publicação pela Vercel.
+
 ## Variáveis de ambiente
 
 As variáveis estão documentadas em `.env.example`. As principais são:

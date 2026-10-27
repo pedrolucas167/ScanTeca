@@ -1,0 +1,52 @@
+name: Release proposal
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Planejar, criar PR ou publicar release já revisada
+        type: choice
+        options: [plan, pull-request, publish]
+        default: plan
+permissions:
+  contents: read
+jobs:
+  release-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - run: node scripts/release-plan.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-proposal
+          path: reports/release/plan.md
+          if-no-files-found: error
+          retention-days: 14
+  release-write:
+    if: inputs.mode != 'plan' && github.ref == 'refs/heads/main'
+    needs: release-plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Require a dedicated release token
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: node -e "if (!process.env.RELEASE_PLEASE_TOKEN) throw Error('Configure token dedicado e restrito ao repositório no ambiente release');"
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: ${{ inputs.mode != 'publish' }}
+          skip-github-pull-request: ${{ inputs.mode == 'publish' }}
