@@ -12,7 +12,7 @@ updates:
       prefix: chore(deps)
     groups:
       vitest:
-        patterns: [vitest, '@vitest/*']
+        patterns: [vitest, '@vitest/*', jsdom]
       development:
         dependency-type: development
         update-types: [minor, patch]

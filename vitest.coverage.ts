@@ -14,7 +14,7 @@ export default defineConfig({
         "middleware.ts",
         "instrumentation.ts",
       ],
-      exclude: ["**/*.test.ts", "**/*.integration.test.ts", "**/*.d.ts"],
+      exclude: ["**/*.test.{ts,tsx}", "**/*.integration.test.ts", "**/*.d.ts"],
       reporter: ["json", "json-summary", "html"],
       reportsDirectory: "coverage/unit",
     },

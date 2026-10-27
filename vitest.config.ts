@@ -5,7 +5,7 @@ import coverage from "./vitest.coverage";
 export default mergeConfig(coverage, defineConfig({
   test: {
     environment: "node",
-    include: ["**/*.test.ts"],
+    include: ["**/*.test.{ts,tsx}"],
     exclude: ["node_modules/**", "**/*.integration.test.ts"],
   },
   resolve: {
