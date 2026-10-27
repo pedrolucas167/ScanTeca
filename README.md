@@ -115,6 +115,8 @@ Veja [Cobertura de testes e CI](docs/TEST-COVERAGE.md) para o escopo, os relató
 
 O [guia de CI e deploy](docs/CI-DEPLOY-RUNBOOK.md) descreve o preparo de um clone novo,
 os testes de navegador isolados, os segredos necessários e a publicação pela Vercel.
+Para testar autenticado localmente com Docker ativo e chaves Clerk de desenvolvimento,
+execute `npm run test:e2e:auth`; a conta e o banco são temporários.
 
 Antes de commitar ou enviar, configure a [proteção contra segredos](docs/SECRETS-GUARD.md).
 

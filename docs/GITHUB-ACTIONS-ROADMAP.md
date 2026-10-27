@@ -118,7 +118,8 @@ modelo desativado, não uma sincronização automática das configurações remo
 
 Os dez cenários públicos de navegador passaram localmente com build de produção.
 O workflow de navegador continua manual e aguarda segredos do ambiente `e2e`;
-o modo autenticado exige conta exclusiva. Os modos de escrita de release também
+o modo autenticado usa conta temporária criada e removida pelo próprio teste.
+Os modos de escrita de release também
 aguardam configuração específica. Veja o [guia operacional](CI-DEPLOY-RUNBOOK.md).
 
 ## Referências oficiais

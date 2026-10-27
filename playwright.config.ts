@@ -1,18 +1,10 @@
-import fs from "node:fs";
-import dotenv from "dotenv";
 import { defineConfig } from "@playwright/test";
+import { loadDevelopmentClerkKeys } from "./scripts/e2e-clerk-keys.mjs";
 
 // Carrega somente as chaves Clerk. Nunca importa DATABASE_URL ou integrações de .env.
-const local: Record<string, string> = {};
-for (const file of [".env", ".env.local", ".env.development.local"]) {
-  if (fs.existsSync(file)) Object.assign(local, dotenv.parse(fs.readFileSync(file)));
-}
-for (const key of ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY"]) {
-  if (process.env[key] === undefined && local[key]) process.env[key] = local[key];
-}
-const publicKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-const secretKey = process.env.CLERK_SECRET_KEY;
-if (!publicKey?.startsWith("pk_test_") || !secretKey?.startsWith("sk_test_")) throw new Error("E2E requer chaves Clerk de desenvolvimento.");
+const keys = loadDevelopmentClerkKeys();
+Object.assign(process.env, keys);
+const { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: publicKey, CLERK_SECRET_KEY: secretKey } = keys;
 process.env.CLERK_PUBLISHABLE_KEY = publicKey;
 const database = process.env.SCANTECA_TEST_DATABASE_URL;
 if (!database) throw new Error("Defina SCANTECA_TEST_DATABASE_URL para o PostgreSQL descartável.");
@@ -25,7 +17,6 @@ const isolatedEnvironment = {
 };
 Object.assign(process.env, isolatedEnvironment);
 const authenticated = process.env.E2E_AUTHENTICATED === "1";
-if (authenticated && !process.env.E2E_CLERK_USER_EMAIL) throw new Error("Defina a conta Clerk exclusiva em E2E_CLERK_USER_EMAIL.");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -44,13 +35,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    ...(authenticated ? [{ name: "clerk-setup", testMatch: "global.setup.ts" }] : []),
     { name: "guest-desktop", testMatch: "guest.spec.ts", use: { viewport: { width: 1440, height: 900 } } },
     { name: "guest-mobile", testMatch: "guest.spec.ts", use: { viewport: { width: 375, height: 900 } } },
-    ...(authenticated ? [{ name: "authenticated", testMatch: "authenticated.spec.ts", dependencies: ["clerk-setup"], use: { screenshot: "off" as const } }] : []),
+    ...(authenticated ? [{ name: "authenticated", testMatch: "authenticated.spec.ts", use: { screenshot: "off" as const } }] : []),
   ],
   webServer: {
-    command: process.env.CI ? "npm run start -- --port 3020" : "npm run dev -- --port 3020",
+    command: process.env.CI || process.env.E2E_PRODUCTION === "1" ? "npm run start -- --port 3020" : "npm run dev -- --port 3020",
     url: "http://localhost:3020",
     reuseExistingServer: false,
     timeout: 180000,

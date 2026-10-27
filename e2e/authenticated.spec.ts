@@ -1,10 +1,24 @@
-import { clerk, setupClerkTestingToken } from "@clerk/testing/playwright";
-import { expect, test } from "@playwright/test";
+import { clerk, clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
+import { expect, test } from "./fixtures";
 
-test("conta exclusiva publica e remove somente o registro do teste", async ({ page }) => {
+// Mesmo worker: o token fica disponível sem arquivo de sessão ou projeto auxiliar.
+test.beforeAll(async () => { await clerkSetup(); });
+
+test("conta temporária publica e remove somente o registro do teste", async ({ page, identity }) => {
   await setupClerkTestingToken({ page });
-  await page.goto("/");
-  await clerk.signIn({ page, emailAddress: process.env.E2E_CLERK_USER_EMAIL! });
+  await page.goto("/sign-in");
+  await expect(page.locator('input[name="identifier"]')).toBeVisible();
+  try {
+    await clerk.signIn({ page, emailAddress: identity.email });
+  } catch (error) {
+    // A atualização de sessão do Next pode substituir o documento durante setActive.
+    // Só aceitamos esse caso específico e exigimos a identidade exata logo abaixo.
+    if (!(error instanceof Error) || !error.message.includes("Execution context was destroyed")) throw error;
+  }
+  await page.waitForFunction(userId => {
+    const clerk = (window as unknown as { Clerk?: { user?: { id: string } } }).Clerk;
+    return clerk?.user?.id === userId;
+  }, identity.userId);
   let postId: string | undefined;
   try {
     await page.goto("/feed");
