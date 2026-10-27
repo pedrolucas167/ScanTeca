@@ -30,7 +30,8 @@
         "required_status_checks": [
           { "context": "build", "integration_id": 15368 },
           { "context": "reading-integration", "integration_id": 15368 },
-          { "context": "coverage", "integration_id": 15368 }
+          { "context": "coverage", "integration_id": 15368 },
+          { "context": "secrets", "integration_id": 15368 }
         ]
       }
     }

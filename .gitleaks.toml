@@ -1,0 +1,45 @@
+title = "Scanteca: secrets guard"
+
+[extend]
+useDefault = true
+
+# Valor público fictício usado somente pelo build da CI; não é uma credencial.
+[[allowlists]]
+description = "Chave publica ficticia do build"
+regexTarget = "secret"
+regexes = ['''^pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA$''']
+
+[[rules]]
+id = "clerk-secret-key"
+description = "Chave privada Clerk"
+regex = '''\bsk_(?:test|live)_[A-Za-z0-9_-]{16,}'''
+keywords = ["sk_test_", "sk_live_"]
+
+[[rules]]
+id = "database-password"
+description = "Senha em URL de banco"
+regex = '''(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|rediss?)://[^\s:/]+:([^\s@]+)@'''
+secretGroup = 1
+keywords = ["postgres", "mysql", "mongodb", "redis"]
+[[rules.allowlists]]
+description = "Senha publica exclusiva do banco descartavel local"
+regexTarget = "match"
+regexes = ['''^postgresql://scanteca_test:scanteca_test_local@''', '''^postgresql://scanteca_dev:scanteca_dev_local@''']
+[[rules.allowlists]]
+description = "Credenciais sinteticas dos testes do seed"
+condition = "AND"
+paths = ['''^prisma/development-fixtures\.test\.ts$''']
+regexTarget = "match"
+regexes = ['''^postgresql://dev:dev@''']
+[[rules.allowlists]]
+description = "Placeholders documentados, sem credencial real"
+condition = "AND"
+paths = ['''^\.env\.example$''', '''^prisma-next\.md$''']
+regexTarget = "match"
+regexes = ['''^postgresql://user:password@''']
+[[rules.allowlists]]
+description = "Conexao ficticia do build sem banco de dados"
+condition = "AND"
+paths = ['''^\.github/workflows/ci\.yml$''']
+regexTarget = "match"
+regexes = ['''^postgresql://user:pass@''']

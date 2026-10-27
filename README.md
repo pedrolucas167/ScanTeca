@@ -116,6 +116,8 @@ Veja [Cobertura de testes e CI](docs/TEST-COVERAGE.md) para o escopo, os relató
 O [guia de CI e deploy](docs/CI-DEPLOY-RUNBOOK.md) descreve o preparo de um clone novo,
 os testes de navegador isolados, os segredos necessários e a publicação pela Vercel.
 
+Antes de commitar ou enviar, configure a [proteção contra segredos](docs/SECRETS-GUARD.md).
+
 ## Variáveis de ambiente
 
 As variáveis estão documentadas em `.env.example`. As principais são:
