@@ -61,10 +61,29 @@ export default function FeedClient() {
   const [reloadCount, setReloadCount] = useState(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [posting, setPosting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [quotedPost, setQuotedPost] = useState<FeedPost | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [actionErrors, setActionErrors] = useState<Record<string, string | null>>({});
+  const [pendingPosts, setPendingPosts] = useState<Record<string, boolean>>({});
+  const pendingRef = useRef(new Set<string>());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const runPostAction = async (postId: string, action: () => Promise<void>) => {
+    if (pendingRef.current.has(postId)) return;
+    pendingRef.current.add(postId);
+    setPendingPosts(current => ({ ...current, [postId]: true }));
+    setActionErrors(current => ({ ...current, [postId]: null }));
+    try { await action(); }
+    catch (reason) {
+      setActionErrors(current => ({ ...current, [postId]: reason instanceof Error ? reason.message : "Não foi possível concluir a ação. Tente novamente." }));
+    } finally {
+      pendingRef.current.delete(postId);
+      setPendingPosts(current => ({ ...current, [postId]: false }));
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,6 +107,7 @@ export default function FeedClient() {
   }, [reloadCount]);
   const addPost = async (content: string) => {
     let postId: string | null = null;
+    setPosting(true);
     
     try {
       // First create the post
@@ -130,20 +150,29 @@ export default function FeedClient() {
       throw error;
     } finally {
       setUploadingImage(false);
+      setPosting(false);
     }
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    event.target.value = "";
+    setImageError(null);
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setImageError("Selecione uma imagem JPG, PNG ou WebP.");
+      return;
+    }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("Imagem muito grande. Máximo 5MB.");
+      setImageError("Imagem muito grande. O tamanho máximo é 5 MB.");
       return;
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onerror = () => setImageError("Não foi possível abrir a imagem. Selecione o arquivo novamente.");
+    reader.onload = () => {
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
@@ -276,8 +305,8 @@ export default function FeedClient() {
                 <button
                   type="button"
                   onClick={removeImage}
-                  disabled={uploadingImage}
-                  className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70 disabled:opacity-50"
+                  disabled={posting || uploadingImage}
+                  className="absolute top-2 right-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70 disabled:opacity-50"
                   aria-label="Remover imagem"
                 >
                   <X className="h-4 w-4" />
@@ -290,8 +319,8 @@ export default function FeedClient() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingImage}
-              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/20 disabled:opacity-50"
+              disabled={posting || uploadingImage}
+              className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/20 disabled:opacity-50"
             >
               <ImageIcon className="h-4 w-4" />
               Adicionar imagem
@@ -304,12 +333,13 @@ export default function FeedClient() {
               className="hidden"
             />
           </div>
+          {imageError && <p role="alert" className="mb-3 text-sm text-error">{imageError}</p>}
           
           <TextComposer
             placeholder="O que você está lendo ou pensando? 📖"
             submitLabel={uploadingImage ? "Enviando..." : "Publicar"}
             onSubmit={addPost}
-            disabled={uploadingImage}
+            disabled={posting || uploadingImage}
             quotedPost={quotedPost ? { author: quotedPost.author, text: quotedPost.text } : null}
             onCancelQuote={cancelQuote}
           />
@@ -317,14 +347,14 @@ export default function FeedClient() {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-headline-md text-xl">Da sua rede</h2>
-          <button type="button" className="text-xs font-medium text-primary hover:underline">
+          <span className="text-xs font-medium text-on-surface-variant">
             Mais recentes
-          </button>
+          </span>
         </div>
 
         <div className="space-y-5">
           {loading && (
-            <div className="flex flex-col items-center justify-center py-12">
+            <div role="status" className="flex flex-col items-center justify-center py-12">
               <BookLoader size={150} label="Carregando a rede..." />
             </div>
           )}
@@ -367,7 +397,7 @@ export default function FeedClient() {
                       </p>
                     </div>
                   </div>
-                  <button type="button" onClick={() => void moderatePost(post)} aria-label="Mais opções" className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-high">
+                  <button type="button" onClick={() => void runPostAction(post.id, () => moderatePost(post))} disabled={pendingPosts[post.id]} aria-label={`Mais opções da publicação de ${post.author}`} className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50">
                     <MoreHorizontal className="h-5 w-5" />
                   </button>
                 </div>
@@ -386,8 +416,8 @@ export default function FeedClient() {
 
                 {post.imageUrl && (
                   <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant/20">
-                    <div 
-                      className="relative h-96 w-full cursor-pointer"
+                    <button type="button" aria-label={`Ampliar imagem da publicação de ${post.author}`}
+                      className="relative block h-96 w-full cursor-pointer"
                       onClick={() => {
                         setLightboxImage(post.imageUrl || null);
                         setLightboxOpen(true);
@@ -400,7 +430,7 @@ export default function FeedClient() {
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
-                    </div>
+                    </button>
                   </div>
                 )}
 
@@ -425,8 +455,11 @@ export default function FeedClient() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => void togglePostState(post.id, "reaction")}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition ${isLiked ? "bg-error-container/20 text-error" : "text-on-surface-variant hover:bg-surface-container hover:text-error"}`}
+                      onClick={() => void runPostAction(post.id, () => togglePostState(post.id, "reaction"))}
+                      disabled={pendingPosts[post.id]}
+                      aria-label={`Curtir, ${post.likes} curtidas`}
+                      aria-pressed={isLiked}
+                      className={`flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition disabled:opacity-50 ${isLiked ? "bg-error-container/20 text-error" : "text-on-surface-variant hover:bg-surface-container hover:text-error"}`}
                     >
                       <span>{isLiked ? "❤️" : "🤍"}</span>
                       {post.likes}
@@ -434,16 +467,21 @@ export default function FeedClient() {
                     <button
                       type="button"
                       onClick={() => setOpenComments((current) => ({ ...current, [post.id]: !commentsVisible }))}
-                      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-on-surface-variant hover:bg-primary-container/20 hover:text-primary"
+                      aria-label={`Comentários, ${post.commentsCount}`}
+                      aria-expanded={commentsVisible}
+                      aria-controls={`comments-${post.id}`}
+                      className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-on-surface-variant hover:bg-primary-container/20 hover:text-primary"
                     >
                       <MessageCircle className="h-4 w-4" />
                       {post.commentsCount}
                     </button>
                     <button
                       type="button"
-                      onClick={() => void togglePostState(post.id, "bookmark")}
+                      onClick={() => void runPostAction(post.id, () => togglePostState(post.id, "bookmark"))}
+                      disabled={pendingPosts[post.id]}
+                      aria-pressed={isSaved}
                       aria-label={isSaved ? "Remover dos salvos" : "Salvar post"}
-                      className={`rounded-full p-2 transition ${isSaved ? "text-secondary" : "text-on-surface-variant hover:text-secondary"}`}
+                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 transition disabled:opacity-50 ${isSaved ? "text-secondary" : "text-on-surface-variant hover:text-secondary"}`}
                     >
                       <Bookmark className="h-4 w-4" fill={isSaved ? "currentColor" : "none"} />
                     </button>
@@ -451,15 +489,18 @@ export default function FeedClient() {
                   <button 
                     type="button" 
                     onClick={() => quotePost(post)}
-                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-primary hover:bg-primary-container/20"
+                    disabled={posting}
+                    className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-primary hover:bg-primary-container/20"
                   >
                     <Quote className="h-4 w-4" />
                     Citar
                   </button>
                 </div>
 
+                {actionErrors[post.id] && <p role="alert" className="mt-3 text-sm text-error">{actionErrors[post.id]}</p>}
+
                 {commentsVisible && (
-                  <div className="mt-3 space-y-3 border-t border-outline-variant/15 pt-3">
+                  <div id={`comments-${post.id}`} className="mt-3 space-y-3 border-t border-outline-variant/15 pt-3">
                     {post.comments.map((comment) => (
                       <div key={comment.id} className="flex gap-2 text-xs">
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-container/40 font-semibold text-primary">
