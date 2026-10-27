@@ -35,21 +35,41 @@ somente chaves de uma instância Clerk de desenvolvimento:
 | --- | --- |
 | `E2E_CLERK_PUBLISHABLE_KEY` | Chave pública de desenvolvimento |
 | `E2E_CLERK_SECRET_KEY` | Chave secreta da mesma instância de desenvolvimento |
-| `E2E_CLERK_USER_EMAIL` | Conta exclusiva, necessária apenas para modo autenticado |
 
 Não envie o arquivo de ambiente inteiro. Os testes recusam chaves de produção,
 reutilização de servidor e banco fora do endereço descartável permitido. O modo
-autenticado cria uma sessão isolada com o helper oficial; não reutiliza sessão
-pessoal. O teste remove somente a publicação que ele próprio criou.
+autenticado cria uma conta temporária, com email de teste e identificador únicos,
+e uma sessão isolada com o helper oficial. Não é preciso cadastrar email fixo ou
+manter senha: a senha exigida pela instância é aleatória e existe apenas em memória.
+O teste remove a publicação e a conta que ele próprio criou, inclusive se falhar.
 
-Para execução local, suba PostgreSQL com pgvector, usuário `scanteca_test`, senha
-local `scanteca_test_local`, banco `scanteca_reading_test` e porta **127.0.0.1:55439**.
-Defina `SCANTECA_TEST_DATABASE_URL` com essa conexão e use a mesma URL em
-`DATABASE_URL` apenas para preparar o schema com `npx prisma db push`.
-Instale Chromium com `npx playwright install chromium` e execute `npm run test:e2e`.
+Localmente, mantenha Docker ativo, rode `npm ci` e depois **`npm run test:e2e:auth`**.
+O comando valida as chaves de desenvolvimento, sobe PostgreSQL isolado, prepara o
+schema, instala Chromium se necessário, gera o build de produção e executa o
+cenário no mesmo modo da CI. A geração do build leva mais tempo que o servidor de
+desenvolvimento, mas evita interferência de recarregamentos durante o login. Ao terminar, encerra
+somente seu próprio projeto Docker e descarta o banco, mesmo em falha normal.
+Não exige exportar URLs ou instalar a CLI do Clerk. A porta local 55439 deve estar
+livre; um serviço existente nessa porta não é removido nem reutilizado.
 As chaves locais são lidas sem importar URLs de banco ou integrações do `.env`.
-`E2E_AUTHENTICATED=1` habilita o cenário adicional e exige a conta dedicada.
-Encerre os serviços descartáveis após a execução.
+O isolamento usa `compose.e2e.yml`, com armazenamento temporário em memória.
+
+Na CI, abra **Actions → Browser tests → Run workflow** na `main`. O cenário
+autenticado vem selecionado por padrão; desmarque-o para rodar somente os dez
+cenários públicos. A preparação do Clerk acontece no mesmo worker do teste, sem
+arquivos de sessão compartilhados. O ambiente `e2e` deve permitir somente a branch
+`main`; os dois secrets devem ser cadastrados nesse ambiente, não no código.
+Isso impede que uma execução de branch não revisada receba essas credenciais.
+
+Um encerramento forçado pode impedir o teardown do processo. Nesse caso, confira
+o projeto Docker criado por essa execução e a conta marcada com
+`privateMetadata.scantecaE2E`, usando o identificador da execução. Remova somente
+esses recursos; não há rotina automática que apague contas por prefixo ou varra
+usuários da instância.
+
+O helper oficial autentica por um ticket de curta duração. O cenário valida a
+sessão e as operações autenticadas da aplicação; não substitui testes específicos
+dos formulários de senha, provedores OAuth ou MFA.
 
 Traces, vídeos e screenshots autenticados ficam desativados. Logs passam por um
 filtro de tokens. Somente screenshots de falhas públicas podem ser publicados,
@@ -92,7 +112,7 @@ outro PR. Nenhum desses modos mescla PRs automaticamente ou substitui a Vercel.
 
 ## Pendências que precisam de configuração
 
-As chaves Clerk não são cadastradas por commit. O modo autenticado só pode ser
-validado após configurar a conta dedicada; os modos de escrita de release exigem
+As chaves Clerk não são cadastradas por commit. A execução autenticada na CI exige
+os dois secrets de desenvolvimento; a conta é criada automaticamente. Os modos de escrita de release exigem
 o token e o ambiente. Mantenha novos checks opcionais até validar seu fluxo real.
 Registre a execução e o commit verificado antes de torná-los obrigatórios.
