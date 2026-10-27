@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { TextComposer } from "./TextComposer";
 import BookLoader from "@/components/BookPagesLoader";
+import FeedSignInPrompt from "./FeedSignInPrompt";
+import { requestFeed } from "./request-feed";
 
 interface Comment {
   id: string;
@@ -55,6 +57,8 @@ export default function FeedClient() {
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -63,18 +67,25 @@ export default function FeedClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/feed")
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Não foi possível carregar o feed.");
-        return response.json() as Promise<{ posts: FeedPost[] }>;
-      })
-      .then((data) => setPosts(data.posts))
-      .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "Erro ao carregar o feed.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
+    const controller = new AbortController();
+    const signal = controller.signal;
+    void requestFeed<FeedPost>(signal).then(result => {
+      if (signal.aborted) return;
+      if (result.kind === "unauthorized") {
+        setPosts([]);
+        setSessionExpired(true);
+      } else if (result.kind === "success") {
+        setPosts(result.posts);
+      } else {
+        setError(result.message);
+      }
+    }).catch(() => {
+      // Cancelamento ao desmontar a tela: não apresenta erro de conexão.
+    }).finally(() => {
+      if (!signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [reloadCount]);
   const addPost = async (content: string) => {
     let postId: string | null = null;
     
@@ -219,6 +230,8 @@ export default function FeedClient() {
     }
   };
 
+  if (sessionExpired) return <FeedSignInPrompt />;
+
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-surface px-4 py-6 pb-28 text-on-surface">
       <div className="mx-auto max-w-2xl">
@@ -315,7 +328,12 @@ export default function FeedClient() {
               <BookLoader size={150} label="Carregando a rede..." />
             </div>
           )}
-          {error && <p className="rounded-xl border border-error/30 bg-error-container/20 p-4 text-sm text-error">{error}</p>}
+          {error && (
+            <div role="alert" className="rounded-xl border border-error/30 bg-error-container/20 p-4 text-sm text-error">
+              <p>{error}</p>
+              <button type="button" onClick={() => { setLoading(true); setError(null); setReloadCount(value => value + 1); }} className="mt-3 min-h-11 rounded-full border border-error/50 px-4 py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error">Tentar novamente</button>
+            </div>
+          )}
           {!loading && !error && posts.length === 0 && (
             <p className="rounded-xl border border-outline-variant/30 bg-surface-container-low p-6 text-center text-sm text-on-surface-variant">
               Ainda não há publicações. Seja o primeiro a compartilhar uma leitura! ✨
