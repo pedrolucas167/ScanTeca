@@ -12,7 +12,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ptBR } from "@clerk/localizations";
 import { clerkAppearance } from "@/lib/clerk-appearance";
 import { unstable_cache } from "next/cache";
-import { BookOpen, Heart, Sparkles, ChevronDown } from "lucide-react";
+import { BookOpen, Heart, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import AccentPicker from "@/components/ui/AccentPicker";
@@ -22,6 +22,7 @@ import PushOptIn from "@/components/ui/PushOptIn";
 import InstallPrompt from "@/components/ui/InstallPrompt";
 import AdminLink from "@/components/ui/AdminLink";
 import MobileNav from "@/components/ui/MobileNav";
+import NavigationDropdown from "@/components/ui/NavigationDropdown";
 import RoutePrefetch from "@/components/ui/RoutePrefetch";
 import WebVitals from "@/components/ui/WebVitals";
 import "./globals.css";
@@ -161,50 +162,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     <Sparkles className="h-3.5 w-3.5" />
                     Oráculo
                   </Link>
-                  <div className="relative group z-50">
-                    <button className="flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800">
-                      Mais
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                    <div className="absolute left-0 top-full mt-1 hidden w-48 rounded-lg border border-zinc-200 bg-white py-2 shadow-lg group-hover:block dark:border-zinc-800 dark:bg-zinc-950">
-                      <Link
-                        href="/perfil"
-                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        Perfil
-                      </Link>
-                      <Link
-                        href="/descobrir/leitores"
-                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        Leitores
-                      </Link>
-                      <Link
-                        href="/jornada"
-                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        Jornada
-                      </Link>
-                      <Link
-                        href="/diario"
-                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        Diário
-                      </Link>
-                      <Link
-                        href="/rota"
-                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        Rota
-                      </Link>
-                      <Link
-                        href="/manifesto"
-                        className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        Manifesto
-                      </Link>
-                    </div>
-                  </div>
+                  <NavigationDropdown links={[
+                    { href: "/perfil", label: "Perfil" },
+                    { href: "/descobrir/leitores", label: "Leitores" },
+                    { href: "/jornada", label: "Jornada" },
+                    { href: "/diario", label: "Diário" },
+                    { href: "/rota", label: "Rota" },
+                    { href: "/manifesto", label: "Manifesto" },
+                  ]} />
                 </div>
                 <div className="ml-auto xl:hidden">
                   <MobileNav />
