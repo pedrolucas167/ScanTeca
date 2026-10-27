@@ -1,7 +1,8 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, mergeConfig } from "vitest/config";
 import path from "node:path";
+import coverage from "./vitest.coverage";
 
-export default defineConfig({
+export default mergeConfig(coverage, defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
@@ -12,4 +13,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "."),
     },
   },
-});
+}));

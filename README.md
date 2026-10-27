@@ -103,10 +103,15 @@ Abra [http://localhost:3000](http://localhost:3000).
 | `npm start` | Inicia o build de produção |
 | `npm run lint` | Executa o ESLint |
 | `npm test` | Executa os testes com Vitest |
+| `npm run test:coverage` | Mede cobertura da suíte principal, incluindo arquivos sem testes |
+| `npm run test:integration:coverage` | Mede cobertura da integração com banco e Redis isolados |
+| `npm run coverage:check` | Combina as duas coberturas e verifica os mínimos versionados |
 | `npm run db:migrate` | Cria e aplica uma migração em desenvolvimento |
 | `npm run db:deploy` | Aplica migrações existentes |
 | `npm run db:push` | Sincroniza o schema com o banco |
 | `npm run db:seed` | Popula dados de desenvolvimento |
+
+Veja [Cobertura de testes e CI](docs/TEST-COVERAGE.md) para o escopo, os relatórios e a execução completa.
 
 ## Variáveis de ambiente
 
