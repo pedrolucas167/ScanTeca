@@ -90,14 +90,14 @@ export default function LandingPage() {
               href="/sign-up"
               className="flex min-h-11 items-center justify-center gap-2.5 rounded-full bg-primary-container px-4 py-3.5 font-label-md text-label-md text-white shadow-lg shadow-primary-container/35 transition-all hover:bg-inverse-primary active:scale-[0.98] sm:px-7"
             >
-              <Icon name="menu_book" className="text-lg" fill />
+              <Icon decorative name="menu_book" className="text-lg" fill />
               <span>Começar Minha Estante Grátis</span>
             </Link>
             <Link
               href="/manifesto"
               className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-outline-variant/50 bg-surface-container px-4 py-3.5 font-label-md text-label-md text-on-surface transition-all hover:bg-surface-container-high active:scale-[0.98] sm:px-7"
             >
-              <Icon name="auto_stories" className="text-lg text-secondary" />
+              <Icon decorative name="auto_stories" className="text-lg text-secondary" />
               <span>Leia o Manifesto</span>
             </Link>
           </div>
@@ -109,7 +109,7 @@ export default function LandingPage() {
           <div className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-lg border border-outline-variant/30 p-6 sm:p-8 lg:col-span-7">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-4">
               <div className="flex items-center gap-2">
-                <Icon name="format_quote" className="text-2xl text-primary" />
+                <Icon decorative name="format_quote" className="text-2xl text-primary" />
                 <span className="font-caption text-caption uppercase tracking-wider text-outline">
                   Vozes Literárias
                 </span>
@@ -119,6 +119,7 @@ export default function LandingPage() {
                   <button
                     key={q.tab}
                     onClick={() => setQuoteIdx(i)}
+                    aria-pressed={i === quoteIdx}
                     className={`min-h-11 rounded-full px-3 py-1 font-caption text-caption transition-all ${
                       i === quoteIdx
                         ? "active-quote-tab"
@@ -134,14 +135,14 @@ export default function LandingPage() {
               <blockquote className="mb-5 font-quote-lg text-quote-md italic leading-relaxed text-on-surface sm:text-quote-lg">
                 &ldquo;{quote?.content}&rdquo;
               </blockquote>
-              <p className="font-body-sm text-body-sm text-outline-variant">
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
                 — {quote?.author},{" "}
                 <span className="italic text-tertiary">{quote?.work}</span>
               </p>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 pt-4 font-caption text-caption text-on-surface-variant">
               <span className="flex items-center gap-1.5">
-                <Icon name="verified" className="text-sm text-primary" />
+                <Icon decorative name="verified" className="text-sm text-primary" />
                 Acervo de Clássicos Francófonos Catalogados
               </span>
               <span className="text-outline">
@@ -209,7 +210,7 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 font-caption text-caption text-primary">
               <span className="flex items-center gap-1">
-                <Icon name="psychology" className="text-sm" />
+                <Icon decorative name="psychology" className="text-sm" />
                 Vetorizado no Oráculo IA
               </span>
               <span className="font-semibold">Sinopse Extraída (100%)</span>
@@ -240,7 +241,7 @@ export default function LandingPage() {
             <div className="flex flex-col justify-between rounded-lg border border-error/20 bg-surface-container-low p-8">
               <div>
                 <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-error/30 bg-error-container/20 text-error">
-                  <Icon name="table_rows_narrow" className="text-2xl" />
+                  <Icon decorative name="table_rows_narrow" className="text-2xl" />
                 </div>
                 <h3 className="mb-3 font-headline-md text-headline-md text-on-surface">
                   O Fardo do Acervo Inerte
@@ -260,7 +261,7 @@ export default function LandingPage() {
                       key={t}
                       className="flex items-start gap-3 font-body-sm text-body-sm text-on-surface-variant"
                     >
-                      <Icon name="close" className="text-lg text-error" />
+                      <Icon decorative name="close" className="text-lg text-error" />
                       <span>
                         <strong>{t}</strong> {d}
                       </span>
@@ -269,7 +270,7 @@ export default function LandingPage() {
                 </ul>
               </div>
               <div className="mt-8 flex items-center gap-2 border-t border-outline-variant/20 pt-6 font-caption text-caption text-outline">
-                <Icon name="sentiment_dissatisfied" className="text-sm" />
+                <Icon decorative name="sentiment_dissatisfied" className="text-sm" />
                 <span>
                   84% dos colecionadores desistem de catalogar após o 50º livro.
                 </span>
@@ -280,7 +281,7 @@ export default function LandingPage() {
               <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-primary-container/10 blur-2xl" />
               <div className="relative">
                 <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/40 bg-primary-container/20 text-primary">
-                  <Icon name="auto_awesome" className="text-2xl" />
+                  <Icon decorative name="auto_awesome" className="text-2xl" />
                 </div>
                 <h3 className="mb-3 font-headline-md text-headline-md text-on-surface">
                   O Padrão Scanteca
@@ -299,7 +300,7 @@ export default function LandingPage() {
                       key={t}
                       className="flex items-start gap-3 font-body-sm text-body-sm text-on-surface"
                     >
-                      <Icon
+                      <Icon decorative
                         name="check_circle"
                         className="text-lg text-primary"
                       />
@@ -311,7 +312,7 @@ export default function LandingPage() {
                 </ul>
               </div>
               <div className="relative mt-8 flex items-center gap-2 border-t border-outline-variant/20 pt-6 font-caption text-caption text-primary">
-                <Icon name="bolt" className="text-sm" />
+                <Icon decorative name="bolt" className="text-sm" />
                 <span>
                   Catalogação 15x mais rápida que qualquer método tradicional.
                 </span>
@@ -340,7 +341,7 @@ export default function LandingPage() {
           <div className="flex flex-col justify-between rounded-lg border border-outline-variant/30 bg-surface-container p-8 lg:col-span-7">
             <div>
               <div className="mb-3 flex items-center gap-2 font-label-sm text-label-sm text-primary">
-                <Icon name="barcode_scanner" className="text-base" />
+                <Icon decorative name="barcode_scanner" className="text-base" />
                 <span>PILAR I • ENTRADA ÁGIL</span>
               </div>
               <h3 className="mb-3 font-headline-md text-headline-md text-on-surface">
@@ -403,7 +404,7 @@ export default function LandingPage() {
           >
             <div>
               <div className="mb-3 flex items-center gap-2 font-label-sm text-label-sm text-primary">
-                <Icon name="straighten" className="text-base" />
+                <Icon decorative name="straighten" className="text-base" />
                 <span>PILAR II • ESTATURA TANGÍVEL</span>
               </div>
               <h3 className="mb-3 font-headline-md text-headline-md text-on-surface">
@@ -425,11 +426,11 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="flex h-14 w-14 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20 text-primary">
-                  <Icon name="height" className="text-3xl" />
+                  <Icon decorative name="height" className="text-3xl" />
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-md border border-outline-variant/20 bg-surface-container p-3">
-                <Icon name="pets" className="text-2xl text-secondary" />
+                <Icon decorative name="pets" className="text-2xl text-secondary" />
                 <div className="font-caption text-caption text-on-surface-variant">
                   Equivalente à altura de uma{" "}
                   <strong className="text-on-surface">girafa adulta</strong> em
@@ -462,7 +463,7 @@ export default function LandingPage() {
             <div className="mb-8 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
               <div className="max-w-2xl">
                 <div className="mb-2 flex items-center gap-2 font-label-sm text-label-sm text-primary">
-                  <Icon name="shelves" className="text-base" />
+                  <Icon decorative name="shelves" className="text-base" />
                   <span>PILAR III • CURADORIA & COMPARTILHAMENTO</span>
                 </div>
                 <h3 className="mb-2 font-headline-md text-headline-md text-on-surface">
@@ -476,11 +477,11 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex items-center gap-1.5 rounded-full border border-outline-variant/30 bg-surface-container-high px-4 py-2 font-label-sm text-label-sm text-primary">
-                  <Icon name="file_download" className="text-base" />
+                  <Icon decorative name="file_download" className="text-base" />
                   <span>Exportar CSV / BibTeX</span>
                 </span>
                 <span className="flex items-center gap-1.5 rounded-full border border-outline-variant/30 bg-surface-container-high px-4 py-2 font-label-sm text-label-sm text-on-surface">
-                  <Icon name="share" className="text-base" />
+                  <Icon decorative name="share" className="text-base" />
                   <span>scanteca.com/@sua-estante</span>
                 </span>
               </div>
@@ -526,7 +527,7 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-6xl px-6 md:px-12">
           <div className="mx-auto mb-16 max-w-3xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary-container/20 px-3.5 py-1.5 font-label-sm text-label-sm text-primary">
-              <Icon name="neurology" className="text-base" />
+              <Icon decorative name="neurology" className="text-base" />
               <span>INTELIGÊNCIA ARTIFICIAL VETORIAL (RAG & PGVECTOR)</span>
             </div>
             <h2 className="mb-4 font-headline-lg text-display-mobile text-on-surface md:text-headline-lg">
@@ -543,8 +544,8 @@ export default function LandingPage() {
           <div className="glass-panel ambient-glow mx-auto max-w-4xl rounded-lg border border-primary/30 p-6 shadow-2xl sm:p-10">
             <div className="mb-6 flex items-center justify-between border-b border-outline-variant/30 pb-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-container text-on-primary">
-                  <Icon name="psychology" className="text-xl" />
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
+                  <Icon decorative name="psychology" className="text-xl" />
                 </div>
                 <div>
                   <h4 className="font-body-md text-body-md font-semibold text-on-surface">
@@ -567,12 +568,12 @@ export default function LandingPage() {
                   absurdo e solidão moderna?&rdquo;
                 </div>
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface">
-                  <Icon name="person" className="text-sm" />
+                  <Icon decorative name="person" className="text-sm" />
                 </div>
               </div>
               <div className="flex items-start gap-3.5">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
-                  <Icon name="auto_awesome" className="text-sm" />
+                  <Icon decorative name="auto_awesome" className="text-sm" />
                 </div>
                 <div className="max-w-2xl space-y-3.5 rounded-2xl rounded-tl-none border border-outline-variant/30 bg-surface-container-high/90 p-5 font-body-md text-body-md">
                   <p className="leading-relaxed text-on-surface">
@@ -588,7 +589,7 @@ export default function LandingPage() {
                         key={t}
                         className="flex items-start gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-3"
                       >
-                        <Icon
+                        <Icon decorative
                           name="bookmark"
                           className="flex-shrink-0 text-xl text-primary"
                         />
@@ -662,7 +663,7 @@ export default function LandingPage() {
               <div>
                 <div className="mb-4 flex items-center gap-1 text-primary">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Icon key={i} name="star" className="text-sm" fill />
+                    <Icon decorative key={i} name="star" className="text-sm" fill />
                   ))}
                 </div>
                 <p className="mb-6 font-body-md text-body-md italic leading-relaxed text-on-surface">
@@ -690,7 +691,7 @@ export default function LandingPage() {
         <div className="mt-16 flex flex-col items-center justify-between gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-low p-6 text-center sm:flex-row sm:text-left">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-container/20 text-primary">
-              <Icon name="lock" className="text-xl" />
+              <Icon decorative name="lock" className="text-xl" />
             </div>
             <div>
               <h5 className="font-body-sm text-body-sm font-semibold text-on-surface">
@@ -727,7 +728,7 @@ export default function LandingPage() {
               href="/sign-up"
               className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-8 py-4 font-label-md text-label-md text-white shadow-xl shadow-primary-container/30 transition-all hover:bg-inverse-primary active:scale-[0.98] sm:w-auto"
             >
-              <Icon name="barcode_scanner" className="text-xl" />
+              <Icon decorative name="barcode_scanner" className="text-xl" />
               <span>Catalogar Meu Primeiro Livro</span>
             </Link>
             <Link

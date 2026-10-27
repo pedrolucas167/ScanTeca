@@ -15,6 +15,26 @@
   --auth-control-border: #71717a;
   --auth-focus: var(--color-indigo-600);
   --auth-link: var(--color-indigo-700);
+  --ui-focus: var(--color-indigo-700);
+  --ui-surface: #fafafa;
+  --ui-surface-dim: #e4e4e7;
+  --ui-surface-bright: #ffffff;
+  --ui-surface-lowest: #ffffff;
+  --ui-surface-low: #f4f4f5;
+  --ui-surface-container: #efeff2;
+  --ui-surface-high: #e4e4e7;
+  --ui-surface-highest: #d4d4d8;
+  --ui-on-surface: #18181b;
+  --ui-on-surface-variant: #52525b;
+  --ui-outline: #656570;
+  --ui-outline-variant: #a1a1aa;
+  --ui-accent: var(--color-indigo-700);
+  --ui-accent-container: var(--color-indigo-700);
+  --ui-on-accent: #ffffff;
+  --ui-error: #b91c1c;
+  --ui-error-container: #fee2e2;
+  --ui-on-error-container: #7f1d1d;
+  --ui-glass: rgb(255 255 255 / 0.85);
   color-scheme: light;
 }
 
@@ -29,6 +49,26 @@
   --auth-control-border: #71717a;
   --auth-focus: var(--color-indigo-300);
   --auth-link: var(--color-indigo-300);
+  --ui-focus: var(--color-indigo-300);
+  --ui-surface: #111319;
+  --ui-surface-dim: #111319;
+  --ui-surface-bright: #373940;
+  --ui-surface-lowest: #0c0e14;
+  --ui-surface-low: #191b22;
+  --ui-surface-container: #1e1f26;
+  --ui-surface-high: #282a30;
+  --ui-surface-highest: #33343b;
+  --ui-on-surface: #e2e2eb;
+  --ui-on-surface-variant: #c8c4d7;
+  --ui-outline: #a1a0b2;
+  --ui-outline-variant: #747284;
+  --ui-accent: var(--color-indigo-300);
+  --ui-accent-container: var(--color-indigo-700);
+  --ui-on-accent: var(--color-indigo-950);
+  --ui-error: #ffb4ab;
+  --ui-error-container: #93000a;
+  --ui-on-error-container: #ffdad6;
+  --ui-glass: rgb(20 24 36 / 0.85);
   color-scheme: dark;
 }
 
@@ -71,7 +111,7 @@
   --color-indigo-300: #6ee7b7;
   --color-indigo-400: #34d399;
   --color-indigo-500: #10b981;
-  --color-indigo-600: #059669;
+  --color-indigo-600: #047857;
   --color-indigo-700: #047857;
   --color-indigo-800: #065f46;
   --color-indigo-900: #064e3b;
@@ -85,7 +125,7 @@
   --color-indigo-300: #fdba74;
   --color-indigo-400: #fb923c;
   --color-indigo-500: #f97316;
-  --color-indigo-600: #ea580c;
+  --color-indigo-600: #c2410c;
   --color-indigo-700: #c2410c;
   --color-indigo-800: #9a3412;
   --color-indigo-900: #7c2d12;
@@ -98,58 +138,86 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+
+#main-content {
+  scroll-margin-top: 8rem;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--auth-surface);
+  color: var(--foreground);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 #scanner-region video {
   border-radius: 0.75rem;
 }
 
-/* ===== Stitch landing page — paleta dark Material + tipografia ===== */
-@theme {
-  --color-surface: #111319;
-  --color-surface-dim: #111319;
-  --color-surface-bright: #373940;
-  --color-surface-container-lowest: #0c0e14;
-  --color-surface-container-low: #191b22;
-  --color-surface-container: #1e1f26;
-  --color-surface-container-high: #282a30;
-  --color-surface-container-highest: #33343b;
-  --color-surface-variant: #33343b;
-  --color-surface-tint: #c4c0ff;
-  --color-on-surface: #e2e2eb;
-  --color-on-surface-variant: #c8c4d7;
-  --color-on-background: #e2e2eb;
-  --color-outline: #918fa1;
-  --color-outline-variant: #464555;
-  --color-primary: #c4c0ff;
-  --color-primary-container: #5b50e6;
-  --color-on-primary: #2100a3;
-  --color-on-primary-container: #e8e4ff;
+/* As telas Stitch compartilham tema e cor de destaque com o cabeçalho. */
+@theme inline {
+  --color-surface: var(--ui-surface);
+  --color-surface-dim: var(--ui-surface-dim);
+  --color-surface-bright: var(--ui-surface-bright);
+  --color-surface-container-lowest: var(--ui-surface-lowest);
+  --color-surface-container-low: var(--ui-surface-low);
+  --color-surface-container: var(--ui-surface-container);
+  --color-surface-container-high: var(--ui-surface-high);
+  --color-surface-container-highest: var(--ui-surface-highest);
+  --color-surface-variant: var(--ui-surface-highest);
+  --color-surface-tint: var(--ui-accent);
+  --color-on-surface: var(--ui-on-surface);
+  --color-on-surface-variant: var(--ui-on-surface-variant);
+  --color-on-background: var(--ui-on-surface);
+  --color-outline: var(--ui-outline);
+  --color-outline-variant: var(--ui-outline-variant);
+  --color-primary: var(--ui-accent);
+  --color-primary-container: var(--ui-accent-container);
+  --color-on-primary: var(--ui-on-accent);
+  --color-on-primary-container: #ffffff;
   --color-primary-fixed: #e3dfff;
   --color-primary-fixed-dim: #c4c0ff;
   --color-on-primary-fixed: #110068;
   --color-on-primary-fixed-variant: #3826c5;
-  --color-inverse-primary: #5145dc;
+  --color-inverse-primary: var(--color-indigo-800);
   --color-inverse-surface: #e2e2eb;
   --color-inverse-on-surface: #2e3037;
-  --color-secondary: #c0c1ff;
-  --color-secondary-container: #3131c0;
+  --color-secondary: var(--ui-accent);
+  --color-secondary-container: var(--ui-accent-container);
   --color-on-secondary: #1000a9;
-  --color-on-secondary-container: #b0b2ff;
+  --color-on-secondary-container: #ffffff;
   --color-secondary-fixed: #e1e0ff;
   --color-secondary-fixed-dim: #c0c1ff;
   --color-on-secondary-fixed: #07006c;
   --color-on-secondary-fixed-variant: #2f2ebe;
-  --color-tertiary: #ccbeff;
-  --color-tertiary-container: #6b5e9f;
+  --color-tertiary: var(--ui-accent);
+  --color-tertiary-container: var(--ui-accent-container);
   --color-on-tertiary: #332664;
   --color-on-tertiary-container: #ebe3ff;
   --color-tertiary-fixed: #e7deff;
   --color-tertiary-fixed-dim: #ccbeff;
   --color-on-tertiary-fixed: #1e0e4e;
   --color-on-tertiary-fixed-variant: #4a3d7c;
-  --color-error: #ffb4ab;
-  --color-error-container: #93000a;
-  --color-on-error: #690005;
-  --color-on-error-container: #ffdad6;
+  --color-error: var(--ui-error);
+  --color-error-container: var(--ui-error-container);
+  --color-on-error: var(--ui-surface);
+  --color-on-error-container: var(--ui-on-error-container);
+}
+
+@theme {
 
   /* Tipografia Stitch — tamanhos */
   --text-display: 56px;
@@ -230,10 +298,10 @@ body {
 
 /* CSS custom do design Stitch */
 .glass-panel {
-  background: rgba(20, 24, 36, 0.75);
+  background: var(--ui-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--ui-outline-variant);
 }
 .scanner-line {
   animation: scan 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -261,9 +329,9 @@ body {
   box-shadow: 0 0 45px -5px rgba(91, 80, 230, 0.3);
 }
 .active-quote-tab {
-  background: rgba(91, 80, 230, 0.25);
-  color: #e8e4ff;
-  border-color: rgba(196, 192, 255, 0.4);
+  background: color-mix(in srgb, var(--ui-accent) 12%, var(--ui-surface));
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -331,10 +399,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .msg-in,
-  .typing-dot,
-  .animate-pulse {
-    animation: none !important;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

@@ -120,6 +120,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         <ClerkProvider localization={clerkLocalization} appearance={clerkAppearance}>
+          <a href="#main-content" className="skip-link">Pular para o conteúdo</a>
           <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
             <nav className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-5 md:h-16 md:flex-nowrap md:py-0">
               <div className="flex min-w-0 basis-full items-center gap-3 md:basis-auto md:flex-1 xl:gap-6">
@@ -221,7 +222,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </div>
             </nav>
           </header>
-          {children}
+          <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col focus:outline-none">
+            {children}
+          </div>
           <footer className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 md:flex-row md:justify-between">
               <div className="flex items-center gap-2.5">
@@ -251,7 +254,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   LinkedIn
                 </a>
               </div>
-              <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 md:text-right">
+              <p className="text-center text-xs text-zinc-600 dark:text-zinc-400 md:text-right">
                 &copy; {new Date().getFullYear()} Scanteca — Bibliotheca Personalis.
                 <br />
                 Feito com{" "}
