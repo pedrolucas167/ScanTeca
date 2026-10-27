@@ -63,7 +63,11 @@ atualize a base de cada PR e confirme novamente os checks antes do próximo merg
 A proteção proposta exige PR, resolução das conversas, branch atualizada e os três
 checks centrais. Não exige outra pessoa para aprovar enquanto o projeto tiver um
 único colaborador. O arquivo `.github/rulesets/main-proposal.json` é uma proposta
-desativada; o estado real deve ser conferido nas configurações do repositório.
+desativada para revisão/importação. Em 27 de outubro de 2026, o ruleset real foi
+ativado pela API e conferido: PR obrigatório, resolução de conversas, branch
+atualizada, bloqueio de exclusão e force push e checks `build`,
+`reading-integration` e `coverage`, sem exigir outro aprovador.
+Confira o estado atual nas configurações do repositório antes de alterá-lo.
 
 Merge na `main` aciona a integração existente com a Vercel. Não execute deploy
 manual como atalho. Confirme o deployment de produção referente ao commit integrado;

@@ -101,12 +101,25 @@ não substituem a automação desses cenários.
 - Tornar novos avisos de lint bloqueantes só depois de criar um controle que
   diferencie o legado. Não reprovar toda a base por avisos preexistentes sem tratá-los.
 
-## Limites desta proposta
+## Estado inicial da proposta
 
 Não foram alteradas configurações no GitHub, agendamentos, permissões, secrets ou
 automações ativas. Não há novo workflow habilitado nem PR publicado desta proposta.
 Os nomes e parâmetros do JSON foram conferidos com a documentação e os checks
 existentes; a política ainda precisa ser testada no GitHub após sua ativação aprovada.
+
+## Implantação em 27 de outubro de 2026
+
+Os quatro pacotes foram integrados por PR após aprovação dos checks centrais.
+O grafo de dependências foi habilitado e a revisão de dependências passou. O
+ruleset real da principal foi ativado e relido pela API, exigindo os três checks,
+PR e atualização da branch, com zero aprovações externas. O JSON permanece um
+modelo desativado, não uma sincronização automática das configurações remotas.
+
+Os dez cenários públicos de navegador passaram localmente com build de produção.
+O workflow de navegador continua manual e aguarda segredos do ambiente `e2e`;
+o modo autenticado exige conta exclusiva. Os modos de escrita de release também
+aguardam configuração específica. Veja o [guia operacional](CI-DEPLOY-RUNBOOK.md).
 
 ## Referências oficiais
 
