@@ -19,7 +19,8 @@ nem demonstra que todos os fluxos de interface foram exercitados.
 
 ## Executar localmente
 
-Base inicial combinada, com 208 arquivos no escopo e 265 testes aprovados:
+Base inicial de controle, medida localmente em 208 arquivos antes dos testes
+dedicados de Web Push:
 
 | Métrica | Cobertura |
 | --- | ---: |
@@ -31,6 +32,13 @@ Por área, a cobertura de linhas é: `modules` 80,14%, `lib` 37,92%, `app` 8,93%
 e `components` 1,69%. Esses números descrevem a base inicial; consulte o artefato
 da execução mais recente para acompanhar a evolução. O objetivo seguinte é
 cobrir os fluxos de interface e as APIs ainda não exercitadas, aumentando os mínimos.
+
+Os testes zeram a configuração VAPID herdada da máquina antes de importar a
+aplicação. Casos dedicados de Web Push usam fixtures e transporte simulado para
+verificar envio, opt-out, endpoints expirados e metas sem chamar serviços externos.
+Isso elimina a diferença observada na primeira execução da CI: as credenciais
+locais ativavam caminhos que não eram percorridos no runner. Os mínimos iniciais
+foram mantidos; a correção adiciona testes em vez de reduzir o limite para aprovar.
 
 ```powershell
 npm ci
