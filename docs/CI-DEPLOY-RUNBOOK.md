@@ -68,6 +68,8 @@ ativado pela API e conferido: PR obrigatório, resolução de conversas, branch
 atualizada, bloqueio de exclusão e force push e checks `build`,
 `reading-integration` e `coverage`, sem exigir outro aprovador.
 Confira o estado atual nas configurações do repositório antes de alterá-lo.
+O pacote de proteção de segredos acrescenta o check `secrets` ao modelo; sua
+exigência é ativada após validar o workflow no GitHub e integrar o pacote.
 
 Merge na `main` aciona a integração existente com a Vercel. Não execute deploy
 manual como atalho. Confirme o deployment de produção referente ao commit integrado;

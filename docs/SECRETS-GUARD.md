@@ -28,7 +28,9 @@ não há exclusão geral para testes, documentação ou arquivos de ambiente.
 Hooks locais podem ser contornados e a CI já recebe o commit no servidor. Para
 barrar também no GitHub, habilite Secret scanning e Push protection nas configurações
 de segurança, onde disponíveis, e exija o check `secrets` na proteção de branch
-após sua primeira execução aprovada. A cobertura de padrões do provedor não é
+após sua primeira execução aprovada. O modelo de ruleset já inclui esse check;
+o rollout ativa essa exigência depois da integração deste pacote, mantendo os
+três checks centrais existentes. A cobertura de padrões do provedor não é
 universal; nenhum detector garante identificar todo formato de variável sensível.
 
 Nesta implantação, a API confirmou Secret scanning e Push protection **ativos**.
