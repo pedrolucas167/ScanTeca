@@ -63,7 +63,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,
