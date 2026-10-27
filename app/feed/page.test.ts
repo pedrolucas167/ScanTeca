@@ -1,9 +1,10 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ auth: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), useAuth: vi.fn(() => ({ isLoaded: true })) }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
 vi.mock("@clerk/nextjs", () => ({
+  useAuth: mocks.useAuth,
   SignInButton: ({ children }: { children: ReactNode }) => children,
   SignUpButton: ({ children }: { children: ReactNode }) => children,
 }));
@@ -25,5 +26,11 @@ describe("entrada do feed", () => {
     const html = renderToStaticMarkup(await FeedPage());
     expect(html).toContain("Feed autenticado");
     expect(html).not.toContain("Entre para participar");
+  });
+  it.each([false, true])("só libera os botões após carregar autenticação: %s", async isLoaded => {
+    mocks.auth.mockResolvedValue({ userId: null });
+    mocks.useAuth.mockReturnValueOnce({ isLoaded });
+    const html = renderToStaticMarkup(await FeedPage());
+    expect((html.match(/disabled=""/gu) || []).length).toBe(isLoaded ? 0 : 2);
   });
 });
