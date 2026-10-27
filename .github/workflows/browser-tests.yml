@@ -1,0 +1,59 @@
+name: Browser tests
+on:
+  workflow_dispatch:
+    inputs:
+      authenticated:
+        description: Incluir conta exclusiva e teste autenticado no banco descartável
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: e2e
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: scanteca_test
+          POSTGRES_PASSWORD: scanteca_test_local
+          POSTGRES_DB: scanteca_reading_test
+        ports: ['55439:5432']
+        options: >-
+          --health-cmd "pg_isready -U scanteca_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://scanteca_test:scanteca_test_local@127.0.0.1:55439/scanteca_reading_test
+      SCANTECA_TEST_DATABASE_URL: postgresql://scanteca_test:scanteca_test_local@127.0.0.1:55439/scanteca_reading_test
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+      E2E_AUTHENTICATED: ${{ inputs.authenticated && '1' || '0' }}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      OPENROUTER_API_KEY: ''
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Check development credentials
+        run: node -e "if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_') || !process.env.CLERK_SECRET_KEY?.startsWith('sk_test_')) throw Error('Configure chaves Clerk de desenvolvimento no ambiente e2e'); if (process.env.E2E_AUTHENTICATED === '1' && !process.env.E2E_CLERK_USER_EMAIL) throw Error('Configure a conta exclusiva de teste');"
+      - run: npx prisma db push --skip-generate
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e-tools
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: failure()
+        with:
+          name: browser-failure-screenshots
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
