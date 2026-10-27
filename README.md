@@ -2,6 +2,10 @@
 
 Biblioteca pessoal para catalogar livros por ISBN, acompanhar a jornada de leitura e conversar com o acervo por meio do Oráculo.
 
+[![Página inicial do Scanteca no tema escuro, com apresentação do catálogo por ISBN e do Oráculo](docs/images/scanteca-inicio-escuro.png)](https://scanteca.vercel.app)
+
+*Sua estante de livros físicos, viva e conversacional. [Conheça o Scanteca](https://scanteca.vercel.app).*
+
 O projeto é uma **PWA** em português do Brasil. O manifesto define instalação em modo standalone, orientação vertical e as categorias `books`, `utilities` e `lifestyle`.
 
 Para testar Biblioteca e Leitura com sua conta de desenvolvimento, veja [Dados fictícios e PostgreSQL local](docs/DEVELOPMENT-DATA.md).
