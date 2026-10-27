@@ -17,6 +17,7 @@
     "test:coverage-tools": "node --test scripts/coverage-policy.test.mjs",
     "test:ci-policy": "node --test scripts/github-policy.test.mjs",
     "ci:policy": "node scripts/check-github-policy.mjs",
+    "security:audit": "node scripts/dependency-audit.mjs",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
