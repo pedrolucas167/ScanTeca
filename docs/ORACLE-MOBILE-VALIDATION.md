@@ -55,3 +55,21 @@ deslocamento visual têm testes unitários. Teclado nativo, gestos e áreas segu
 de aparelhos físicos iOS/Android ainda precisam de conferência em dispositivo.
 Esta alteração trata a interface; a pesquisa e as regras de acesso do backend
 mantêm seu comportamento anterior.
+
+## Regressão: fonte principal cortada no celular
+
+O teste inicial de fontes usava um título curto e media somente a largura do
+documento. Com um título longo, a coluna implícita da grade podia crescer além
+da conversa, que já tinha a rolagem horizontal ocultada pelo layout externo.
+O novo caso reproduziu 702 px de excesso na largura interna antes da correção.
+
+A grade agora declara uma coluna com mínimo zero no mobile e os cartões podem
+encolher até a largura disponível. Títulos de livros, diário, avaliações e
+catálogo externo quebram em linhas, sem reticências; autores e evidências sem
+espaços também não aumentam a largura. O selo de status continua independente.
+
+O cenário adicional mede a conversa e cada cartão, em 320, 375, 390, 430, 768 e
+1440 px. Também confere fonte raiz ampliada para 20 px e evidência expandida.
+Passou em Chromium e WebKit do Playwright. Ele integra os projetos públicos de
+desktop e celular já existentes na CI. WebKit simulado não substitui a
+conferência em um iPhone físico.
