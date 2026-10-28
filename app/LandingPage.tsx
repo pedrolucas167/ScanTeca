@@ -31,7 +31,7 @@ const QUOTES = [
 const SHELF = [
   { img: "/landing/cem-anos.jpg", title: "Cem Anos de Solidão", author: "G. García Márquez", status: "Lido", tag: "text-primary" },
   { img: "/landing/o-estrangeiro.jpg", title: "O Estrangeiro", author: "Albert Camus", status: "Lendo", tag: "text-secondary" },
-  { img: "/landing/cidades-invisiveis.jpg", title: "As Cidades Invisíveis", author: "Italo Calvino", status: "Na Fila", tag: "text-outline" },
+  { img: "/landing/cidades-invisiveis.jpg", title: "As Cidades Invisíveis", author: "Italo Calvino", status: "Na Fila", tag: "text-outline", cropToCover: true },
   { img: "/landing/metamorfose.jpg", title: "A Metamorfose", author: "Franz Kafka", status: "Emprestado", tag: "text-tertiary" },
   { img: "/landing/grande-sertao.jpg", title: "Grande Sertão: Veredas", author: "Guimarães Rosa", status: "Lido", tag: "text-primary" },
   { img: "/landing/ensaio-cegueira.jpg", title: "Ensaio sobre a Cegueira", author: "José Saramago", status: "Lido", tag: "text-primary" },
@@ -493,12 +493,16 @@ export default function LandingPage() {
                   className="group flex flex-col rounded-lg border border-outline-variant/20 bg-surface-container-low p-3 transition-colors hover:border-primary/40"
                 >
                   <div className="mb-3 aspect-[2/3] w-full overflow-hidden rounded bg-surface-container-high">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      alt={`Capa de ${b.title}`}
-                      src={b.img}
-                    />
+                    {/* This source includes a full page; frame only the book cover. */}
+                    <div className={`h-full w-full ${b.cropToCover ? "origin-[50%_57%] scale-[1.32]" : ""}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        alt={`Capa de ${b.title}`}
+                        src={b.img}
+                        style={b.cropToCover ? { objectPosition: "31.5% center" } : undefined}
+                      />
+                    </div>
                   </div>
                   <span
                     className={`text-[10px] font-bold uppercase tracking-wider ${b.tag}`}
