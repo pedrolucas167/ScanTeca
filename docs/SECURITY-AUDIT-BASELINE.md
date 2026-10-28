@@ -19,3 +19,14 @@ tabela agrupa o trabalho, não altera a contagem do npm. Não foi executado
 desses achados: revisão de dependências examina mudanças do PR; auditoria da base
 existente é uma verificação distinta. As atualizações precisam de commits e PRs
 próprios, com validação de compatibilidade antes da integração.
+
+## Correções compatíveis — 28 de outubro de 2026
+
+Atualizados Next.js e eslint-config-next para 16.4.3, Zod para 4.6.7 e as
+resoluções transitivas de sharp para 0.35.5 e source-map-js para 1.2.2. O lockfile
+continua sendo a fonte das versões instaladas; não foi usado `audit fix --force`.
+
+A nova auditoria de produção reportou **zero críticos e três altos**, todos na
+cadeia Prisma / @prisma/config / deepmerge-ts. Isso representa a remoção do achado
+crítico e de três achados altos da base inicial, não a eliminação de todos os
+riscos. A migração Prisma e a atualização da suíte de testes são pacotes próprios.
