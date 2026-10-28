@@ -22,10 +22,15 @@ explícitos. A opção removida `coverage.all` sai; os padrões `coverage.includ
 continuam incluindo os arquivos não importados pelos testes. As correções
 transitivas de brace-expansion foram aplicadas pelo lockfile sem overrides.
 
-**Os limites antigos não foram alterados nesta preparação.** O gate reprova funções
-e branches com os novos números. A adoção de uma base correspondente ao coletor
-novo depende da decisão sobre essa migração; não integrar este pacote com o gate
-desativado ou reduzindo limites sem registrar a mudança de método.
+**A adoção do coletor novo e de uma base correspondente foi aprovada pelo usuário.**
+Os mínimos passam a 24,61% de linhas, 23,74% de statements, 18,75% de funções e
+21,14% de branches, conforme essa medição. O gate continua ativo para as quatro
+métricas e passa a exigir que a versão principal do coletor corresponda à base;
+uma próxima mudança de método não pode ser confundida com regressão de código.
+
+A fábrica Prisma acrescentada no pacote seguinte eleva o escopo atual a 209
+arquivos; não foi excluída da coleta. A base acima conserva a referência aprovada
+antes desse acréscimo, e a nova execução precisa atendê-la sem retirar arquivos.
 
 Validação: as duas suítes passaram com PostgreSQL e Redis descartáveis, sem chamadas
 reais a IA. TypeScript passou. Os containers foram encerrados após a execução.

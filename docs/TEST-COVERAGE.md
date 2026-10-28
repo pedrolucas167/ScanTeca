@@ -17,6 +17,15 @@ módulos de negócio não significa que as páginas e componentes tenham cobertu
 equivalente. Em particular, cobertura de funções/branches não substitui a de linhas
 nem demonstra que todos os fluxos de interface foram exercitados.
 
+## Coletor atual e comparação histórica
+
+A migração para Vitest/coverage-v8 5.0.5 muda o remapeamento dos resultados. A
+comparação e a aprovação da base correspondente estão em
+[TEST-STACK-UPGRADE.md](TEST-STACK-UPGRADE.md). Os mínimos atuais são 24,61% de
+linhas, 23,74% de statements, 18,75% de funções e 21,14% de branches. As quatro
+métricas continuam bloqueantes e a versão principal do coletor é conferida.
+Os números históricos abaixo não são diretamente comparáveis a esse método.
+
 ## Executar localmente
 
 Base inicial de controle, medida localmente em 208 arquivos antes dos testes

@@ -1,9 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findRegressions, metrics } from "./coverage-policy.mjs";
+import { assertCollectorMajor, findRegressions, metrics } from "./coverage-policy.mjs";
 
 const summary = value => Object.fromEntries(metrics.map(metric => [metric, { pct: value }]));
 const minimums = value => Object.fromEntries(metrics.map(metric => [metric, value]));
+
+test("exige revisão da base ao trocar a versão principal do coletor", () => {
+  assert.doesNotThrow(() => assertCollectorMajor("5.0.5", 5));
+  assert.doesNotThrow(() => assertCollectorMajor("5.1.0", 5));
+  for (const version of ["3.2.7", "6.0.0", "Unknown", undefined]) assert.throws(() => assertCollectorMajor(version, 5), /não corresponde/u);
+});
 
 test("aceita a base atual e melhorias sem atualizar os limites", () => {
   assert.deepEqual(findRegressions(summary(17.54), minimums(17.54)), []);
