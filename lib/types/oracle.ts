@@ -1,4 +1,5 @@
 import type { OracleMode } from "@/lib/constants/oracle";
+import type { OracleAction } from "@/lib/oracle-actions";
 
 export interface Source {
   id: string;
@@ -19,6 +20,17 @@ export interface Message {
   sources?: Source[];
   retrievalStats?: RetrievalStats;
   citations?: number[];
+  action?: OracleAction;
+}
+
+export interface OracleStreamEvent {
+  transcript?: string;
+  sessionId?: string;
+  sources?: Source[];
+  retrievalStats?: RetrievalStats;
+  citations?: number[];
+  text?: string;
+  action?: unknown;
 }
 
 export interface RetrievalStats {

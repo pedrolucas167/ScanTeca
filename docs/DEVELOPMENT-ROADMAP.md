@@ -1,8 +1,22 @@
 # Roadmap de modularização — ScanTeca
 
-Atualizado em 13/10/2026. Estratégia: migração incremental no mesmo Next.js,
+Registro histórico iniciado em 13/10/2026. Estratégia: migração incremental no mesmo Next.js,
 PostgreSQL e deploy. Estimativas em dias de engenharia focada de uma pessoa,
 incluindo revisão e testes; não são prazos de calendário ou compromissos.
+
+## Estado atual — 28/10/2026
+
+As linhas abaixo registram o contexto histórico em que foram estimadas. Biblioteca,
+Prisma e base de testes já avançaram desde então. A auditoria de segurança atual
+está em [SECURITY-AUDIT-BASELINE.md](./SECURITY-AUDIT-BASELINE.md); a medição de
+cobertura está em [TEST-COVERAGE.md](./TEST-COVERAGE.md); o status dos pacotes
+aprovados está em [IMPROVEMENTS-ROADMAP.md](./IMPROVEMENTS-ROADMAP.md).
+
+O pacote E2E de Biblioteca, Leitura e privacidade valida cadastro, progresso e
+isolamento entre contas. O Oráculo está sendo tratado como pacote separado para
+cancelamento do provedor, respostas incompletas e navegação das ações. Os jobs e
+notificações, Comunidade e métricas de produção continuam frentes futuras; este
+documento não os marca como concluídos.
 
 ## Ordem por criticidade
 

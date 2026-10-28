@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
+import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
+import { consumeOracleEvents } from "@/lib/oracle-stream";
 import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, type OracleMode } from "@/lib/constants/oracle";
-import type { Source, Message, OracleSession, OracleArtifact } from "@/lib/types/oracle";
+import type { Source, Message, OracleSession, OracleArtifact, OracleStreamEvent } from "@/lib/types/oracle";
 
 function Icon({
   name,
@@ -180,47 +182,35 @@ export default function OraclePage() {
   };
 
   const readOracleStream = async (res: Response): Promise<string> => {
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
     let fullText = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === "[DONE]") continue;
-
-        try {
-          const json = JSON.parse(payload);
+    await consumeOracleEvents<OracleStreamEvent>(res.body, (json) => {
+      receivedAnyRef.current = true;
+      if (isOracleAction(json.action)) {
+        const action = json.action;
+        setMessages(previous => previous.map((message, index) => index === previous.length - 1 && message.role === "assistant" ? { ...message, action } : message));
+      }
           if (json.transcript) {
+            const transcript = json.transcript;
             setMessages((prev) => {
               const updated = [...prev];
               const userIdx = updated.length - 2;
               if (updated[userIdx]?.role === "user") {
                 updated[userIdx] = {
                   ...updated[userIdx],
-                  content: json.transcript,
+                  content: transcript,
                 };
               }
               return updated;
             });
           }
           if (json.sessionId) {
-            setSessionId(json.sessionId);
+            const receivedSessionId = json.sessionId;
+            setSessionId(receivedSessionId);
             setSessions((previous) => {
-              if (previous.some((session) => session.id === json.sessionId)) return previous;
+              if (previous.some((session) => session.id === receivedSessionId)) return previous;
               return [
                 {
-                  id: json.sessionId,
+                  id: receivedSessionId,
                   title: "Nova conversa",
                   mode,
                   updatedAt: new Date().toISOString(),
@@ -271,8 +261,8 @@ export default function OraclePage() {
           }
           if (json.text) {
             setGenerationStage("Redigindo uma resposta...");
-            // eslint-disable-next-line react-hooks/immutability
-            // eslint-disable-next-line react-hooks/immutability
+
+
             fullText += json.text;
             if (voiceOnRef.current) feedTts(json.text);
             // Update message content directly for real-time display
@@ -288,9 +278,7 @@ export default function OraclePage() {
               return updated;
             });
           }
-        } catch {}
-      }
-    }
+    }, abortRef.current?.signal);
     if (voiceOnRef.current) feedTts("", true);
     return fullText;
   };
@@ -531,8 +519,6 @@ export default function OraclePage() {
             }
           }
           if (json.text) {
-            // eslint-disable-next-line react-hooks/immutability
-            // eslint-disable-next-line react-hooks/immutability
             fullText += json.text;
             // Update message content directly for real-time display
             setMessages((prev) => {
@@ -1388,6 +1374,7 @@ export default function OraclePage() {
                       className="transition-opacity duration-300 min-h-[100px]"
                     >
                       <Markdown content={msg.content} sources={msg.sources} />
+                      {msg.action && <Link className="inline-flex min-h-11 items-center rounded-lg border border-current px-4 mt-3 focus-visible:outline-2 focus-visible:outline-offset-2" href={ORACLE_ACTIONS[msg.action].href}>{ORACLE_ACTIONS[msg.action].label}</Link>}
                       {loading && i === messages.length - 1 && (
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />
                       )}
