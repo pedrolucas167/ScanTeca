@@ -188,12 +188,13 @@ export default function ManualAddPage() {
         className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
       >
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-isbn" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             ISBN (opcional)
           </label>
           <input
             type="text"
             value={form.isbn}
+            id="manual-isbn"
             onChange={(e) => setForm({ ...form, isbn: e.target.value })}
             placeholder="Ex: 9788535902778"
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
@@ -201,12 +202,13 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Título *
           </label>
           <input
             type="text"
             value={form.title}
+            id="manual-title"
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="Título do livro"
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
@@ -215,12 +217,13 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-author" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Autor
           </label>
           <input
             type="text"
             value={form.author}
+            id="manual-author"
             onChange={(e) => setForm({ ...form, author: e.target.value })}
             placeholder="Nome do autor"
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
@@ -229,25 +232,27 @@ export default function ManualAddPage() {
 
         <div className="mb-4 grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label htmlFor="manual-date" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Data de publicação
             </label>
             <input
               type="text"
               value={form.publishedDate}
+              id="manual-date"
               onChange={(e) => setForm({ ...form, publishedDate: e.target.value })}
               placeholder="Ex: 2019"
               className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label htmlFor="manual-pages" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Páginas
             </label>
             <input
               type="number"
               min="0"
               value={form.pages}
+              id="manual-pages"
               onChange={(e) => setForm({ ...form, pages: e.target.value })}
               placeholder="Ex: 320"
               className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
@@ -256,12 +261,13 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-genre" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Gênero
           </label>
           <input
             type="text"
             value={form.genre}
+            id="manual-genre"
             onChange={(e) => setForm({ ...form, genre: e.target.value })}
             placeholder="Ex: Ficção, Romance, Fantasia..."
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
@@ -269,11 +275,12 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-synopsis" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Sinopse
           </label>
           <textarea
             value={form.synopsis}
+            id="manual-synopsis"
             onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
             placeholder="Resumo do livro..."
             rows={5}
@@ -310,11 +317,12 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-status" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Status
           </label>
           <select
             value={form.status}
+            id="manual-status"
             onChange={(e) =>
               setForm({
                 ...form,
@@ -331,11 +339,12 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-rating" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Avaliação
           </label>
           <select
             value={form.rating}
+            id="manual-rating"
             onChange={(e) => setForm({ ...form, rating: e.target.value })}
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
           >
@@ -349,11 +358,12 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-notes" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Notas pessoais
           </label>
           <textarea
             value={form.notes}
+            id="manual-notes"
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             placeholder="Minhas anotações..."
             rows={2}
@@ -362,7 +372,7 @@ export default function ManualAddPage() {
         </div>
 
         <div className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="manual-cover-file" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Capa do livro
           </label>
           <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
@@ -400,12 +410,14 @@ export default function ManualAddPage() {
               setPreview(url);
             }}
             placeholder="URL da imagem da capa"
+            aria-label="URL da imagem da capa"
             className="mb-3 w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-foreground placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800 dark:placeholder-zinc-500"
           />
 
           <input
             ref={fileInputRef}
             type="file"
+            id="manual-cover-file"
             accept="image/*"
             onChange={handleFileChange}
             className="w-full text-sm text-zinc-600 file:mr-4 file:rounded-full file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
@@ -456,6 +468,7 @@ export default function ManualAddPage() {
 
       {message && (
         <div
+          role={message.includes("adicionado") ? "status" : "alert"}
           className={`mt-6 w-full max-w-md rounded-lg p-4 text-sm font-medium ${
             message.includes("adicionado")
               ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"

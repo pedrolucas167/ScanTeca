@@ -49,6 +49,8 @@ schema, instala Chromium se necessário, gera o build de produção e executa o
 cenário no mesmo modo da CI. A geração do build leva mais tempo que o servidor de
 desenvolvimento, mas evita interferência de recarregamentos durante o login. Ao terminar, encerra
 somente seu próprio projeto Docker e descarta o banco, mesmo em falha normal.
+Os três cenários autenticados e os limites dos providers estão em
+[AUTHENTICATED-E2E.md](AUTHENTICATED-E2E.md).
 Não exige exportar URLs ou instalar a CLI do Clerk. A porta local 55439 deve estar
 livre; um serviço existente nessa porta não é removido nem reutilizado.
 As chaves locais são lidas sem importar URLs de banco ou integrações do `.env`.
