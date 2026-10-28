@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
+import type { Source } from "../lib/types/oracle";
 
 // These cases control API responses; service-worker activation must not reload
 // the document in the middle of a draft or bypass Playwright's request routes.
@@ -9,7 +10,7 @@ const answer = "Uma conexão entre memória e cidade, a partir dos livros do seu
 const sources = [{ id: "oracle-ui-fixture", title: "Livro de demonstração", author: "Autoria de teste", status: "TO_READ", genre: null }];
 const stream = `data: ${JSON.stringify({ sources })}\n\ndata: ${JSON.stringify({ text: answer })}\n\ndata: [DONE]\n\n`;
 
-async function bootstrap(page: Page, messages: { role: string; content: string }[] = []) {
+async function bootstrap(page: Page, messages: { role: string; content: string; sources?: Source[] }[] = []) {
   await page.route("**/api/vitals", route => route.fulfill({ status: 204 }));
   await page.route("**/api/oracle", async route => {
     if (route.request().method() === "GET") {
@@ -88,6 +89,51 @@ test("chat reserva espaço às mensagens e mantém o compositor no viewport", as
     await expect(page.locator("body > header")).toBeVisible();
     expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe("hidden");
   }
+});
+
+test("fontes longas ficam inteiras dentro da conversa em telas pequenas", async ({ page }) => {
+  const title = "The De Monarchia of Dante Alighieri — a critical edition with historical commentary and introduction";
+  const evidence = `A Latin treatise on secular and religious power by Dante Alighieri. ${"TrechoSemEspacos".repeat(24)}`;
+  const longSources: Source[] = [
+    { id: "source-primary", title, author: "Dante Alighieri", status: "READ", relevance: 79.95, matchedBy: "similaridade semântica", evidence },
+    { id: "source-external", title: `Catálogo externo: ${title}`, author: "AutoriaSemEspacos".repeat(10), external: true, evidence },
+    { id: "source-diary", title: `Diário: ${title}`, author: "Dante Alighieri", sourceType: "diary", evidence },
+    { id: "source-review", title: `Avaliação: ${title}`, author: "Dante Alighieri", sourceType: "review", evidence },
+  ];
+  await bootstrap(page, [{ role: "assistant", content: "Estas são as fontes usadas na resposta.", sources: longSources }]);
+  await openOracle(page);
+  const main = page.getByRole("main", { name: "Conversa com o Oráculo" });
+  const disclosure = main.locator("details").filter({ has: page.locator("summary", { hasText: "Fontes usadas" }) });
+  await disclosure.locator(":scope > summary").click();
+  const primary = disclosure.getByRole("heading", { name: title, exact: true });
+
+  const checkBounds = async () => {
+    expect(await main.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    const bounds = await main.boundingBox();
+    for (const heading of await disclosure.getByRole("heading").all()) {
+      const card = heading.locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' relative ')][1]");
+      const box = await card.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(bounds!.x);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width + 1);
+      expect(await card.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      expect(await heading.evaluate(element => ({
+        whiteSpace: getComputedStyle(element).whiteSpace,
+        overflow: element.scrollWidth - element.clientWidth,
+      }))).toEqual({ whiteSpace: "normal", overflow: 0 });
+    }
+  };
+
+  for (const width of [320, 375, 390, 430, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await checkBounds();
+  }
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.addStyleTag({ content: "html { font-size: 20px; }" });
+  await checkBounds();
+  const card = primary.locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' relative ')][1]");
+  await card.locator("details > summary").click();
+  await expect(card.getByText("Ocultar evidência", { exact: true })).toBeVisible();
+  await checkBounds();
 });
 
 test("resposta nova respeita quem está lendo acima e permite voltar ao fim", async ({ page }) => {

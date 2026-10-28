@@ -1196,7 +1196,7 @@ export default function OraclePage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-start gap-space-sm pr-1">
+              <div className="flex min-w-0 flex-col items-start gap-space-sm pr-1">
                 <div className="flex items-center gap-2">
                   <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/40 bg-primary/20">
                     <Icon decorative name="auto_awesome" className="text-xs text-primary" />
@@ -1205,7 +1205,7 @@ export default function OraclePage() {
                     Oráculo da Bibliotheca
                   </span>
                 </div>
-                <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
+                <div className="min-w-0 w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && msg.content === "" ? (
                   <div className="flex items-center gap-2 py-1 min-h-[60px]" aria-label="Oráculo digitando">
                     <div
@@ -1284,12 +1284,12 @@ export default function OraclePage() {
                   )}
 
                   {msg.sources && msg.sources.length > 0 && (
-                    <details className="group/sources rounded-xl border border-outline-variant/30">
+                    <details className="group/sources min-w-0 max-w-full rounded-xl border border-outline-variant/30">
                       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-primary marker:hidden">
                         <span>Fontes usadas ({msg.sources.length})</span>
                         <Icon decorative name="expand_more" className="text-lg group-open/sources:rotate-180" />
                       </summary>
-                      <div className="grid gap-3 px-3 pb-3 pt-2 sm:grid-cols-2">
+                      <div className="grid min-w-0 grid-cols-1 gap-3 px-3 pb-3 pt-2 sm:grid-cols-2">
                       {msg.sources.map((source, sourceIndex) => {
                         const isBookSource = !source.external && !source.sourceType;
                         const selected = isBookSource && selectedCompare.some((item) => item.id === source.id);
@@ -1297,7 +1297,7 @@ export default function OraclePage() {
                         return (
                           <div
                             key={source.id}
-                            className={`relative rounded-xl border bg-surface-container-lowest/80 p-space-sm transition-[background-color,box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-primary/50 hover:bg-surface-container-lowest hover:shadow-md hover:shadow-primary/5 ${
+                            className={`relative min-w-0 max-w-full rounded-xl border bg-surface-container-lowest/80 p-space-sm [overflow-wrap:anywhere] transition-[background-color,box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-primary/50 hover:bg-surface-container-lowest hover:shadow-md hover:shadow-primary/5 ${
                               selected
                                 ? "border-primary"
                                 : sourceIndex === 0
@@ -1306,11 +1306,11 @@ export default function OraclePage() {
                             }`}
                           >
                             {sourceIndex === 0 && (
-                              <span className="absolute -top-2 left-3 rounded-full border border-primary/40 bg-surface-container px-2 py-0.5 font-caption text-[10px] font-semibold uppercase tracking-wider text-primary">
+                              <span className="absolute -top-2 left-3 max-w-[calc(100%-1.5rem)] rounded-full border border-primary/40 bg-surface-container px-2 py-0.5 font-caption text-[10px] font-semibold uppercase tracking-wider text-primary">
                                 Fonte principal
                               </span>
                             )}
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
                                   {source.external
@@ -1322,18 +1322,18 @@ export default function OraclePage() {
                                         : "Fonte do acervo"}
                                 </span>
                                 {source.external ? (
-                                  <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
+                                  <h3 className="mt-1 whitespace-normal font-quote-md text-quote-md font-semibold text-on-surface">
                                     {source.title}
                                   </h3>
                                 ) : isBookSource ? (
-                                  <Link href={`/books/${source.id}`} className="group mt-1 flex items-center gap-1">
-                                    <h3 className="truncate font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
+                                  <Link href={`/books/${source.id}`} className="group mt-1 flex min-w-0 items-start gap-1">
+                                    <h3 className="min-w-0 flex-1 whitespace-normal font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
                                       {source.title}
                                     </h3>
-                                    <Icon decorative name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
+                                    <Icon decorative name="open_in_new" className="shrink-0 text-xs text-outline group-hover:text-primary" />
                                   </Link>
                                 ) : (
-                                  <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
+                                  <h3 className="mt-1 whitespace-normal font-quote-md text-quote-md font-semibold text-on-surface">
                                     {source.title}
                                   </h3>
                                 )}
@@ -1362,7 +1362,7 @@ export default function OraclePage() {
                                   </details>
                                 )}
                               </div>
-                              <span className={`rounded-full border px-2 py-0.5 text-[11px] ${source.external ? "border-tertiary/30 bg-tertiary-container/20 text-tertiary" : "border-primary/30 bg-primary-container/20 text-primary"}`}>
+                              <span className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] ${source.external ? "border-tertiary/30 bg-tertiary-container/20 text-tertiary" : "border-primary/30 bg-primary-container/20 text-primary"}`}>
                                 {source.external
                                   ? "Externo"
                                   : source.sourceType === "diary"
