@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 import path from "node:path";
-import coverage from "./vitest.coverage";
+import coverage from "./vitest.coverage.mjs";
 
 export default mergeConfig(coverage, defineConfig({
   test: {
@@ -10,7 +10,7 @@ export default mergeConfig(coverage, defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      "@": path.resolve(import.meta.dirname, "."),
     },
   },
 }));

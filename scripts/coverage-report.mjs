@@ -3,7 +3,7 @@ import path from "node:path";
 import coverage from "istanbul-lib-coverage";
 import report from "istanbul-lib-report";
 import reports from "istanbul-reports";
-import { findRegressions, metrics } from "./coverage-policy.mjs";
+import { assertCollectorMajor, findRegressions, metrics } from "./coverage-policy.mjs";
 
 try {
   const root = process.cwd();
@@ -48,6 +48,11 @@ try {
   let regressions = [];
   if (process.argv.includes("--check")) {
     const minimums = JSON.parse(fs.readFileSync(path.join(root, "coverage-baseline.json"), "utf8"));
+    if (minimums._collectorMajor !== undefined) {
+      const collector = JSON.parse(fs.readFileSync(path.join(root, "node_modules/@vitest/coverage-v8/package.json"), "utf8"));
+      assertCollectorMajor(collector.version, minimums._collectorMajor);
+      markdown.push("", `Coletor: @vitest/coverage-v8 ${collector.version}; base correspondente versionada.`);
+    }
     regressions = findRegressions(summary, minimums);
     markdown.push("", regressions.length ? "**Reprovado: cobertura abaixo da base versionada.**" : "**Aprovado: cobertura atende à base versionada.**");
     for (const item of regressions) markdown.push(`- ${item.metric}: ${format(item.actual)}; mínimo ${format(item.minimum)}.`);

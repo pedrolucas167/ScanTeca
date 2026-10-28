@@ -38,3 +38,12 @@ três achados restantes na auditoria local de produção: **zero vulnerabilidade
 reportadas nesse escopo**. Os achados de desenvolvimento da suíte antiga continuam
 separados até a adoção do novo coletor e de sua base aprovada.
 Veja [a migração e sua validação](PRISMA-UPGRADE.md).
+
+## Suíte atualizada — 28 de outubro de 2026
+
+Com Vitest/coverage-v8 5.0.5, jsdom 30.1.3 e as resoluções corrigidas de
+brace-expansion, a auditoria local **completa**, incluindo desenvolvimento,
+reportou zero vulnerabilidades. Essa medição se refere ao lockfile do pacote
+de atualização da suíte, que também incorpora a migração Prisma; não descreve
+branches antigas ainda em revisão. A mudança do coletor e a base aprovada estão
+documentadas em [TEST-STACK-UPGRADE.md](TEST-STACK-UPGRADE.md).

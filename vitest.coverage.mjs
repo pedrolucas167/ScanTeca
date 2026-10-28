@@ -1,11 +1,12 @@
 import { defineConfig } from "vitest/config";
 
+// include mantém arquivos não importados na medição, sem a opção all removida no v4.
+
 export default defineConfig({
   test: {
     setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
-      all: true,
       include: [
         "app/**/*.{ts,tsx}",
         "components/**/*.{ts,tsx}",
