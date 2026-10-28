@@ -5,12 +5,12 @@ vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: async () => null, rateLimit
 vi.mock("@/lib/moderation", () => ({ moderateContent: mocks.moderate }));
 vi.mock("@/lib/social-notifications", () => ({ createSocialNotification: mocks.notify }));
 vi.mock("@/lib/prisma", async () => {
-  const { PrismaClient } = await import("@prisma/client");
+  const { createPrismaClient } = await import("@/lib/prisma-client");
   const raw = process.env.SCANTECA_TEST_DATABASE_URL;
   if (!raw) throw new Error("Defina a base isolada de testes.");
   const url = new URL(raw);
   if (url.hostname !== "127.0.0.1" || url.port !== "55439" || url.pathname !== "/scanteca_reading_test") throw new Error("Base de integração não permitida.");
-  return { prisma: new PrismaClient({ datasourceUrl: raw }) };
+  return { prisma: createPrismaClient(raw) };
 });
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";

@@ -1,14 +1,14 @@
 import { beforeEach, afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", async () => {
-  const { PrismaClient } = await import("@prisma/client");
+  const { createPrismaClient } = await import("@/lib/prisma-client");
   const raw = process.env.SCANTECA_TEST_DATABASE_URL;
   if (!raw) throw new Error("Defina SCANTECA_TEST_DATABASE_URL para a base local isolada de testes.");
   const url = new URL(raw);
   if (url.hostname !== "127.0.0.1" || url.port !== "55439" || url.pathname !== "/scanteca_reading_test") {
     throw new Error("Integração só aceita a base local scanteca_reading_test na porta 55439.");
   }
-  return { prisma: new PrismaClient({ datasourceUrl: raw }) };
+  return { prisma: createPrismaClient(raw) };
 });
 vi.mock("@/lib/embeddings", () => ({
   generateEmbedding: vi.fn().mockResolvedValue(null),

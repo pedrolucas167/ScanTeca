@@ -54,7 +54,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx prisma db push --skip-generate
+      - run: npm run db:prepare:test
       - run: npm run test:integration:coverage
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
@@ -83,6 +83,7 @@ jobs:
 
       - run: npm run test:coverage-tools
       - run: npm run test:e2e-tools
+      - run: npm run test:db-tools
       - run: npm run test:coverage
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
