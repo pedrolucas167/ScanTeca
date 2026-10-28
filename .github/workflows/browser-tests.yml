@@ -44,7 +44,7 @@ jobs:
       - run: npm ci
       - name: Check development credentials
         run: node -e "if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_') || !process.env.CLERK_SECRET_KEY?.startsWith('sk_test_')) throw Error('Configure chaves Clerk de desenvolvimento no ambiente e2e');"
-      - run: npx prisma db push --skip-generate
+      - run: npm run db:prepare:test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e-tools
       - run: npm run build

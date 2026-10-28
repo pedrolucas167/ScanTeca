@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "../lib/prisma-client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { fixtureId, seedDevelopment } from "./development-fixtures";
 
@@ -6,7 +6,7 @@ const raw = process.env.SCANTECA_TEST_DATABASE_URL;
 if (!raw) throw new Error("Defina a base local isolada de testes.");
 const url = new URL(raw);
 if (url.hostname !== "127.0.0.1" || url.port !== "55439" || url.pathname !== "/scanteca_reading_test") throw new Error("Base de integração não permitida.");
-const prisma = new PrismaClient({ datasourceUrl: raw });
+const prisma = createPrismaClient(raw);
 const userId = "user_development_fixture_test";
 const other = "user_development_fixture_other";
 const now = new Date("2026-10-13T15:00:00Z");

@@ -30,3 +30,11 @@ A nova auditoria de produção reportou **zero críticos e três altos**, todos 
 cadeia Prisma / @prisma/config / deepmerge-ts. Isso representa a remoção do achado
 crítico e de três achados altos da base inicial, não a eliminação de todos os
 riscos. A migração Prisma e a atualização da suíte de testes são pacotes próprios.
+
+## Migração Prisma — 28 de outubro de 2026
+
+A atualização coordenada de Prisma, cliente e adapter-pg para 7.10.1 removeu os
+três achados restantes na auditoria local de produção: **zero vulnerabilidades
+reportadas nesse escopo**. Os achados de desenvolvimento da suíte antiga continuam
+separados até a adoção do novo coletor e de sua base aprovada.
+Veja [a migração e sua validação](PRISMA-UPGRADE.md).
