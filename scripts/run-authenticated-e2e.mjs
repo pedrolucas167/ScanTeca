@@ -21,7 +21,7 @@ try {
   run(process.execPath, ["node_modules/@playwright/test/cli.js", "test", "--list", "--project=authenticated"]);
   cleanup = true;
   run("docker", [...compose, "up", "--detach", "--wait"]);
-  run(process.execPath, ["node_modules/prisma/build/index.js", "db", "push", "--skip-generate"]);
+  run(process.execPath, ["scripts/prepare-test-database.mjs"]);
   run(process.execPath, ["node_modules/@playwright/test/cli.js", "install", "chromium"]);
   run(process.execPath, ["node_modules/prisma/build/index.js", "generate"]);
   run(process.execPath, ["node_modules/next/dist/bin/next", "build"]);

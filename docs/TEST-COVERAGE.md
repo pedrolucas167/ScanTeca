@@ -53,7 +53,7 @@ Para integração, prepare o PostgreSQL e Redis descartáveis descritos em
 $env:DATABASE_URL = 'postgresql://scanteca_test:scanteca_test_local@127.0.0.1:55439/scanteca_reading_test'
 $env:SCANTECA_TEST_DATABASE_URL = $env:DATABASE_URL
 $env:SCANTECA_TEST_REDIS = '127.0.0.1:56379'
-npx prisma db push --skip-generate
+npm run db:prepare:test
 npm run test:integration:coverage
 npm run coverage:check
 ```

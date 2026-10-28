@@ -43,7 +43,7 @@ de banco. As credenciais abaixo são valores de teste, não da aplicação.
 ```powershell
 docker run --detach --rm --name scanteca-reading-tests --publish 127.0.0.1:55439:5432 --env POSTGRES_PASSWORD=scanteca_test_local --env POSTGRES_USER=scanteca_test --env POSTGRES_DB=scanteca_reading_test pgvector/pgvector:pg16
 $env:DATABASE_URL = 'postgresql://scanteca_test:scanteca_test_local@127.0.0.1:55439/scanteca_reading_test'
-npx prisma db push --skip-generate
+npm run db:prepare:test
 $env:SCANTECA_TEST_DATABASE_URL = $env:DATABASE_URL
 npm run test:integration
 docker stop scanteca-reading-tests

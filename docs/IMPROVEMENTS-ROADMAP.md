@@ -6,8 +6,8 @@ Integração exige os checks da principal; publicação segue pela Vercel.
 
 | Ordem | Pacote | Critério de conclusão | Estado |
 | --- | --- | --- | --- |
-| 1a | Correções compatíveis de dependências | Remover o achado crítico, manter Next e ESLint alinhados e validar unitários, integração, build e navegador | Em validação |
-| 1b | Prisma e dependências de testes | Tratar os achados remanescentes em pacotes próprios, com migração explícita, sem reduzir os limites de cobertura | Pendente |
+| 1a | Correções compatíveis de dependências | Remover o achado crítico, manter Next e ESLint alinhados e validar unitários, integração, build e navegador | Integrado; CI aprovada |
+| 1b | Prisma e dependências de testes | Tratar os achados remanescentes em pacotes próprios; migração do coletor com comparação documentada e base correspondente aprovada | Prisma em validação; nova base do Vitest aprovada |
 | 2 | E2E de Biblioteca, Leitura e privacidade | Cadastrar livro, persistir progresso e comprovar que outra conta não acessa ou altera os registros privados | Pendente |
 | 3 | Oráculo | Cancelamento propagado ao provedor, falhas visíveis sem salvar resposta incompleta e encaminhamento claro das ações disponíveis | Pendente |
 | 4 | Documentação operacional | Separar o estado atual das evidências históricas, registrar o que cada teste cobre e manter os passos de CI e deploy reproduzíveis | Em andamento |

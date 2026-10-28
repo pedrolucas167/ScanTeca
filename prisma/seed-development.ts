@@ -12,9 +12,8 @@ async function main() {
     process.stdout.write("[seed:dev] Nenhuma conexão ou gravação. Use --apply para criar os dados.\n");
     return;
   }
-  // Prisma loads .env at import time; Next's development overrides must win first.
-  const { PrismaClient } = await import("@prisma/client");
-  const prisma = new PrismaClient({ datasourceUrl: config.databaseUrl });
+  const { createPrismaClient } = await import("../lib/prisma-client");
+  const prisma = createPrismaClient(config.databaseUrl);
   try {
     await seedDevelopment(prisma, config.userId);
     process.stdout.write("[seed:dev] Concluído: biblioteca, coleções, livros, sessão, atividade, diário e anotação. Registros existentes preservados.\n");
