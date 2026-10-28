@@ -4,6 +4,47 @@
    (localStorage > prefers-color-scheme) e o toggle alterna manualmente */
 @custom-variant dark (&:where(.dark, .dark *));
 
+.oracle-composer {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 767px) {
+  /* The conversation owns the mobile viewport; its back link keeps navigation available. */
+  body:has([data-oracle-chat]) {
+    overflow: hidden;
+  }
+
+  body:has([data-oracle-chat]) > header,
+  body:has([data-oracle-chat]) > footer {
+    display: none;
+  }
+
+  .oracle-chat-shell {
+    position: fixed;
+    inset-inline: 0;
+    top: var(--oracle-viewport-top, 0px);
+    height: var(--oracle-viewport-height, 100dvh);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+    overflow: hidden;
+  }
+
+  [data-oracle-chat] :is(button, summary) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  [data-oracle-chat] > .fixed {
+    position: absolute;
+    top: env(safe-area-inset-top, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  [data-oracle-chat][data-keyboard-open="true"] .oracle-composer {
+    padding-bottom: 0.5rem;
+  }
+}
+
 :root {
   --background: #fafafa;
   --foreground: #171717;

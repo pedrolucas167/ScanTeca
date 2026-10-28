@@ -3,29 +3,14 @@
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
+import { Icon } from "@/components/ui/Icon";
+import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
+import { OracleComposer } from "@/components/oracle/OracleComposer";
+import { useOracleViewport } from "@/components/oracle/useOracleViewport";
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { consumeOracleEvents } from "@/lib/oracle-stream";
 import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, type OracleMode } from "@/lib/constants/oracle";
 import type { Source, Message, OracleSession, OracleArtifact, OracleStreamEvent } from "@/lib/types/oracle";
-
-function Icon({
-  name,
-  className = "",
-  fill = false,
-}: {
-  name: string;
-  className?: string;
-  fill?: boolean;
-}) {
-  return (
-    <span
-      className={`material-symbols-outlined ${className}`}
-      style={fill ? { fontVariationSettings: "'FILL' 1" } : undefined}
-    >
-      {name}
-    </span>
-  );
-}
 
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -84,6 +69,8 @@ export default function OraclePage() {
       !!navigator.mediaDevices?.getUserMedia,
     () => false
   );
+  const shellRef = useRef<HTMLDivElement>(null);
+  useOracleViewport(shellRef);
   const scrollRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -103,6 +90,21 @@ export default function OraclePage() {
   const stickToBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const receivedAnyRef = useRef(false);
+
+  useEffect(() => {
+    const panel = scrollRef.current;
+    const content = panel?.firstElementChild;
+    if (!panel || !content) return;
+    const follow = () => {
+      if (stickToBottomRef.current) panel.scrollTop = panel.scrollHeight;
+      setShowJumpDown(panel.scrollHeight - panel.clientHeight - panel.scrollTop > 80);
+    };
+    const observer = new ResizeObserver(follow);
+    observer.observe(panel);
+    observer.observe(content);
+    follow();
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     fetch("/api/oracle")
@@ -612,11 +614,6 @@ export default function OraclePage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    sendMessage(input.trim());
-  };
-
   const copyResponse = async (text: string, i: number) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -939,124 +936,35 @@ export default function OraclePage() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-surface text-on-surface">
-      {/* Header */}
-      <header className="z-40 flex w-full shrink-0 flex-col border-b border-outline-variant/30 bg-surface/80 px-4 py-3 shadow-sm backdrop-blur-md">
-        <div className="flex items-center justify-between">
-        <div className="flex items-center gap-space-xs">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20">
-            <Icon name="auto_awesome" className="text-xl text-primary" />
+    <div ref={shellRef} data-oracle-chat className="oracle-chat-shell flex h-[calc(100dvh-4rem)] min-h-0 flex-col bg-surface text-on-surface">
+      <header className="relative z-40 flex shrink-0 items-center justify-between gap-2 border-b border-outline-variant/30 bg-surface px-2 py-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link href="/" aria-label="Voltar ao catálogo" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high md:hidden">
+            <Icon decorative name="arrow_back" className="text-xl" />
+          </Link>
+          <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary-container/20 md:flex">
+            <Icon decorative name="auto_awesome" className="text-xl text-primary" />
           </div>
-          <div>
-            <div className="flex items-center gap-space-2xs">
-              <h1 className="font-headline-md text-headline-md italic leading-none text-on-surface">
-                Oráculo de Bolso
-              </h1>
-              <span className="rounded bg-primary-container/20 px-1.5 py-0.5 font-caption text-caption font-semibold uppercase tracking-widest text-primary">
-                RAG v2
-              </span>
-            </div>
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              <p className="font-caption text-[11px] leading-tight text-on-surface-variant">
-                {stats.indexed} de {stats.total} volumes indexados <span className="text-outline">(pgvector)</span>
-              </p>
-            </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold"><span className="md:hidden">Oráculo</span><span className="hidden md:inline">Oráculo de Bolso</span></h1>
+            <p className="truncate text-xs text-on-surface-variant">{ORACLE_MODES.find(item => item.id === mode)?.label} · {scope === "library" ? "Meu acervo" : "Acervo + catálogo"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-space-2xs">
-          <button
-            onClick={() => setShowLibrary(true)}
-            title="Conversas e resultados salvos"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-          >
-            <Icon name="history" className="text-lg" />
-          </button>
-          <button
-            onClick={startNewSession}
-            title="Nova conversa"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-          >
-            <Icon name="add_comment" className="text-lg" />
-          </button>
-          <button
-            onClick={() => {
-              setProfileDraft(profile);
-              setShowProfile(true);
-            }}
-            title="Memória do leitor"
-            className="flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface transition-colors hover:border-primary/50"
-          >
-            <Icon name="psychology" className="text-sm text-primary" />
-            <span className="hidden sm:inline">Minha memória</span>
-          </button>
-          <button
-            onClick={() =>
-              setPlaybackRate((prev) => {
-                const SPEEDS = [0.75, 1, 1.25, 1.5];
-                const i = SPEEDS.findIndex((s) => Math.abs(s - prev) < 0.01);
-                const nextIndex = i === -1 ? 0 : (i + 1) % SPEEDS.length;
-                return SPEEDS[nextIndex] ?? 1;
-              })
-            }
-            title="Velocidade da voz"
-            className="flex h-8 min-w-[3.5rem] items-center justify-center rounded-full border border-outline-variant/40 bg-surface-container px-2 text-[11px] font-medium text-on-surface transition-colors hover:border-primary/50 active:scale-95"
-          >
-            {playbackRate.toLocaleString("pt-BR")}x
-          </button>
-          <button
-            onClick={toggleVoice}
-            title={voiceOn ? "Desativar voz" : "Ativar Voice Chat"}
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors duration-150 active:scale-95 ${
-              voiceOn
-                ? "bg-primary-container/20 text-primary"
-                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-            }`}
-          >
-            <Icon name="voice_chat" className="text-lg" />
-          </button>
-          {messages.length > 0 && (
-            <button
-              onClick={() => setShowClearConfirm(true)}
-              title="Limpar conversa"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-error-container/30 hover:text-error active:scale-95"
-            >
-              <Icon name="delete" className="text-lg" />
-            </button>
-          )}
-        </div>
-        </div>
-        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-outline-variant/20 pt-2">
-          <span className="flex flex-shrink-0 items-center gap-1 px-0.5 font-caption text-caption uppercase tracking-wider text-outline">
-            <Icon name="filter_alt" className="text-xs" /> Escopo
-          </span>
-          <button
-            type="button"
-            onClick={() => setScope("library")}
-            aria-pressed={scope === "library"}
-            className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-label-sm text-label-sm transition-all active:scale-95 ${
-              scope === "library"
-                ? "border-primary bg-primary text-on-primary"
-                : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
-            }`}
-          >
-            <Icon name="library_books" className="text-xs" /> Todo o acervo
-          </button>
-          <button
-            type="button"
-            onClick={() => setScope("all")}
-            aria-pressed={scope === "all"}
-            className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-label-sm text-label-sm transition-all active:scale-95 ${
-              scope === "all"
-                ? "border-tertiary bg-tertiary-container/30 text-tertiary"
-                : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
-            }`}
-          >
-            <Icon name="public" className="text-xs" /> Acervo + mundo
-          </button>
+        <div className="flex shrink-0 items-center">
+          <button type="button" onClick={() => setShowLibrary(true)} aria-label="Conversas salvas" title="Conversas salvas" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"><Icon decorative name="history" className="text-xl" /></button>
+          <button type="button" onClick={startNewSession} aria-label="Nova conversa" title="Nova conversa" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"><Icon decorative name="add_comment" className="text-xl" /></button>
+          <OracleChatSettings
+            mode={mode} onModeChange={setMode} scope={scope} onScopeChange={setScope}
+            temperature={temperature} onTemperatureChange={setTemperature}
+            voiceOn={voiceOn} onVoiceChange={toggleVoice} playbackRate={playbackRate}
+            onPlaybackRateChange={() => setPlaybackRate(previous => {
+              const speeds = [0.75, 1, 1.25, 1.5];
+              const index = speeds.findIndex(speed => Math.abs(speed - previous) < 0.01);
+              return speeds[(index + 1) % speeds.length] ?? 1;
+            })}
+            onOpenMemory={() => { setProfileDraft(profile); setShowProfile(true); }}
+            onClear={() => setShowClearConfirm(true)} canClear={messages.length > 0}
+          />
         </div>
       </header>
 
@@ -1069,11 +977,11 @@ export default function OraclePage() {
                 <p className="font-body-sm text-body-sm text-on-surface-variant">Conversas e resultados que você decidiu guardar.</p>
               </div>
               <button onClick={() => setShowLibrary(false)} aria-label="Fechar biblioteca" className="rounded-full p-1 text-outline hover:bg-surface-container-high">
-                <Icon name="close" />
+                <Icon decorative name="close" />
               </button>
             </div>
             <button onClick={startNewSession} className="mb-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-4 py-2.5 font-label-md font-semibold text-on-primary-container">
-              <Icon name="add_comment" className="text-base" /> Nova conversa
+              <Icon decorative name="add_comment" className="text-base" /> Nova conversa
             </button>
             <section>
               <h3 className="mb-2 font-label-md font-semibold uppercase tracking-wider text-primary">Conversas</h3>
@@ -1110,7 +1018,7 @@ export default function OraclePage() {
                           title="Renomear conversa"
                           className="rounded-full p-1 text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface"
                         >
-                          <Icon name="edit" className="text-sm" />
+                          <Icon decorative name="edit" className="text-sm" />
                         </button>
                         <button
                           onClick={() =>
@@ -1121,7 +1029,7 @@ export default function OraclePage() {
                           title="Excluir conversa"
                           className={`rounded-full p-1 transition-colors ${confirmDeleteSessionId === session.id ? "text-error" : "text-outline hover:bg-surface-container-high hover:text-error"}`}
                         >
-                          <Icon name="delete" className="text-sm" />
+                          <Icon decorative name="delete" className="text-sm" />
                         </button>
                       </div>
                     </div>
@@ -1176,7 +1084,7 @@ export default function OraclePage() {
                 <h2 className="font-headline-sm text-headline-sm font-semibold text-on-surface">Memória do leitor</h2>
                 <p className="mt-1 font-body-sm text-on-surface-variant">Edite o que o Oráculo aprendeu sobre suas preferências e objetivos.</p>
               </div>
-              <button onClick={() => setShowProfile(false)} aria-label="Fechar" className="rounded-full p-1 text-outline hover:bg-surface-container-high"><Icon name="close" /></button>
+              <button onClick={() => setShowProfile(false)} aria-label="Fechar" className="rounded-full p-1 text-outline hover:bg-surface-container-high"><Icon decorative name="close" /></button>
             </div>
             <textarea value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} maxLength={2000} rows={8} placeholder="Preferências, autores, gêneros, temas e objetivos de leitura..." className="w-full resize-y rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 font-body-sm text-on-surface outline-none focus:border-primary" />
             <div className="mt-4 flex flex-wrap justify-between gap-2">
@@ -1193,7 +1101,7 @@ export default function OraclePage() {
           <div className="w-full max-w-sm rounded-2xl border border-outline-variant/30 bg-surface-container p-6 shadow-2xl">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-error-container/30">
-                <Icon name="delete" className="text-xl text-error" />
+                <Icon decorative name="delete" className="text-xl text-error" />
               </div>
               <div>
                 <h2 className="font-headline-sm text-headline-sm font-semibold text-on-surface">
@@ -1228,73 +1136,27 @@ export default function OraclePage() {
       {/* Main — container de scroll da conversa */}
       <main
         ref={scrollRef}
+        onScroll={event => {
+          const panel = event.currentTarget;
+          const atBottom = panel.scrollHeight - panel.clientHeight - panel.scrollTop < 80;
+          stickToBottomRef.current = atBottom;
+          setShowJumpDown(!atBottom);
+        }}
         onWheel={(event) => {
           if (event.deltaY < 0) releaseAutoScroll();
         }}
         onTouchMove={releaseAutoScroll}
-        className="min-h-0 w-full flex-1 overflow-y-auto"
+        aria-label="Conversa com o Oráculo"
+        className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
       >
-        <div className="mx-auto w-full max-w-lg px-4 pb-6 pt-4 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Modo do Oráculo">
-          {ORACLE_MODES.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setMode(item.id)}
-              aria-pressed={mode === item.id}
-              className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-label-sm text-label-sm transition-colors ${
-                mode === item.id
-                  ? "border-primary bg-primary-container/20 text-primary"
-                  : "border-outline-variant/40 bg-surface-container text-on-surface-variant hover:border-primary/50"
-              }`}
-            >
-              <Icon name={item.icon} className="text-sm" />
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest/60 p-2 md:w-60 md:shrink-0">
-          <Icon name="thermostat" className="text-on-surface-variant" />
-          <span className="font-caption text-caption text-on-surface-variant">
-            Temperatura
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={2}
-            step={0.1}
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-outline-variant accent-primary"
-            aria-label="Temperatura da IA"
-          />
-          <span className="min-w-[2.5ch] text-right font-caption text-caption text-primary">
-            {temperature.toFixed(1)}
-          </span>
-        </div>
-        </div>
-
-        {/* Welcome card */}
-        <div className="relative mb-6 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest/60 p-space-md backdrop-blur-sm">
-          <div className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-primary-container/10 blur-2xl" />
-          <div className="relative flex items-start gap-space-xs">
-            <Icon
-              name="psychology"
-              className="mt-0.5 text-lg text-primary"
-            />
-            <div>
-              <p className="font-label-md text-label-md font-semibold text-primary">
-                Diálogo Sináptico com sua Estante
-              </p>
-              <p className="mt-0.5 font-body-sm text-body-sm text-on-surface-variant">
-                Você está conversando com os livros da sua estante física.
-                Pergunte sobre temas cruzados, ideias ou onde encontrar uma
-                citação exata.
-              </p>
-            </div>
+        <div className="mx-auto w-full min-w-0 max-w-lg px-3 pb-4 pt-3 sm:px-4 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
+        {messages.length === 0 && (
+          <div className="mb-5 pt-5 md:pt-8">
+            <h2 className="font-serif text-2xl text-on-surface md:text-3xl">Que conexão vamos descobrir?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">Explore temas, compare livros ou encontre sua próxima leitura.</p>
+            {stats.total > 0 && <p className="mt-2 text-xs text-outline">{stats.indexed} de {stats.total} livros prontos para consulta</p>}
           </div>
-        </div>
+        )}
 
         {messages.length === 0 && (
           <div className="flex flex-wrap gap-2">
@@ -1305,7 +1167,7 @@ export default function OraclePage() {
                   setInput(suggestion);
                   inputRef.current?.focus();
                 }}
-                className="rounded-full border border-outline-variant/40 bg-surface-container px-3 py-1.5 text-left font-caption text-caption text-on-surface transition-colors hover:border-primary/50 hover:bg-surface-container-high"
+                className="min-h-11 rounded-xl border border-outline-variant/40 bg-surface-container px-3 py-2 text-left font-caption text-caption text-on-surface transition-colors hover:border-primary/50 hover:bg-surface-container-high"
               >
                 {suggestion}
               </button>
@@ -1314,7 +1176,7 @@ export default function OraclePage() {
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className="msg-in group mb-6">
+          <div key={i} className="msg-in group mb-5 min-w-0 [overflow-wrap:anywhere]">
             {msg.role === "user" ? (
               <div className="flex flex-col items-end gap-1 pl-8">
                 <div className="rounded-2xl rounded-tr-xs border border-white/10 bg-primary-container px-space-md py-space-sm shadow-md">
@@ -1337,16 +1199,11 @@ export default function OraclePage() {
               <div className="flex flex-col items-start gap-space-sm pr-1">
                 <div className="flex items-center gap-2">
                   <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/40 bg-primary/20">
-                    <Icon name="auto_awesome" className="text-xs text-primary" />
+                    <Icon decorative name="auto_awesome" className="text-xs text-primary" />
                   </div>
                   <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-primary">
                     Oráculo da Bibliotheca
                   </span>
-                  {!loading && i === messages.length - 1 && (
-                    <span className="font-caption text-caption text-outline">
-                      retrieval em 180ms
-                    </span>
-                  )}
                 </div>
                 <div className="w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && msg.content === "" ? (
@@ -1371,7 +1228,7 @@ export default function OraclePage() {
                 ) : (
                     <div
                       aria-live={loading && i === messages.length - 1 ? "polite" : undefined}
-                      className="transition-opacity duration-300 min-h-[100px]"
+                      className="min-w-0 transition-opacity duration-300"
                     >
                       <Markdown content={msg.content} sources={msg.sources} />
                       {msg.action && <Link className="inline-flex min-h-11 items-center rounded-lg border border-current px-4 mt-3 focus-visible:outline-2 focus-visible:outline-offset-2" href={ORACLE_ACTIONS[msg.action].href}>{ORACLE_ACTIONS[msg.action].label}</Link>}
@@ -1385,14 +1242,14 @@ export default function OraclePage() {
                     <details className="group/retrieval overflow-hidden rounded-xl border border-primary/20 bg-surface-container-lowest/70">
                       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 font-caption text-caption marker:hidden">
                         <span className="flex min-w-0 items-center gap-2 text-primary">
-                          <Icon name="travel_explore" className="text-sm" />
+                          <Icon decorative name="travel_explore" className="text-sm" />
                           <span className="font-semibold uppercase tracking-wider">
                             Como encontrei estas fontes?
                           </span>
                         </span>
                         <span className="flex flex-shrink-0 items-center gap-1.5 text-outline">
                           <span>{msg.retrievalStats.durationMs} ms</span>
-                          <Icon name="expand_more" className="text-sm transition-transform group-open/retrieval:rotate-180" />
+                          <Icon decorative name="expand_more" className="text-sm transition-transform group-open/retrieval:rotate-180" />
                         </span>
                       </summary>
                       <div className="grid gap-2 border-t border-outline-variant/20 px-3 pb-3 pt-2 sm:grid-cols-2">
@@ -1427,7 +1284,12 @@ export default function OraclePage() {
                   )}
 
                   {msg.sources && msg.sources.length > 0 && (
-                    <div className="grid gap-2.5 sm:grid-cols-2">
+                    <details className="group/sources rounded-xl border border-outline-variant/30">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-primary marker:hidden">
+                        <span>Fontes usadas ({msg.sources.length})</span>
+                        <Icon decorative name="expand_more" className="text-lg group-open/sources:rotate-180" />
+                      </summary>
+                      <div className="grid gap-3 px-3 pb-3 pt-2 sm:grid-cols-2">
                       {msg.sources.map((source, sourceIndex) => {
                         const isBookSource = !source.external && !source.sourceType;
                         const selected = isBookSource && selectedCompare.some((item) => item.id === source.id);
@@ -1468,7 +1330,7 @@ export default function OraclePage() {
                                     <h3 className="truncate font-quote-md text-quote-md font-semibold text-on-surface group-hover:text-primary">
                                       {source.title}
                                     </h3>
-                                    <Icon name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
+                                    <Icon decorative name="open_in_new" className="text-xs text-outline group-hover:text-primary" />
                                   </Link>
                                 ) : (
                                   <h3 className="mt-1 truncate font-quote-md text-quote-md font-semibold text-on-surface">
@@ -1523,7 +1385,7 @@ export default function OraclePage() {
                                   onClick={() => void copyEvidence(source)}
                                   className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface transition-colors hover:border-primary/50 hover:text-primary"
                                 >
-                                  <Icon name={copiedSourceId === source.id ? "check" : "content_copy"} className="text-xs" />
+                                  <Icon decorative name={copiedSourceId === source.id ? "check" : "content_copy"} className="text-xs" />
                                   {copiedSourceId === source.id ? "Copiado" : "Copiar evidência"}
                                 </button>
                               )}
@@ -1532,7 +1394,7 @@ export default function OraclePage() {
                                   href="/search-add"
                                   className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
                                 >
-                                  <Icon name="add" className="text-xs" /> Adicionar ao acervo
+                                  <Icon decorative name="add" className="text-xs" /> Adicionar ao acervo
                                 </Link>
                               ) : isBookSource ? (
                                 <>
@@ -1540,21 +1402,21 @@ export default function OraclePage() {
                                 href={`/books/${source.id}`}
                                 className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50"
                               >
-                                <Icon name="menu_book" className="text-xs" /> Abrir
+                                <Icon decorative name="menu_book" className="text-xs" /> Abrir
                               </Link>
                               <button
                                 onClick={() => void updateBookStatus(source, "READING")}
                                 disabled={busy || source.status === "READING"}
                                 className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50 disabled:opacity-40"
                               >
-                                <Icon name="play_arrow" className="text-xs" /> Iniciar leitura
+                                <Icon decorative name="play_arrow" className="text-xs" /> Iniciar leitura
                               </button>
                               <button
                                 onClick={() => void updateBookStatus(source, "TO_READ")}
                                 disabled={busy || source.status === "TO_READ"}
                                 className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 px-2.5 py-1 font-caption text-caption text-on-surface hover:border-primary/50 disabled:opacity-40"
                               >
-                                <Icon name="playlist_add" className="text-xs" /> Adicionar à fila
+                                <Icon decorative name="playlist_add" className="text-xs" /> Adicionar à fila
                               </button>
                               <button
                                 onClick={() => toggleCompare(source)}
@@ -1564,7 +1426,7 @@ export default function OraclePage() {
                                     : "border-outline-variant/40 text-on-surface hover:border-primary/50"
                                 }`}
                               >
-                                <Icon name={selected ? "check" : "compare_arrows"} className="text-xs" />
+                                <Icon decorative name={selected ? "check" : "compare_arrows"} className="text-xs" />
                                 {selected ? "Selecionado" : "Comparar"}
                               </button>
                                 </>
@@ -1579,7 +1441,7 @@ export default function OraclePage() {
                           href={`/rota?books=${encodeURIComponent(msg.sources.filter((source) => !source.external && !source.sourceType).map((source) => source.id).join(","))}`}
                           className="inline-flex items-center gap-1.5 rounded-full bg-primary-container px-3 py-1.5 font-label-sm text-label-sm font-semibold text-on-primary-container"
                         >
-                          <Icon name="route" className="text-sm" /> Criar rota com estes livros
+                          <Icon decorative name="route" className="text-sm" /> Criar rota com estes livros
                         </Link>
                         )}
                         {selectedCompare.length === 2 && (
@@ -1588,11 +1450,12 @@ export default function OraclePage() {
                             disabled={loading}
                             className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 px-3 py-1.5 font-label-sm text-label-sm font-semibold text-primary disabled:opacity-50"
                           >
-                            <Icon name="compare_arrows" className="text-sm" /> Comparar selecionados
+                            <Icon decorative name="compare_arrows" className="text-sm" /> Comparar selecionados
                           </button>
                         )}
                       </div>
-                    </div>
+                      </div>
+                    </details>
                   )}
                   {msg.content &&
                     !(loading && i === messages.length - 1) &&
@@ -1609,7 +1472,7 @@ export default function OraclePage() {
                               : "text-outline hover:text-on-surface"
                           }`}
                         >
-                          <Icon
+                          <Icon decorative
                             name={playingTtsIndex === i ? "stop" : "volume_up"}
                             className="text-sm"
                           />
@@ -1620,7 +1483,7 @@ export default function OraclePage() {
                           disabled={savingArtifact === i}
                           className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary disabled:opacity-50"
                         >
-                          <Icon name="bookmark_add" className="text-sm" />
+                          <Icon decorative name="bookmark_add" className="text-sm" />
                           {savingArtifact === i ? "Salvando..." : "Salvar resultado"}
                         </button>
                         <button
@@ -1628,7 +1491,7 @@ export default function OraclePage() {
                           title="Copiar resposta"
                           className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary"
                         >
-                          <Icon name={copiedIndex === i ? "check" : "content_copy"} className="text-sm" />
+                          <Icon decorative name={copiedIndex === i ? "check" : "content_copy"} className="text-sm" />
                           {copiedIndex === i ? "Copiado" : "Copiar"}
                         </button>
                         {i === messages.length - 1 && (
@@ -1638,7 +1501,7 @@ export default function OraclePage() {
                             title="Regenerar resposta"
                             className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary disabled:opacity-50"
                           >
-                            <Icon name="refresh" className="text-sm" />
+                            <Icon decorative name="refresh" className="text-sm" />
                             Regenerar
                           </button>
                         )}
@@ -1658,7 +1521,7 @@ export default function OraclePage() {
                 onClick={retryFailedSend}
                 className="flex flex-shrink-0 items-center gap-1 rounded-full border border-error/40 px-3 py-1 font-caption text-caption font-semibold transition-colors hover:bg-error-container/40"
               >
-                <Icon name="refresh" className="text-sm" />
+                <Icon decorative name="refresh" className="text-sm" />
                 Tentar novamente
               </button>
             )}
@@ -1668,8 +1531,8 @@ export default function OraclePage() {
       </main>
 
       {/* Input bar — em fluxo no fim da coluna, nunca sobrepõe o footer */}
-      <div className="w-full shrink-0 border-t border-outline-variant/20 bg-surface/95 pt-2 backdrop-blur-md">
-        <div className="relative mx-auto flex w-full max-w-lg flex-col gap-2.5 px-4 pb-4 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
+      <div className="oracle-composer w-full shrink-0 border-t border-outline-variant/20 bg-surface/95 pt-2 backdrop-blur-md">
+        <div className="relative mx-auto flex w-full min-w-0 max-w-lg flex-col gap-2 px-3 sm:px-4 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
           {showJumpDown && (
             <button
               type="button"
@@ -1681,15 +1544,15 @@ export default function OraclePage() {
                   behavior: "smooth",
                 });
               }}
-              title="Voltar ao fim da conversa"
+              aria-label="Voltar ao fim da conversa"
               className="absolute -top-12 left-1/2 z-20 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-outline-variant/40 bg-surface-container-high/95 text-on-surface shadow-lg backdrop-blur-md transition-all hover:border-primary/50 hover:text-primary active:scale-90"
             >
-              <Icon name="keyboard_arrow_down" className="text-lg" />
+              <Icon decorative name="keyboard_arrow_down" className="text-lg" />
             </button>
           )}
           {messages.length > 0 && (
             <div
-              className={`flex items-center gap-2 overflow-x-auto scroll-smooth py-1 pr-6 no-scrollbar transition-all duration-300 [mask-image:linear-gradient(to_right,black_0%,black_calc(100%-2rem),transparent_100%)] ${
+              className={`hidden items-center gap-2 overflow-x-auto scroll-smooth md:flex py-1 pr-6 no-scrollbar transition-all duration-300 [mask-image:linear-gradient(to_right,black_0%,black_calc(100%-2rem),transparent_100%)] ${
                 loading
                   ? "pointer-events-none -translate-y-1 opacity-0"
                   : "translate-y-0 opacity-100"
@@ -1704,92 +1567,18 @@ export default function OraclePage() {
                   }}
                   className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-outline-variant/40 bg-surface-container/90 px-3 py-1.5 font-caption text-caption text-on-surface shadow-sm transition-colors hover:border-primary/50 hover:bg-surface-container-high active:scale-95"
                 >
-                  <Icon name="auto_awesome" className="text-xs text-primary" />
+                  <Icon decorative name="auto_awesome" className="text-xs text-primary" />
                   <span>{suggestion}</span>
                 </button>
               ))}
             </div>
           )}
 
-          <p role="status" className="text-xs text-outline">
-            {transcribing ? "Transcrevendo áudio…" : recording ? "Gravando áudio…" : "Revise o texto antes de enviar ao Oráculo."}
-          </p>
-          <form
-            onSubmit={handleSubmit}
-            className="relative flex items-end gap-1.5 rounded-[28px] border border-outline-variant/50 bg-surface-container/95 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
-          >
-            <button
-              type="button"
-              onClick={() => setScope((s) => (s === "library" ? "all" : "library"))}
-              title={scope === "library" ? "Buscando só no seu acervo — toque para incluir livros externos" : "Buscando no acervo + catálogo externo"}
-              className={`flex flex-shrink-0 items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-[11px] font-medium transition-colors ${
-                scope === "all"
-                  ? "border-tertiary/50 bg-tertiary-container/20 text-tertiary"
-                  : "border-outline-variant/30 bg-surface-container-high text-on-surface-variant"
-              }`}
-            >
-              <Icon name={scope === "all" ? "public" : "local_library"} className={`text-xs ${scope === "all" ? "text-tertiary" : "text-primary"}`} />
-              <span className="hidden sm:inline">{scope === "all" ? "Estante + Mundo" : "Estante"}</span>
-              <Icon name="unfold_more" className="text-[10px]" />
-            </button>
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`;
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage(input.trim());
-                }
-              }}
-              placeholder={
-                recording
-                  ? "Gravando... toque no microfone para transcrever"
-                  : "Pergunte ao seu acervo físico..."
-              }
-              disabled={loading || transcribing || recording}
-              className="max-h-32 flex-1 resize-none self-center border-0 bg-transparent px-1 py-1.5 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 focus:outline-none focus:ring-0 disabled:opacity-60"
-            />
-            {micSupported && (
-              <button
-                type="button"
-                onClick={handleMic}
-                disabled={loading || transcribing}
-                title={recording ? "Parar e transcrever" : "Gravar áudio para revisar"}
-                className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors active:scale-90 disabled:opacity-50 ${
-                  recording
-                    ? "animate-pulse bg-error text-white"
-                    : "text-outline hover:bg-surface-container-high hover:text-on-surface"
-                }`}
-              >
-                <Icon name="mic" className="text-lg" />
-              </button>
-            )}
-            {loading ? (
-              <button
-                type="button"
-                onClick={stopGeneration}
-                title="Parar geração"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-error-container text-error transition-all hover:brightness-110 active:scale-95"
-              >
-                <Icon name="stop" className="text-lg" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!input.trim() || recording || transcribing}
-                title="Enviar mensagem"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-white shadow-[0_0_16px_rgba(91,80,230,0.5)] transition-all hover:bg-inverse-primary active:scale-95 disabled:opacity-50"
-              >
-                <Icon name="arrow_upward" className="text-lg" />
-              </button>
-            )}
-          </form>
+          <OracleComposer
+            inputRef={inputRef} value={input} onChange={setInput} onSend={question => void sendMessage(question)}
+            loading={loading} recording={recording} transcribing={transcribing}
+            micSupported={micSupported} onMic={() => void handleMic()} onStop={stopGeneration}
+          />
         </div>
       </div>
     </div>
