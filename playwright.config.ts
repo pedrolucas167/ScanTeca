@@ -35,8 +35,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "guest-desktop", testMatch: "guest.spec.ts", use: { viewport: { width: 1440, height: 900 } } },
-    { name: "guest-mobile", testMatch: "guest.spec.ts", use: { viewport: { width: 375, height: 900 } } },
+    { name: "guest-desktop", testMatch: ["guest.spec.ts", "oracle.spec.ts"], use: { viewport: { width: 1440, height: 900 } } },
+    { name: "guest-mobile", testMatch: ["guest.spec.ts", "oracle.spec.ts"], use: { viewport: { width: 375, height: 900 } } },
     ...(authenticated ? [{ name: "authenticated", testMatch: "authenticated.spec.ts", use: { screenshot: "off" as const } }] : []),
   ],
   webServer: {
