@@ -48,6 +48,7 @@ export default defineConfig({
       ...isolatedEnvironment,
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: publicKey,
       CLERK_SECRET_KEY: secretKey,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${new URL("./scripts/e2e-provider-fixtures.mjs", import.meta.url).href}`.trim(),
     },
   },
 });
