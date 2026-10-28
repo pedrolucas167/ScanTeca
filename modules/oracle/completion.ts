@@ -1,10 +1,12 @@
 /** Accept a provider answer only after its explicit completion marker. */
-export async function readOracleCompletion(body: ReadableStream<Uint8Array>): Promise<string> {
+export async function readOracleCompletion(body: ReadableStream<Uint8Array>, options: { signal?: AbortSignal; onDelta?: (text: string) => void } = {}): Promise<string> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
   let completed = false;
+  const abort = () => { void reader.cancel(options.signal?.reason).catch(() => undefined); };
+  options.signal?.addEventListener("abort", abort, { once: true });
   const consume = (line: string) => {
     if (!line.startsWith("data:")) return;
     const payload = line.slice(5).trim();
@@ -17,14 +19,16 @@ export async function readOracleCompletion(body: ReadableStream<Uint8Array>): Pr
       throw new Error("Oracle completion was truncated");
     }
     const content = choice?.delta?.content;
-    if (typeof content === "string") text += content;
+    if (typeof content === "string") { text += content; options.onDelta?.(content); }
     else if (Array.isArray(content)) {
-      for (const part of content) if (typeof part?.text === "string") text += part.text;
+      for (const part of content) if (typeof part?.text === "string") { text += part.text; options.onDelta?.(part.text); }
     }
   };
   try {
+    options.signal?.throwIfAborted();
     while (!completed) {
       const { done, value } = await reader.read();
+      options.signal?.throwIfAborted();
       buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -34,6 +38,7 @@ export async function readOracleCompletion(body: ReadableStream<Uint8Array>): Pr
     if (!completed) throw new Error("Oracle connection ended before completion");
     return text;
   } finally {
+    options.signal?.removeEventListener("abort", abort);
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }

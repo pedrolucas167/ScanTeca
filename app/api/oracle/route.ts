@@ -1,3 +1,4 @@
+import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { readOracleCompletion, saveOracleAnswer } from "@/modules/oracle";
 import { NextRequest } from "next/server";
@@ -153,9 +154,13 @@ Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros 
   }
 }
 
-async function directChatResponse(question: string, apiKey: string) {
+async function directChatResponse(question: string, apiKey: string, requestSignal: AbortSignal) {
+  const cancellation = new AbortController();
+  let consumerCancelled = false;
+  const signal = AbortSignal.any([requestSignal, cancellation.signal]);
   try {
-    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
+      signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -188,57 +193,22 @@ async function directChatResponse(question: string, apiKey: string) {
     }
 
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
     const stream = new ReadableStream({
       async start(controller) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ transcript: question })}\n\n`));
-        const reader = res.body!.getReader();
-        let buffer = "";
-        const processPayload = (payload: string) => {
-          if (!payload || payload === "[DONE]") return;
-          try {
-            const json = JSON.parse(payload);
-            const delta = json.choices?.[0]?.delta?.content;
-            if (typeof delta === "string") {
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`)
-              );
-            }
-          } catch (error) {
-            console.warn("[oracle] invalid direct-chat SSE payload:", {
-              error,
-              payload: payload.slice(0, 200),
-            });
-          }
-        };
-
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              if (buffer.trim()) {
-                processPayload(buffer.trim().replace(/^data:\s*/, ""));
-              }
-              break;
-            }
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const payload = trimmed.slice(5).trim();
-              processPayload(payload);
-            }
-          }
-        } finally {
+          await readOracleCompletion(res.body!, { signal, onDelta(text) {
+            signal.throwIfAborted();
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+          } });
+          signal.throwIfAborted();
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
+        } catch {
+          if (!consumerCancelled) controller.error(new Error("Não foi possível concluir a resposta. Tente novamente."));
         }
       },
+      cancel(reason) { consumerCancelled = true; cancellation.abort(reason); },
     });
     return new Response(stream, {
       headers: {
@@ -257,22 +227,14 @@ async function directChatResponse(question: string, apiKey: string) {
 }
 
 async function toolExecutionResponse(routing: RoutingDecision, transcript: string) {
-  // TODO: Implement tool execution logic
-  // For now, return a message indicating the feature is coming soon
-  const toolMessages: Record<string, string> = {
-    create_route: "Para criar uma rota de leitura, use o recurso de Rotas na biblioteca. Selecione os livros e clique em 'Criar rota'.",
-    add_book: "Para adicionar um livro, use o scanner de ISBN ou cadastro manual na página de catálogo.",
-    update_status: "Para atualizar o status de leitura, abra o livro e selecione o status desejado.",
-    unknown: "Entendi que você quer executar uma ação. Essa funcionalidade estará disponível em breve.",
-  };
-
-  const message = toolMessages[routing.tool ?? "unknown"] || toolMessages.unknown;
+  const action = isOracleAction(routing.tool) ? routing.tool : undefined;
+  const message = action ? ORACLE_ACTIONS[action].message : "Escolha uma ação no catálogo para continuar.";
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ transcript })}\n\n`));
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message, action })}\n\n`));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
     },
@@ -391,16 +353,6 @@ export async function POST(request: NextRequest) {
     if (rateLimit) return rateLimit;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "OPENROUTER_API_KEY não configurada. Adicione a chave no .env para usar o Oráculo.",
-        }),
-        { status: 503, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
     const parsed = await readJson(request, oracleSchema);
     if (!parsed.ok) return parsed.response;
     const {
@@ -414,6 +366,8 @@ export async function POST(request: NextRequest) {
     } = parsed.data;
 
     let question = parsed.data.question?.trim() ?? "";
+
+    if (!question && audio?.data && !apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
 
     if (!question && audio?.data) {
       const sttRes = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
@@ -458,15 +412,9 @@ export async function POST(request: NextRequest) {
     // Jev Query Routing - decide se precisa de busca vetorial
     const routing = await jevRouteQuery(trimmed);
 
-    // Direct chat response for greetings and casual conversation
-    if (shouldDirectChat(routing)) {
-      return directChatResponse(trimmed, apiKey);
-    }
-
-    // Tool execution for specific actions
-    if (shouldExecuteTool(routing)) {
-      return toolExecutionResponse(routing, trimmed);
-    }
+    if (shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
+    if (!apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
+    if (shouldDirectChat(routing)) return directChatResponse(trimmed, apiKey, request.signal);
     let sessionId = requestedSessionId ?? null;
     let currentRequestMessageId: string | null = null;
     try {
@@ -939,9 +887,12 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
       },
     ];
 
+    const cancellation = new AbortController();
+  let consumerCancelled = false;
+    const generationSignal = AbortSignal.any([request.signal, cancellation.signal]);
     const llmRes = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
-      signal: request.signal,
+      signal: generationSignal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -1066,7 +1017,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         };
 
         try {
-          const fullText = await readOracleCompletion(llmRes.body!);
+          const fullText = await readOracleCompletion(llmRes.body!, { signal: generationSignal });
           const quality = validateOracleResponse(fullText);
           const outputText = quality.valid
             ? fullText.trim()
@@ -1075,7 +1026,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             console.warn("[oracle] response rejected:", quality.reason);
           }
 
-          request.signal.throwIfAborted();
+          generationSignal.throwIfAborted();
           if (quality.valid) {
             await saveOracleAnswer({ userId, sessionId, mode, content: outputText,
               sources, replacesId: previousAnswer?.id });
@@ -1083,6 +1034,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
               await updateReaderProfile(userId, setting?.oracleProfile, trimmed, outputText, apiKey);
             }
           }
+          generationSignal.throwIfAborted();
           // Extract and send citations
           const citations = extractCitations(outputText);
           controller.enqueue(
@@ -1092,6 +1044,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             encoder.encode(`data: ${JSON.stringify({ citations })}\n\n`)
           );
         } catch (err) {
+          if (consumerCancelled) return;
           console.error("[oracle] completion failed:", err);
           controller.error(new Error("Não foi possível concluir a resposta. Tente novamente."));
           return;
@@ -1099,6 +1052,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
+      cancel(reason) { consumerCancelled = true; cancellation.abort(reason); },
     });
 
     return new Response(stream, {

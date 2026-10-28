@@ -28,8 +28,8 @@ Os números históricos abaixo não são diretamente comparáveis a esse método
 
 ## Executar localmente
 
-Base inicial de controle, medida localmente em 208 arquivos antes dos testes
-dedicados de Web Push:
+Referência histórica do Vitest 3, medida localmente em 208 arquivos antes dos
+testes dedicados de Web Push; não compare diretamente com os mínimos do Vitest 5:
 
 | Métrica | Cobertura |
 | --- | ---: |

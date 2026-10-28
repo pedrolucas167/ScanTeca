@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readOracleCompletion } from "./completion";
 
 function stream(text: string) {
@@ -11,6 +11,21 @@ function stream(text: string) {
 }
 const answer = 'data: {"choices":[{"delta":{"content":"Olá, leitor"}}]}\n\n';
 describe("Oracle provider completion", () => {
+  it("reports incremental text while still requiring completion", async () => {
+    const onDelta = vi.fn();
+    await expect(readOracleCompletion(stream(answer + "data: [DONE]"), { onDelta })).resolves.toBe("Olá, leitor");
+    expect(onDelta).toHaveBeenCalledExactlyOnceWith("Olá, leitor");
+  });
+  it("cancels a pending provider read when the consumer aborts", async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ cancel });
+    const controller = new AbortController();
+    const result = readOracleCompletion(body, { signal: controller.signal });
+    controller.abort();
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  });
   it("reassembles UTF-8 and accepts an explicit completion marker", async () => {
     await expect(readOracleCompletion(stream(answer + "data: [DONE]"))).resolves.toBe("Olá, leitor");
   });

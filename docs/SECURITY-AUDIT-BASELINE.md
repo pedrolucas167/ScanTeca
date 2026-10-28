@@ -20,6 +20,12 @@ desses achados: revisão de dependências examina mudanças do PR; auditoria da 
 existente é uma verificação distinta. As atualizações precisam de commits e PRs
 próprios, com validação de compatibilidade antes da integração.
 
+## Estado atual — 28 de outubro de 2026
+
+Após as atualizações de dependências e do Prisma 7.10.1, `npm audit --omit=dev` e
+a auditoria completa local não reportam vulnerabilidades. A contagem inicial
+abaixo é histórica e descreve a primeira auditoria, antes dessas correções.
+
 ## Correções compatíveis — 28 de outubro de 2026
 
 Atualizados Next.js e eslint-config-next para 16.4.3, Zod para 4.6.7 e as
