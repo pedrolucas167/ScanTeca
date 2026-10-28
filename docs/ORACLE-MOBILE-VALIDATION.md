@@ -43,6 +43,10 @@ Os cenários foram incluídos nas duas configurações públicas do Playwright
 (`guest-desktop` e `guest-mobile`). Nas primeiras execuções locais, o teste de
 falha aguardava o carregamento externo completo ou preenchia o campo antes da
 hidratação. A sincronização agora espera o bootstrap da interface, sem sleeps.
+Os casos de chat também aguardam o SDK do Clerk carregar e bloqueiam service
+workers apenas nesses cenários com respostas HTTP simuladas. Assim, a ativação
+da PWA não recarrega o documento durante a escrita nem contorna as rotas
+controladas pelo Playwright. Os testes autenticados mantêm sua configuração.
 
 ## Limite da validação
 

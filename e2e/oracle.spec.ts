@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { clerk } from "@clerk/testing/playwright";
+
+// These cases control API responses; service-worker activation must not reload
+// the document in the middle of a draft or bypass Playwright's request routes.
+test.use({ serviceWorkers: "block" });
 
 const answer = "Uma conexão entre memória e cidade, a partir dos livros do seu acervo.";
 const sources = [{ id: "oracle-ui-fixture", title: "Livro de demonstração", author: "Autoria de teste", status: "TO_READ", genre: null }];
@@ -15,6 +20,11 @@ async function bootstrap(page: Page, messages: { role: string; content: string }
   });
 }
 
+async function openOracle(page: Page) {
+  await page.goto("/oracle", { waitUntil: "domcontentloaded" });
+  await clerk.loaded({ page });
+}
+
 test("chat reserva espaço às mensagens e mantém o compositor no viewport", async ({ page }) => {
   let sends = 0;
   await page.route("**/api/oracle", async route => {
@@ -23,7 +33,7 @@ test("chat reserva espaço às mensagens e mantém o compositor no viewport", as
     await route.fulfill({ contentType: "text/event-stream", body: stream });
   });
   await bootstrap(page);
-  await page.goto("/oracle", { waitUntil: "domcontentloaded" });
+  await openOracle(page);
   const mobile = page.viewportSize()!.width < 768;
   const height = page.viewportSize()!.height;
   const main = page.getByRole("main", { name: "Conversa com o Oráculo" });
@@ -91,7 +101,7 @@ test("resposta nova respeita quem está lendo acima e permite voltar ao fim", as
   await bootstrap(page, Array.from({ length: 12 }, (_, index) => ({
     role: "assistant", content: `Resposta anterior ${index + 1}.\n\n${"Uma reflexão sobre livros e memória. ".repeat(18)}`,
   })));
-  await page.goto("/oracle", { waitUntil: "domcontentloaded" });
+  await openOracle(page);
   const main = page.getByRole("main", { name: "Conversa com o Oráculo" });
   await expect(page.getByText("Resposta anterior 12.", { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Sua mensagem" }).fill("Continue a conversa");
@@ -119,7 +129,7 @@ test("falha de envio mantém a pergunta e permite tentar novamente", async ({ pa
       : { contentType: "text/event-stream", body: stream });
   });
   await bootstrap(page);
-  await page.goto("/oracle", { waitUntil: "domcontentloaded" });
+  await openOracle(page);
   await expect(page.getByRole("button", { name: "Compare dois livros", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Sua mensagem" }).fill("Uma pergunta preservada");
   await page.getByRole("button", { name: "Enviar mensagem" }).click();
