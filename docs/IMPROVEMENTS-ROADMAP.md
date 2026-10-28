@@ -6,11 +6,11 @@ Integração exige os checks da principal; publicação segue pela Vercel.
 
 | Ordem | Pacote | Critério de conclusão | Estado |
 | --- | --- | --- | --- |
-| 1a | Correções compatíveis de dependências | Remover o achado crítico, manter Next e ESLint alinhados e validar unitários, integração, build e navegador | Integrado; CI aprovada |
-| 1b | Prisma e dependências de testes | Tratar os achados remanescentes em pacotes próprios; migração do coletor com comparação documentada e base correspondente aprovada | Integrado; zero vulnerabilidades no audit e base Vitest 5 integrada |
-| 2 | E2E de Biblioteca, Leitura e privacidade | Cadastrar livro, persistir progresso e comprovar que outra conta não acessa ou altera os registros privados | Três cenários autenticados passaram localmente; CI após atualização da principal em andamento |
-| 3 | Oráculo | Cancelamento propagado ao provedor, falhas visíveis sem salvar resposta incompleta e encaminhamento claro das ações disponíveis | Implementado e validado localmente; aguardando PR/CI |
-| 4 | Documentação operacional | Separar o estado atual das evidências históricas, registrar o que cada teste cobre e manter os passos de CI e deploy reproduzíveis | Atualizado nesta rodada; validar após as integrações |
+| 1a | Correções compatíveis de dependências | Remover o achado crítico, manter Next e ESLint alinhados e validar unitários, integração, build e navegador | Integrado; checks aprovados |
+| 1b | Prisma e dependências de testes | Tratar os achados remanescentes em pacotes próprios; migração do coletor com comparação documentada e base correspondente aprovada | Integrado; auditoria atual sem vulnerabilidades e base Vitest 5 integrada |
+| 2 | E2E de Biblioteca, Leitura e privacidade | Cadastrar livro, persistir progresso e comprovar que outra conta não acessa ou altera os registros privados | Integrado; 3 cenários autenticados e workflow com build e navegador passaram na principal |
+| 3 | Oráculo | Cancelamento propagado ao provedor, falhas visíveis sem salvar resposta incompleta e encaminhamento claro das ações disponíveis | Integrado; build, integração, cobertura, segredos, navegador e smoke de produção aprovados |
+| 4 | Documentação operacional | Separar o estado atual das evidências históricas, registrar o que cada teste cobre e manter os passos de CI e deploy reproduzíveis | Estado atual consolidado; smoke e deploy de produção confirmados |
 
 Os onze cenários de navegador anteriores cobrem dez fluxos públicos e um cenário
 autenticado de publicação/remoção no feed. O pacote de E2E acrescenta cadastro,
@@ -24,3 +24,8 @@ A configuração de testes permanece isolada: conta Clerk temporária, banco Doc
 descartável, sem serviços de IA pagos nem reaproveitamento de sessão pessoal.
 Não aplicar migrações ou dados de teste ao banco de produção. Mudanças na
 infraestrutura ou no comportamento dos providers devem ter validação própria.
+
+Na execução integrada do PR de E2E, a implantação Vercel de preview ficou em
+falha. A implantação de produção do merge concluiu e o smoke da principal passou;
+por isso o erro de preview não afetou a publicação. As duas evidências devem ser
+consultadas separadamente.

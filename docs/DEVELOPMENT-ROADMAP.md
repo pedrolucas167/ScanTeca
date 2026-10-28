@@ -12,11 +12,19 @@ está em [SECURITY-AUDIT-BASELINE.md](./SECURITY-AUDIT-BASELINE.md); a medição
 cobertura está em [TEST-COVERAGE.md](./TEST-COVERAGE.md); o status dos pacotes
 aprovados está em [IMPROVEMENTS-ROADMAP.md](./IMPROVEMENTS-ROADMAP.md).
 
-O pacote E2E de Biblioteca, Leitura e privacidade valida cadastro, progresso e
-isolamento entre contas. O Oráculo está sendo tratado como pacote separado para
-cancelamento do provedor, respostas incompletas e navegação das ações. Os jobs e
-notificações, Comunidade e métricas de produção continuam frentes futuras; este
-documento não os marca como concluídos.
+O pacote E2E de Biblioteca, Leitura e privacidade foi integrado. Cadastro manual,
+progresso persistido e isolamento entre contas passaram nos três cenários
+autenticados; o workflow da principal também passou com build de produção e
+13 cenários de navegador.
+
+O pacote do Oráculo também foi integrado. Cancelamento chega às chamadas de chat,
+transcrição e perfil; streams sem marcador completo viram falha e não salvam
+resposta parcial. Ações reconhecidas apontam para caminhos fixos e deixam a
+confirmação de gravação ao usuário. Build, integração, cobertura, segredos e
+smoke de produção passaram. O deploy da principal foi confirmado.
+
+Jobs e notificações, Comunidade e métricas de produção continuam frentes futuras;
+este documento não os marca como concluídos.
 
 ## Ordem por criticidade
 
