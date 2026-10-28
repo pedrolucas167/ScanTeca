@@ -103,10 +103,12 @@ async function updateReaderProfile(
   currentProfile: string | null | undefined,
   question: string,
   answer: string,
-  apiKey: string
+  apiKey: string,
+  signal: AbortSignal
 ) {
   try {
     const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
+      signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -150,7 +152,7 @@ Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros 
       });
     }
   } catch (err) {
-    console.error("[oracle] profile update error:", err);
+    if (!signal.aborted) console.error("[oracle] profile update error:", err);
   }
 }
 
@@ -370,7 +372,8 @@ export async function POST(request: NextRequest) {
     if (!question && audio?.data && !apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
 
     if (!question && audio?.data) {
-      const sttRes = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
+      const sttRes = await fetchWithTimeout(`${OPENROUTER_BASE}/audio/transcriptions`, {
+        signal: request.signal,
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -387,7 +390,7 @@ export async function POST(request: NextRequest) {
           },
           language: "pt",
         }),
-      });
+      }, 60_000);
       if (!sttRes.ok) {
         const err = await sttRes.text();
         console.error("[oracle] STT error:", sttRes.status, err);
@@ -1031,7 +1034,7 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
             await saveOracleAnswer({ userId, sessionId, mode, content: outputText,
               sources, replacesId: previousAnswer?.id });
             if (conversationHistory.length >= 4) {
-              await updateReaderProfile(userId, setting?.oracleProfile, trimmed, outputText, apiKey);
+              await updateReaderProfile(userId, setting?.oracleProfile, trimmed, outputText, apiKey, generationSignal);
             }
           }
           generationSignal.throwIfAborted();
