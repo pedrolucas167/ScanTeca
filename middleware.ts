@@ -1,12 +1,20 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { measureServerTask } from "@/lib/server-timing";
 
 const isProtectedRoute = createRouteMatcher(["/scanner(.*)", "/api/scan(.*)"]);
 
-export default clerkMiddleware(async (auth, req) => {
+const handleAuthentication = clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
 });
+
+export default function middleware(...args: Parameters<typeof handleAuthentication>) {
+  const path = args[0].nextUrl.pathname;
+  return path === "/" || path === "/manifesto"
+    ? measureServerTask("middleware.auth", () => handleAuthentication(...args))
+    : handleAuthentication(...args);
+}
 
 export const config = {
   matcher: [

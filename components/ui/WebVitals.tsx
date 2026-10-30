@@ -1,6 +1,7 @@
 "use client";
 
 import { useReportWebVitals } from "next/web-vitals";
+import { getLcpAttribution } from "@/lib/lcp-attribution";
 
 export default function WebVitals() {
   useReportWebVitals((metric) => {
@@ -10,6 +11,7 @@ export default function WebVitals() {
       value: metric.value,
       rating: metric.rating,
       path: window.location.pathname,
+      ...(metric.name === "LCP" ? { lcp: getLcpAttribution(metric.entries) } : {}),
     });
     if (navigator.sendBeacon) {
       navigator.sendBeacon("/api/vitals", new Blob([payload], { type: "application/json" }));

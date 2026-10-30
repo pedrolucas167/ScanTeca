@@ -9,6 +9,12 @@ const metricSchema = z.object({
   value: z.number().finite().nonnegative(),
   rating: z.enum(["good", "needs-improvement", "poor"]),
   path: z.string().max(300),
+  lcp: z.object({
+    element: z.enum(["IMG", "H1", "H2", "P", "DIV", "SPAN", "OTHER"]),
+    paintMs: z.number().finite().nonnegative(),
+    resourceStartMs: z.number().finite().nonnegative().optional(),
+    resourceEndMs: z.number().finite().nonnegative().optional(),
+  }).optional(),
 });
 
 export async function POST(request: NextRequest) {

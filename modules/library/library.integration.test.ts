@@ -27,7 +27,7 @@ import { bookCreateSchema } from "./contracts";
 import { scanBook, scanSchema } from "./scan";
 import { reorderBooks, reorderSchema } from "./reorder";
 import { updateLibrarySettings, settingsSchema } from "./settings";
-import { getCatalog, getCatalogDetails, getSharedCatalog, getBookDetail } from "./queries";
+import { getCatalog, getCatalogDetails, getSharedCatalog, getBookDetail, getLibrarySettings } from "./queries";
 import { enrichBooks } from "./enrichment";
 import { generateEmbedding } from "@/lib/embeddings";
 import { refreshBookEmbedding } from "./indexing";
@@ -146,6 +146,14 @@ describe("Biblioteca com PostgreSQL", () => {
     expect((await getCatalogDetails(owner, created.book.id))[0]).toMatchObject({ synopsis: "Sinopse completa", notes: "Notas privadas completas" });
     expect(await getCatalogDetails("library-integration-other", created.book.id)).toEqual([]);
     expect(await getCatalogDetails("library-integration-other")).toEqual([]);
+  });
+
+  it("primeiras leituras concorrentes criam uma única configuração sem perder preferências", async () => {
+    const settings = await Promise.all(Array.from({ length: 5 }, () => getLibrarySettings(owner)));
+    expect(new Set(settings.map(setting => setting.id)).size).toBe(1);
+    expect(await prisma.librarySetting.count({ where: { userId: owner } })).toBe(1);
+    await prisma.librarySetting.update({ where: { userId: owner }, data: { name: "Nome escolhido", accentTheme: "vinho", shareEnabled: true } });
+    expect(await getLibrarySettings(owner)).toMatchObject({ name: "Nome escolhido", accentTheme: "vinho", shareEnabled: true });
   });
 
   it("indexação atrasada não grava vetor de uma versão antiga", async () => {
