@@ -1,5 +1,9 @@
 # Roadmap de modularização — ScanTeca
 
+Continuação do Oráculo em 30/10/2026: [roadmap de qualidade](./ORACLE-QUALITY-ROADMAP.md),
+com o primeiro corte local de busca híbrida, evidências e perguntas de referência.
+As etapas restantes e os limites de validação estão registrados nesse documento.
+
 Registro histórico iniciado em 13/10/2026. Estratégia: migração incremental no mesmo Next.js,
 PostgreSQL e deploy. Estimativas em dias de engenharia focada de uma pessoa,
 incluindo revisão e testes; não são prazos de calendário ou compromissos.
