@@ -20,6 +20,7 @@ export async function fetchWithRetry(
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    fetchOptions.signal?.throwIfAborted();
     try {
       const res = await fetch(url, fetchOptions);
 
@@ -32,6 +33,7 @@ export async function fetchWithRetry(
 
       return res;
     } catch (err) {
+      fetchOptions.signal?.throwIfAborted();
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt >= maxRetries) break;
 
