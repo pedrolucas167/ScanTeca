@@ -26,6 +26,43 @@ async function openOracle(page: Page) {
   await clerk.loaded({ page });
 }
 
+test("memória do leitor permite corrigir, pausar e apagar preferências", async ({ page }) => {
+  let memory: { oracleProfile: string | null; oracleMemoryEnabled: boolean; oracleProfileVersion: number } = {
+    oracleProfile: "Prefiro poesia", oracleMemoryEnabled: true, oracleProfileVersion: 2,
+  };
+  await bootstrap(page);
+  await page.route("**/api/library-settings", async route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      expect(body.oracleProfileVersion).toBe(memory.oracleProfileVersion);
+      memory = { ...body, oracleProfileVersion: memory.oracleProfileVersion + 1 };
+    }
+    await route.fulfill({ json: { setting: memory } });
+  });
+  await openOracle(page);
+  const settings = page.getByRole("button", { name: "Ajustes da conversa" });
+  await settings.click();
+  await page.getByRole("button", { name: "Minha memória" }).click();
+  const dialog = page.getByRole("dialog", { name: "Memória do leitor" });
+  const field = dialog.getByRole("textbox", { name: "Preferências e objetivos" });
+  await expect(field).toHaveValue("Prefiro poesia");
+  await field.fill("Prefiro contos curtos");
+  await dialog.getByRole("checkbox", { name: "Aprender com as próximas conversas" }).uncheck();
+  await dialog.getByRole("button", { name: "Salvar memória" }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Memória salva.");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(settings).toBeFocused();
+  await settings.click();
+  await page.getByRole("button", { name: "Minha memória" }).click();
+  await expect(field).toHaveValue("Prefiro contos curtos");
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await dialog.getByRole("button", { name: "Apagar memória e pausar" }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Memória apagada. Aprendizado pausado.");
+  await expect(field).toHaveValue("");
+  await expect(dialog.getByRole("checkbox")).not.toBeChecked();
+});
+
 test("chat reserva espaço às mensagens e mantém o compositor no viewport", async ({ page }) => {
   let sends = 0;
   await page.route("**/api/oracle", async route => {
