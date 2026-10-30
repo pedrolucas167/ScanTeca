@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEvidenceRegistry, validateCitations } from "./evidence";
+import { createEvidenceRegistry, validateCitations, validateInventoryClaims } from "./evidence";
 
 describe("Oracle evidence references", () => {
   it("keeps numbers aligned across books, diary, reviews and external sources", () => {
@@ -20,5 +20,20 @@ describe("Oracle evidence references", () => {
   });
   it("deduplicates valid citations without treating years as citations", () => {
     expect(validateCitations("Publicado em 1965 [2], anotação [1], novamente [2].", 2)).toEqual({ valid: true, citations: [1, 2] });
+  });
+  it.each([
+    "Em seu acervo pessoal, não há um livro que trate especificamente de navegação por rios.",
+    "No seu acervo, não temos um livro que se encaixe nessa descrição.",
+    "Sua biblioteca não contém nenhuma obra sobre astronomia.",
+  ])("rejects unsupported inventory-wide absence: %s", text => {
+    expect(validateInventoryClaims(text).valid).toBe(false);
+  });
+  it.each([
+    "Nas fontes recuperadas do seu acervo não há um livro sobre rios.",
+    "Não tenho informações sobre livros de navegação no seu acervo.",
+    "Não posso afirmar que no seu acervo não há um livro sobre rios.",
+    "Este título do catálogo externo não está na sua estante.",
+  ])("preserves scoped uncertainty and explicit external sources: %s", text => {
+    expect(validateInventoryClaims(text).valid).toBe(true);
   });
 });

@@ -47,14 +47,16 @@ describe("grounded answers and evidence", () => {
   const book = { id: "dune", title: "Duna", author: "Frank Herbert", publishedDate: "1965",
     genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
 
-  it.each([false, true])("keeps prompt and displayed source numbers aligned (invalid citation: %s)", async invalid => {
+  it.each(["valid", "citation", "inventory"])("checks the grounded response before persistence (%s)", async kind => {
+    const invalid = kind !== "valid";
     vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
     vi.mocked(generateEmbedding).mockResolvedValueOnce(null);
     vi.mocked(saveOracleAnswer).mockClear();
     let prompt = "";
     vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
       prompt = String(options.body);
-      const text = `Duna aborda ecologia em um planeta desértico [${invalid ? 2 : 1}].`;
+      const text = kind === "inventory" ? "Em seu acervo pessoal, não há um livro que trate de navegação por rios [1]."
+        : `Duna aborda ecologia em um planeta desértico [${invalid ? 2 : 1}].`;
       return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`);
     }));
     const response = await POST(questionRequest("Quais temas aparecem em Duna?"));

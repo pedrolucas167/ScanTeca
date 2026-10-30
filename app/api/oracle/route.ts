@@ -1,7 +1,7 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { readOracleCompletion, saveOracleAnswer, retrieveBooks, VECTOR_CANDIDATE_LIMIT,
-  createEvidenceRegistry, validateCitations, buildOracleSystemPrompt } from "@/modules/oracle";
+  createEvidenceRegistry, validateCitations, validateInventoryClaims, buildOracleSystemPrompt } from "@/modules/oracle";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
@@ -799,8 +799,10 @@ export async function POST(request: NextRequest) {
         try {
           const fullText = await readOracleCompletion(llmRes.body!, { signal: generationSignal });
           const citationCheck = validateCitations(fullText, sources.length);
-          const quality = citationCheck.valid ? validateOracleResponse(fullText)
-            : { valid: false, reason: "citação sem fonte correspondente" };
+          const inventoryCheck = validateInventoryClaims(fullText);
+          const quality = !citationCheck.valid ? { valid: false, reason: "citação sem fonte correspondente" }
+            : !inventoryCheck.valid ? { valid: false, reason: "ausência no acervo inferida de contexto parcial" }
+              : validateOracleResponse(fullText);
           const outputText = quality.valid
             ? fullText.trim()
             : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";

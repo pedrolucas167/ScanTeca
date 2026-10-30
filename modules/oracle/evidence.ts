@@ -19,3 +19,16 @@ export function validateCitations(text: string, sourceCount: number) {
     citations: citations.sort((a, b) => a - b),
   };
 }
+
+/** Retrieved sources are partial; a category cannot be declared absent from the whole library. */
+export function validateInventoryClaims(text: string) {
+  const claims = text.split(/(?<=[.!?])\s+|\n+/u).filter(sentence => {
+    const normalized = sentence.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[*_]/g, "");
+    if (/nao (?:posso|podemos|e possivel) afirmar|nao sei se/.test(normalized)) return false;
+    const scoped = /contexto|fontes? (?:recuperad|consultad|disponive)|selecao|amostra|livros? (?:recuperad|listad|apresentad)/.test(normalized);
+    if (scoped) return false;
+    return /(?:seu|sua|nosso|nossa) (?:acervo|biblioteca|estante)/.test(normalized) &&
+      /nao (?:ha|tem|temos|existe|consta|contem) (?:um|uma|nenhum|nenhuma) (?:livro|obra|titulo|exemplar)/.test(normalized);
+  });
+  return { valid: claims.length === 0, claims };
+}
