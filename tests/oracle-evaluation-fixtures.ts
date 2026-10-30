@@ -11,6 +11,13 @@ const station = {
 
 export const oracleEvaluationCases: OracleEvaluationCase[] = [
   {
+    id: "profile-preferences", mode: "RECOMMEND", scope: "library",
+    profile: "Prefere leituras curtas, com até 150 páginas, sobre natureza.",
+    question: "Qual destes livros combina melhor comigo? Explique o motivo.",
+    evidence: [garden, station], expectedMentions: ["Jardins da Maré"], requiredCitations: [1],
+    rubric: "Indicar principalmente Jardins da Maré, ligando explicitamente a preferência declarada por leituras curtas e natureza às 120 páginas e à recuperação ambiental da sinopse. Não inventar outros gostos, experiências ou dados pessoais.",
+  },
+  {
     id: "recommend-environment", mode: "RECOMMEND", scope: "library",
     question: "Quero uma leitura sobre cooperação e cuidado ambiental. Qual destes livros você recomenda?",
     evidence: [garden, station], expectedMentions: ["Jardins da Maré"], requiredCitations: [1],

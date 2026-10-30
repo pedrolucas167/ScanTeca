@@ -22,6 +22,7 @@ interface CaseResult {
   id: string;
   question: string;
   rubric: string;
+  profile: string | null;
   sources: ReturnType<typeof buildEvaluationContext>["sources"];
   context: string;
   systemPromptHash: string;
@@ -34,8 +35,15 @@ interface CaseResult {
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.some(arg => arg !== "--live")) throw new Error("Argumento inválido. Use --live para consultar o provedor.");
-  const live = args.includes("--live");
+  let live = false;
+  let caseId: string | undefined;
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === "--live") live = true;
+    else if (args[index] === "--case" && args[index + 1] && !caseId) caseId = args[++index];
+    else throw new Error("Argumento inválido.");
+  }
+  const selectedCases = caseId ? oracleEvaluationCases.filter(item => item.id === caseId) : oracleEvaluationCases;
+  if (!selectedCases.length) throw new Error("Cenário desconhecido.");
   const model = process.env.ORACLE_CHAT_MODEL || "google/gemini-2.5-flash";
   const judgeModel = process.env.ORACLE_EVAL_JUDGE_MODEL || model;
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -57,10 +65,10 @@ async function main() {
     return { answer: choice.message.content, durationMs: Math.round(performance.now() - started), usage: data.usage ?? null };
   }
 
-  for (const testCase of oracleEvaluationCases) {
+  for (const testCase of selectedCases) {
     const context = buildEvaluationContext(testCase);
-    const systemPrompt = buildOracleSystemPrompt({ mode: testCase.mode, scope: testCase.scope });
-    const metadata = { id: testCase.id, question: testCase.question, rubric: testCase.rubric,
+    const systemPrompt = buildOracleSystemPrompt({ mode: testCase.mode, scope: testCase.scope, profile: testCase.profile });
+    const metadata = { id: testCase.id, question: testCase.question, rubric: testCase.rubric, profile: testCase.profile ?? null,
       sources: context.sources, context: context.content, systemPromptHash: createHash("sha256").update(systemPrompt).digest("hex") };
     if (!live) {
       cases.push({ ...metadata, status: "not_run" });
@@ -72,7 +80,7 @@ async function main() {
       generation = await complete(model, [{ role: "system", content: systemPrompt },
         { role: "user", content: `Evidências recuperadas:\n${context.content}\n\nPergunta do usuário: ${testCase.question}` }], 0.3);
       judge = await complete(judgeModel, [{ role: "system", content: ORACLE_JUDGE_PROMPT },
-        { role: "user", content: JSON.stringify({ question: testCase.question, evidence: context.content, answer: generation.answer, rubric: testCase.rubric }) }], 0);
+        { role: "user", content: JSON.stringify({ question: testCase.question, evidence: context.content, profile: testCase.profile ?? null, answer: generation.answer, rubric: testCase.rubric }) }], 0);
       const evaluation = checkEvaluationAnswer(testCase, generation.answer, parseOracleJudgment(judge.answer));
       cases.push({ ...metadata, status: evaluation.passed ? "passed" : "failed", generation, judge, evaluation });
       process.stdout.write(`${testCase.id}: ${evaluation.passed ? "PASS" : "FAIL"}\n`);
