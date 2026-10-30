@@ -6,10 +6,26 @@ export async function getLibrarySettings(userId: string) {
 
 export async function getCatalog(userId: string) {
   const [books, setting] = await Promise.all([
-    prisma.book.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, include: { collection: { select: { name: true } } } }),
+    prisma.book.findMany({
+      where: { userId }, orderBy: { createdAt: "desc" },
+      select: {
+        id: true, isbn: true, title: true, author: true, publishedDate: true,
+        coverUrl: true, status: true, currentPage: true, rating: true, genre: true,
+        pages: true, customOrder: true, createdAt: true,
+        collection: { select: { name: true } },
+      },
+    }),
     getLibrarySettings(userId),
   ]);
   return { books: books.map(book => ({ ...book, collection: book.collection.name })), setting };
+}
+
+export async function getCatalogDetails(userId: string, id?: string) {
+  const books = await prisma.book.findMany({
+    where: { userId, ...(id ? { id } : {}) }, orderBy: { createdAt: "desc" },
+    include: { collection: { select: { name: true } } },
+  });
+  return books.map(book => ({ ...book, collection: book.collection.name }));
 }
 
 export async function getBookDetail(userId: string, id: string) {

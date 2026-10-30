@@ -43,6 +43,13 @@ test("cadastro manual e progresso de leitura persistem após recarregar", async 
     const created = await creation;
     expect(created.status()).toBe(201);
     bookId = (await created.json()).book.id;
+    await page.goto("/");
+    const details = page.waitForResponse(response => new URL(response.url()).pathname === "/api/books/details" && response.request().method() === "GET");
+    await page.getByRole("button", { name: "Editar", exact: true }).click();
+    expect((await details).status()).toBe(200);
+    await expect(page.getByRole("heading", { name: "Editar Livro", exact: true })).toBeVisible();
+    await expect(page.locator("textarea")).toHaveValue("Livro fictício para validar o fluxo de leitura.");
+    await page.getByRole("button", { name: "Cancelar", exact: true }).click();
     await page.goto(`/books/${bookId}`);
     await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
     await page.goto(`/diario?bookId=${bookId}`);
@@ -80,6 +87,8 @@ test("outra conta não lê nem altera livro e anotação privados", async ({ pag
     await otherPage.goto(`/books/${bookId}`);
     await expect(otherPage.getByRole("heading", { name: "404", exact: true })).toBeVisible();
     await expect(otherPage.getByText(title, { exact: true })).toHaveCount(0);
+    expect((await otherPage.request.get(`/api/books/details?id=${bookId}`)).status()).toBe(404);
+    expect(await (await otherPage.request.get("/api/books/details")).text()).not.toContain(title);
     await otherPage.goto(`/diario?bookId=${bookId}`);
     await expect(otherPage.getByText(note, { exact: true })).toHaveCount(0);
     await expect(otherPage.getByText(title, { exact: true })).toHaveCount(0);

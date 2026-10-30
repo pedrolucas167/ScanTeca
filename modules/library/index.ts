@@ -6,6 +6,6 @@ export { LibraryError } from "./errors";
 export { scanBook, scanSchema } from "./scan";
 export { enrichBooks, enrichSchema } from "./enrichment";
 export { reorderBooks, reorderSchema } from "./reorder";
-export { getCatalog, getSharedCatalog, getBookDetail, getLibrarySettings } from "./queries";
+export { getCatalog, getCatalogDetails, getSharedCatalog, getBookDetail, getLibrarySettings } from "./queries";
 export { updateLibrarySettings, settingsSchema } from "./settings";
 export { LEGACY_DEFAULT_COLLECTION, getDefaultCollection, resolveCollection } from "./collections";
