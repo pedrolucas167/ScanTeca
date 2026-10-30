@@ -1,7 +1,7 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { readOracleCompletion, saveOracleAnswer, retrieveBooks, VECTOR_CANDIDATE_LIMIT,
-  createEvidenceRegistry, validateCitations, validateInventoryClaims, buildOracleSystemPrompt } from "@/modules/oracle";
+  createEvidenceRegistry, validateCitations, validateInventoryClaims, buildOracleSystemPrompt, updateReaderProfile } from "@/modules/oracle";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
@@ -93,66 +93,7 @@ const DISTANCE_THRESHOLD = 0.7;
 const MAX_DIARY_ENTRIES = 8;
 const MAX_RAG_MEMORIES = 6;
 const MAX_TOKENS_CHAT = Number(process.env.ORACLE_MAX_TOKENS || 800);
-const MAX_TOKENS_PROFILE = 120;
 const MAX_TOKENS_REWRITE = 60;
-
-async function updateReaderProfile(
-  userId: string,
-  currentProfile: string | null | undefined,
-  question: string,
-  answer: string,
-  apiKey: string,
-  signal: AbortSignal
-) {
-  try {
-    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
-      signal,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer":
-          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Scanteca Oráculo",
-      },
-      body: JSON.stringify({
-        model: CHAT_MODEL,
-        stream: false,
-        max_tokens: MAX_TOKENS_PROFILE,
-        messages: [
-          {
-            role: "user",
-            content: `Você mantém o perfil de um leitor com base nas conversas dele com um oráculo literário.
-
-Perfil atual:
-${currentProfile?.trim() || "(vazio)"}
-
-Última interação:
-Leitor: ${question}
-Oráculo: ${answer.slice(0, 800)}
-
-Reescreva o perfil em até 5 linhas curtas: gêneros/autores preferidos, livros citados, momento de leitura, pedidos recorrentes. Se nada novo foi revelado, responda exatamente: SEM MUDANÇA. Responda apenas com o perfil.`,
-          },
-        ],
-      }),
-    });
-    if (!res.ok) return;
-
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = data.choices?.[0]?.message?.content?.trim();
-    if (text && !text.startsWith("SEM MUDAN")) {
-      await prisma.librarySetting.upsert({
-        where: { userId },
-        create: { userId, oracleProfile: text },
-        update: { oracleProfile: text },
-      });
-    }
-  } catch (err) {
-    if (!signal.aborted) console.error("[oracle] profile update error:", err);
-  }
-}
 
 async function directChatResponse(question: string, apiKey: string, requestSignal: AbortSignal) {
   const cancellation = new AbortController();
@@ -815,7 +756,9 @@ export async function POST(request: NextRequest) {
             await saveOracleAnswer({ userId, sessionId, mode, content: outputText,
               sources: sources.map(source => ({ ...source })), replacesId: previousAnswer?.id });
             if (conversationHistory.length >= 4) {
-              await updateReaderProfile(userId, setting?.oracleProfile, trimmed, outputText, apiKey, generationSignal);
+              await updateReaderProfile({ userId, snapshot: { oracleProfile: setting?.oracleProfile ?? null,
+                oracleMemoryEnabled: setting?.oracleMemoryEnabled ?? true, oracleProfileVersion: setting?.oracleProfileVersion ?? 0 },
+                question: trimmed, apiKey, model: CHAT_MODEL, signal: generationSignal });
             }
           }
           generationSignal.throwIfAborted();
