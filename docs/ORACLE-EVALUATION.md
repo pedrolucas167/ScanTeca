@@ -2,14 +2,20 @@
 
 ## Executar
 
-`npm run eval:oracle` prepara e salva os nove cenários sem consultar o provedor.
+`npm run eval:oracle` prepara e salva os dez cenários sem consultar o provedor.
 Nenhum caso é marcado como aprovado no modo offline.
 
 `npm run eval:oracle -- --live` usa `OPENROUTER_API_KEY` e `ORACLE_CHAT_MODEL`
-do ambiente ou `.env`, com até 18 chamadas: uma geração e uma avaliação por caso.
+do ambiente ou `.env`, com até 20 chamadas: uma geração e uma avaliação por caso.
 As chamadas usam somente dados fictícios versionados em
 `tests/oracle-evaluation-fixtures.ts`, sem ler livros, perfis ou anotações reais.
 O script não grava no banco de dados.
+
+Para avaliar apenas a personalização com preferências fictícias:
+`npm run eval:oracle -- --live --case profile-preferences`. Essa execução faz
+duas chamadas. O resultado direcionado está em
+[ORACLE-PERSONALIZATION.md](./ORACLE-PERSONALIZATION.md); ele não substitui a
+avaliação geral registrada abaixo.
 
 O prompt de geração é compartilhado com a rota da aplicação. A avaliação usa
 contextos fixos e não verifica recuperação no PostgreSQL, roteamento, histórico,
@@ -39,7 +45,7 @@ Geração usa temperatura 0,3 e avaliação usa 0. O limite de tokens usa
 Não há retentativas automáticas nem seleção da melhor resposta.
 
 Um avaliador automático, especialmente quando usa o mesmo modelo, pode errar.
-Nove casos sintéticos em uma execução não estimam a qualidade geral em produção.
+Uma bateria pequena de casos sintéticos em uma execução não estima a qualidade geral em produção.
 Os relatórios permitem revisão humana das respostas e das justificativas.
 
 ## Primeira rodada real — 30/10/2026
