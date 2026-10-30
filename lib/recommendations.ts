@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { generateEmbedding } from "./embeddings";
 import { fetchWithRetry } from "./fetch-with-retry";
+import { fetchWithTimeout } from "./fetch-with-timeout";
 import {
   cleanTitle,
   normalize,
@@ -309,24 +310,33 @@ export async function searchGoogleBooks(query: string): Promise<GoogleBooksItem[
       ? `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=12${lang}&key=${apiKey}`
       : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=12${lang}`;
 
-  const ptRes = await fetchWithRetry(makeUrl("&langRestrict=pt"), {
-    maxRetries: 2,
-    baseDelay: 500,
-  });
-  let data: { items?: GoogleBooksItem[] } = {};
-  if (ptRes.ok) {
-    data = (await ptRes.json()) as typeof data;
-    if (!data.items || data.items.length === 0) {
-      const fallbackRes = await fetchWithRetry(makeUrl(""), {
-        maxRetries: 2,
-        baseDelay: 500,
-      });
-      if (fallbackRes.ok) {
-        data = (await fallbackRes.json()) as typeof data;
+  // One budget for retries, response bodies and the language fallback together.
+  const signal = AbortSignal.timeout(6000);
+  try {
+    const ptRes = await fetchWithRetry(makeUrl("&langRestrict=pt"), {
+      maxRetries: 2,
+      baseDelay: 500,
+      signal,
+    });
+    let data: { items?: GoogleBooksItem[] } = {};
+    if (ptRes.ok) {
+      data = (await ptRes.json()) as typeof data;
+      if (!data.items || data.items.length === 0) {
+        const fallbackRes = await fetchWithRetry(makeUrl(""), {
+          maxRetries: 2,
+          baseDelay: 500,
+          signal,
+        });
+        if (fallbackRes.ok) {
+          data = (await fallbackRes.json()) as typeof data;
+        }
       }
     }
+    return data.items || [];
+  } catch (error) {
+    console.error("[recommendations] Google Books search error:", error);
+    return [];
   }
-  return data.items || [];
 }
 
 function scoreByOverlap(
@@ -525,7 +535,7 @@ ${bookList}
 Tendências principais: gêneros: ${topGenres.map((g) => g.label).join(", ")}; autores: ${topAuthors.map((a) => a.label).join(", ")}; temas: ${topKeywords.slice(0, 6).map((k) => k.label).join(", ")}.`;
 
   try {
-    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -557,7 +567,7 @@ Tendências principais: gêneros: ${topGenres.map((g) => g.label).join(", ")}; a
       tags: string[];
     }[];
 
-    return (Array.isArray(parsed) ? parsed : []).filter((s) => s.title && s.author);
+    return (Array.isArray(parsed) ? parsed : []).filter((s) => s.title && s.author).slice(0, 5);
   } catch (err) {
     console.error("[recommendations] LLM suggestions error:", err);
     return [];
@@ -567,8 +577,7 @@ Tendências principais: gêneros: ${topGenres.map((g) => g.label).join(", ")}; a
 async function enrichWithGoogleBooks(
   suggestions: { title: string; author: string; reason: string; tags: string[] }[]
 ): Promise<GoogleBooksItem[]> {
-  const results: GoogleBooksItem[] = [];
-  for (const s of suggestions) {
+  const results = await mapInBatches(suggestions, async (s) => {
     const query = `intitle:${s.title} inauthor:${s.author}`;
     const items = await searchGoogleBooks(query);
     const best =
@@ -580,7 +589,16 @@ async function enrichWithGoogleBooks(
           i.volumeInfo.authors?.join(", ") || ""
         )
       ) || items[0];
-    if (best) results.push(best);
+    return best ? [best] : [];
+  });
+  return results.flat();
+}
+
+// Preserve input order while limiting each search group to three requests.
+async function mapInBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += 3) {
+    results.push(...await Promise.all(items.slice(i, i + 3).map(run)));
   }
   return results;
 }
@@ -608,12 +626,7 @@ async function fetchCandidatesFromProfile(
     }
   }
 
-  const all: GoogleBooksItem[] = [];
-  for (const q of queries.slice(0, 4)) {
-    const items = await searchGoogleBooks(q);
-    all.push(...items);
-  }
-  return all;
+  return (await mapInBatches(queries.slice(0, 4), searchGoogleBooks)).flat();
 }
 
 export async function buildRecommendations(
@@ -720,23 +733,11 @@ export async function buildRecommendations(
   const profileVector = allVectors.length > 0 ? averageVectors(allVectors) : null;
 
   // Geração de candidatos
-  const llmSuggestions = await generateLLMSuggestions(
-    booksRaw,
-    genreFreq,
-    authorFreq,
-    keywordFreq
-  );
-
-  const llmCandidates =
-    llmSuggestions.length > 0
-      ? await enrichWithGoogleBooks(llmSuggestions)
-      : [];
-
-  const searchCandidates = await fetchCandidatesFromProfile(
-    genreFreq,
-    authorFreq,
-    keywordFreq
-  );
+  const [llmCandidates, searchCandidates] = await Promise.all([
+    generateLLMSuggestions(booksRaw, genreFreq, authorFreq, keywordFreq)
+      .then(enrichWithGoogleBooks),
+    fetchCandidatesFromProfile(genreFreq, authorFreq, keywordFreq),
+  ]);
 
   const allCandidates = [...llmCandidates, ...searchCandidates];
 
