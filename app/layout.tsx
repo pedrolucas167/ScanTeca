@@ -25,6 +25,7 @@ import MobileNav from "@/components/ui/MobileNav";
 import NavigationDropdown from "@/components/ui/NavigationDropdown";
 import RoutePrefetch from "@/components/ui/RoutePrefetch";
 import WebVitals from "@/components/ui/WebVitals";
+import { measureServerTask } from "@/lib/server-timing";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -80,10 +81,10 @@ export const viewport: Viewport = {
 const getAccentTheme = (userId: string) =>
   unstable_cache(
     async () => {
-      const setting = await prisma.librarySetting.findUnique({
+      const setting = await measureServerTask("db.accent", () => prisma.librarySetting.findUnique({
         where: { userId },
         select: { accentTheme: true },
-      });
+      }));
       return setting?.accentTheme ?? null;
     },
     ["accent-theme", userId],
@@ -93,9 +94,9 @@ const getAccentTheme = (userId: string) =>
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   let accent: string | null = null;
   try {
-    const { userId } = await auth();
+    const { userId } = await measureServerTask("layout.auth", () => auth());
     if (userId) {
-      accent = await getAccentTheme(userId);
+      accent = await measureServerTask("layout.accent", () => getAccentTheme(userId));
     }
   } catch {}
 

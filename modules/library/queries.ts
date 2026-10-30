@@ -1,12 +1,25 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { measureServerTask } from "@/lib/server-timing";
 
 export async function getLibrarySettings(userId: string) {
-  return prisma.librarySetting.upsert({ where: { userId }, update: {}, create: { userId, name: "Minha Biblioteca" } });
+  const existing = await prisma.librarySetting.findUnique({ where: { userId } });
+  if (existing) return existing;
+  try {
+    return await prisma.librarySetting.create({ data: { userId, name: "Minha Biblioteca" } });
+  } catch (error) {
+    // Two first visits may race. Read the winner instead of failing or
+    // overwriting an existing library's name, sharing preferences or theme.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return prisma.librarySetting.findUniqueOrThrow({ where: { userId } });
+    }
+    throw error;
+  }
 }
 
 export async function getCatalog(userId: string) {
   const [books, setting] = await Promise.all([
-    prisma.book.findMany({
+    measureServerTask("catalog.books", () => prisma.book.findMany({
       where: { userId }, orderBy: { createdAt: "desc" },
       select: {
         id: true, isbn: true, title: true, author: true, publishedDate: true,
@@ -14,8 +27,8 @@ export async function getCatalog(userId: string) {
         pages: true, customOrder: true, createdAt: true,
         collection: { select: { name: true } },
       },
-    }),
-    getLibrarySettings(userId),
+    })),
+    measureServerTask("catalog.settings", () => getLibrarySettings(userId)),
   ]);
   return { books: books.map(book => ({ ...book, collection: book.collection.name })), setting };
 }
