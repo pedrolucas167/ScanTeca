@@ -27,7 +27,7 @@ import { bookCreateSchema } from "./contracts";
 import { scanBook, scanSchema } from "./scan";
 import { reorderBooks, reorderSchema } from "./reorder";
 import { updateLibrarySettings, settingsSchema } from "./settings";
-import { getSharedCatalog, getBookDetail } from "./queries";
+import { getCatalog, getCatalogDetails, getSharedCatalog, getBookDetail } from "./queries";
 import { enrichBooks } from "./enrichment";
 import { generateEmbedding } from "@/lib/embeddings";
 import { refreshBookEmbedding } from "./indexing";
@@ -134,6 +134,18 @@ describe("Biblioteca com PostgreSQL", () => {
     expect(await getBookDetail("library-integration-other", created.book.id)).toBeNull();
     await updateLibrarySettings(owner, settingsSchema.parse({ shareEnabled: false }));
     expect(await getSharedCatalog(setting.shareId!)).toBeNull();
+  });
+
+  it("catálogo inicial omite textos privados e detalhes sob demanda mantêm isolamento", async () => {
+    const created = await createBook(owner, input(), { metadataReady: true });
+    await prisma.book.update({ where: { id: created.book.id }, data: { synopsis: "Sinopse completa", notes: "Notas privadas completas" } });
+    const catalog = await getCatalog(owner);
+    expect(catalog.books).toHaveLength(1);
+    expect(catalog.books[0]).not.toHaveProperty("notes");
+    expect(catalog.books[0]).not.toHaveProperty("synopsis");
+    expect((await getCatalogDetails(owner, created.book.id))[0]).toMatchObject({ synopsis: "Sinopse completa", notes: "Notas privadas completas" });
+    expect(await getCatalogDetails("library-integration-other", created.book.id)).toEqual([]);
+    expect(await getCatalogDetails("library-integration-other")).toEqual([]);
   });
 
   it("indexação atrasada não grava vetor de uma versão antiga", async () => {

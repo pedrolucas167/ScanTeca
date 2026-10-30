@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES_STITCH } from "@/lib/constants/book-status";
 import { LITERARY_QUOTES } from "@/lib/constants/literary-quotes";
-import type { Book } from "@/lib/types/book";
+import type { Book, CatalogBook } from "@/lib/types/book";
+import { toCatalogBook } from "@/lib/catalog-book";
+
+const PAGE_SIZE = 24;
 
 const isKnownAuthor = (author: string | null | undefined) => {
   if (!author) return false;
@@ -58,10 +61,10 @@ function BookShelfCover({
   onEdit,
   onDelete,
 }: {
-  book: Book;
+  book: CatalogBook;
   spineCmValue: number;
-  onEdit: (book: Book) => void;
-  onDelete: (book: Book) => void;
+  onEdit: (book: CatalogBook) => void;
+  onDelete: (book: CatalogBook) => void;
 }) {
   const [width, setWidth] = useState(() =>
     Math.min(
@@ -146,7 +149,7 @@ export default function Catalog({
   shareEnabled: initialShareEnabled,
   shareId: initialShareId,
 }: {
-  books: Book[];
+  books: CatalogBook[];
   libraryName: string;
   shareEnabled: boolean;
   shareId: string | null;
@@ -165,7 +168,12 @@ export default function Catalog({
     "title-asc" | "title-desc" | "author-asc" | "author-desc" | "newest" | "oldest" | "rating" | "custom"
   >("newest");
   const [editingBook, setEditingBook] = useState<Book | null>(null);
-  const [bookList, setBookList] = useState<Book[]>(books);
+  const [bookList, setBookList] = useState<CatalogBook[]>(books);
+  const [displayPage, setDisplayPage] = useState({ key: "", limit: PAGE_SIZE });
+  const [loadingDetails, setLoadingDetails] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const editRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => { editRequest.current?.abort(); }, []);
   const [libraryName, setLibraryName] = useState(initialLibraryName);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(initialLibraryName);
@@ -334,9 +342,27 @@ export default function Catalog({
     return result;
   }, [bookList, query, statusFilter, collectionFilter, ratingFilter, yearFilter, genreFilter, noCoverOnly, sortBy]);
 
-  const handleEdit = (book: Book) => setEditingBook({ ...book });
+  const handleEdit = async (book: CatalogBook) => {
+    editRequest.current?.abort();
+    const controller = new AbortController();
+    editRequest.current = controller;
+    setLoadingDetails(book.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/books/details?id=${encodeURIComponent(book.id)}`, {
+        cache: "no-store", signal: controller.signal,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.books?.[0]) throw new Error(data.error || "Erro ao carregar o livro");
+      if (!controller.signal.aborted) setEditingBook(data.books[0]);
+    } catch (error) {
+      if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Erro ao carregar o livro");
+    } finally {
+      if (editRequest.current === controller) setLoadingDetails(null);
+    }
+  };
 
-  const handleDelete = async (book: Book) => {
+  const handleDelete = async (book: CatalogBook) => {
     if (!confirm(`Tem certeza que deseja remover "${book.title}"?`)) return;
     setLoading(true);
     setMessage(null);
@@ -383,7 +409,7 @@ export default function Catalog({
       });
       const data = await res.json();
       if (res.ok) {
-        setBookList((prev) => prev.map((b) => (b.id === data.book.id ? data.book : b)));
+        setBookList((prev) => prev.map((b) => (b.id === data.book.id ? toCatalogBook(data.book) : b)));
         setEditingBook(null);
         setMessage(`${data.book.title} atualizado`);
         setTimeout(() => setMessage(null), 3000);
@@ -397,7 +423,7 @@ export default function Catalog({
     }
   };
 
-  const searchAndSaveCover = async (book: Book) => {
+  const searchAndSaveCover = async (book: CatalogBook) => {
     setLoading(true);
     setMessage(null);
     try {
@@ -657,41 +683,60 @@ export default function Catalog({
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = [
-      "Título", "Autor", "ISBN", "Publicação", "Gênero", "Status", "Coleção",
-      "Avaliação", "Páginas", "Capa", "Sinopse", "Notas",
-    ];
-    const escape = (v: string | number | null | undefined) => {
-      const s = v === null || v === undefined ? "" : String(v);
-      return `"${s.replace(/"/g, '""')}"`;
-    };
-    const rows = filtered.map((b) =>
-      [
-        escape(b.title),
-        escape(b.author),
-        escape(b.isbn),
-        escape(b.publishedDate),
-        escape(b.genre),
-        escape(BOOK_STATUS_LABELS[b.status] ?? b.status),
-        escape(b.collection),
-        escape(b.rating),
-        escape(b.pages),
-        escape(b.coverUrl),
-        escape(b.synopsis),
-        escape(b.notes),
-      ].join(",")
-    );
-    const csv = "\uFEFF" + [headers.map(escape).join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `scanteca-catalogo-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setMessage(`Catálogo exportado (${filtered.length} livros)`);
-    setTimeout(() => setMessage(null), 3000);
+  const handleExportCSV = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/books/details", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erro ao exportar o catálogo");
+      const byId = new Map<string, Book>((data.books as Book[]).map(book => [book.id, book]));
+      // Export every filtered result in the selected order, including unloaded rows.
+      const exportBooks = filtered.map(book => {
+        const details = byId.get(book.id);
+        if (!details) throw new Error("O catálogo mudou. Atualize a página antes de exportar.");
+        return details;
+      });
+      const headers = [
+        "Título", "Autor", "ISBN", "Publicação", "Gênero", "Status", "Coleção",
+        "Avaliação", "Páginas", "Capa", "Sinopse", "Notas",
+      ];
+      const escape = (v: string | number | null | undefined) => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const rows = exportBooks.map((b) =>
+        [
+          escape(b.title),
+          escape(b.author),
+          escape(b.isbn),
+          escape(b.publishedDate),
+          escape(b.genre),
+          escape(BOOK_STATUS_LABELS[b.status] ?? b.status),
+          escape(b.collection),
+          escape(b.rating),
+          escape(b.pages),
+          escape(b.coverUrl),
+          escape(b.synopsis),
+          escape(b.notes),
+        ].join(",")
+      );
+      const csv = "\uFEFF" + [headers.map(escape).join(","), ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `scanteca-catalogo-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage(`Catálogo exportado (${filtered.length} livros)`);
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erro ao exportar o catálogo");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleDragStart = (id: string) => setDraggedId(id);
@@ -791,7 +836,10 @@ export default function Catalog({
     return "girafa adulta";
   };
 
-  const shelfBooks = filtered;
+  const resultsKey = JSON.stringify([query, statusFilter, collectionFilter, ratingFilter, yearFilter, genreFilter, noCoverOnly, sortBy, viewMode]);
+  const visibleLimit = displayPage.key === resultsKey ? displayPage.limit : PAGE_SIZE;
+  const visibleBooks = filtered.slice(0, visibleLimit);
+  const shelfBooks = visibleBooks;
   const stackBooks = filtered
     .filter((b) => b.status === "READING" || b.status === "TO_READ")
     .slice(0, 6);
@@ -1083,10 +1131,11 @@ export default function Catalog({
               </button>
               <button
                 onClick={handleExportCSV}
+                disabled={exporting}
                 className="inline-flex items-center gap-1 rounded-lg border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high"
               >
                 <Icon name="download" className="text-sm" />
-                CSV
+                {exporting ? "Exportando…" : "CSV"}
               </button>
               <button
                 onClick={handleToggleShare}
@@ -1172,6 +1221,8 @@ export default function Catalog({
           </div>
         )}
 
+        {loadingDetails && <p role="status" className="text-sm text-on-surface-variant">Carregando dados do livro…</p>}
+
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Icon name="menu_book" className="mb-4 text-6xl text-outline/30" />
@@ -1194,7 +1245,7 @@ export default function Catalog({
                   Prateleira do Momento
                 </h2>
                 <span className="font-body-sm text-body-sm font-medium text-on-surface-variant">
-                  {shelfBooks.length} volumes
+                  {filtered.length} volumes
                 </span>
               </div>
               <span className="flex items-center font-label-sm text-label-sm text-primary">
@@ -1319,7 +1370,7 @@ export default function Catalog({
           </section>
         ) : viewMode === "list" ? (
           <div className="divide-y divide-outline-variant/20 rounded-xl border border-outline-variant/20 bg-surface-container">
-            {filtered.map((book) => (
+            {visibleBooks.map((book) => (
               <div
                 key={book.id}
                 draggable={sortBy === "custom"}
@@ -1377,7 +1428,7 @@ export default function Catalog({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {filtered.map((book) => (
+            {visibleBooks.map((book) => (
               <article
                 key={book.id}
                 draggable={sortBy === "custom"}
@@ -1426,6 +1477,18 @@ export default function Catalog({
                 </div>
               </article>
             ))}
+          </div>
+        )}
+
+        {viewMode !== "physical-stack" && filtered.length > 0 && (
+          <div className="flex flex-col items-center gap-3 py-4">
+            <p className="text-sm text-on-surface-variant">Exibindo {visibleBooks.length} de {filtered.length} livros</p>
+            {visibleBooks.length < filtered.length && (
+              <button
+                onClick={() => setDisplayPage({ key: resultsKey, limit: visibleLimit + PAGE_SIZE })}
+                className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-on-primary"
+              >Mostrar mais livros</button>
+            )}
           </div>
         )}
 
