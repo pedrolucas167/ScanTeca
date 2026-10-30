@@ -44,7 +44,7 @@ export const oracleEvaluationCases: OracleEvaluationCase[] = [
     evidence: [garden, { source: { id: "fixture-external", title: "Atlas das Águas Suspensas", author: "Bia Sol", external: true },
       content: 'Catálogo externo [FORA DO ACERVO]: "Atlas das Águas Suspensas" — Bia Sol. Sinopse: Uma navegadora cartografa rios suspensos entre montanhas. O leitor NÃO possui este livro segundo o catálogo fornecido.' }],
     expectedMentions: ["Atlas das Águas Suspensas"], requiredCitations: [2],
-    rubric: "Indicar Atlas das Águas Suspensas como sugestão externa, deixando explícito que não faz parte do acervo apresentado.",
+    rubric: "A indicação PRINCIPAL deve ser Atlas das Águas Suspensas, que atende ao pedido específico de navegação por rios. Deixar explícito que é externo. Não substituir a indicação principal por Jardins da Maré só por pertencer ao leitor. A seleção parcial não comprova que o acervo completo não tem livros sobre navegação.",
   },
   {
     id: "unknown-ownership", mode: "LOCATE", scope: "library",

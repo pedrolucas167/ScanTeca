@@ -25,6 +25,14 @@ describe("Oracle evaluation scoring", () => {
   it("rejects wrong attribution reported by the judge", () => {
     expect(checkEvaluationAnswer(testCase, answer, { ...judgment, citationsSupported: false }).passed).toBe(false);
   });
+  it("rejects a primary recommendation that fails the requested topic", () => {
+    expect(checkEvaluationAnswer(testCase, answer, { ...judgment, relevant: false }).passed).toBe(false);
+  });
+  it("does not allow a favorable judge to override an unsupported inventory-wide claim", () => {
+    const result = checkEvaluationAnswer(testCase, `${answer} Em seu acervo pessoal, não há um livro sobre rios.`, judgment);
+    expect(result.passed).toBe(false);
+    expect(result.unsupportedInventoryClaims).toHaveLength(1);
+  });
   it("does not silently coerce invalid judge data to a pass", () => {
     expect(() => parseOracleJudgment('{"relevant":"true","faithful":true}')).toThrow();
     expect(() => parseOracleJudgment("Falha no provedor")).toThrow();

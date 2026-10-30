@@ -101,7 +101,9 @@ async function main() {
   const directory = join(process.cwd(), "reports");
   await mkdir(directory, { recursive: true });
   const output = join(directory, `oracle-evaluation-${timestamp.replace(/[:.]/g, "-")}.json`);
-  await writeFile(output, JSON.stringify({ version: 1, timestamp, live, model, judgeModel, maxTokens,
+  await writeFile(output, JSON.stringify({ version: 2, timestamp, live, model, judgeModel, maxTokens,
+    fixtureHash: createHash("sha256").update(JSON.stringify(oracleEvaluationCases)).digest("hex"),
+    judgePromptHash: createHash("sha256").update(ORACLE_JUDGE_PROMPT).digest("hex"),
     limitations: "Synthetic fixed contexts; no database retrieval, authenticated HTTP, streaming or human judgment validation. Automated judge may share the generation model and can be wrong.",
     summary, cases }, null, 2));
   process.stdout.write(`${JSON.stringify(summary)}\nRelatório: ${output}\n`);

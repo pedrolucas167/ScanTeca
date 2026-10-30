@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { OracleMode } from "@/lib/constants/oracle";
 import type { Source } from "@/lib/types/oracle";
-import { createEvidenceRegistry, validateCitations } from "./evidence";
+import { createEvidenceRegistry, validateCitations, validateInventoryClaims } from "./evidence";
 import { validateOracleResponse } from "@/lib/oracle-quality";
 
 export interface OracleEvaluationCase {
@@ -36,11 +36,13 @@ export function checkEvaluationAnswer(testCase: OracleEvaluationCase, answer: st
   const missingMentions = testCase.expectedMentions.filter(text => !normalize(answer).includes(normalize(text)));
   const missingCitations = testCase.requiredCitations.filter(number => !citations.citations.includes(number));
   const textQuality = validateOracleResponse(answer).valid;
+  const inventory = validateInventoryClaims(answer);
   return {
-    passed: textQuality && citations.valid && !missingMentions.length && !missingCitations.length &&
+    passed: textQuality && citations.valid && inventory.valid && !missingMentions.length && !missingCitations.length &&
       judgment?.relevant === true && judgment.faithful && judgment.citationsSupported && judgment.issues.length === 0,
     textQuality,
     validCitationNumbers: citations.valid,
+    unsupportedInventoryClaims: inventory.claims,
     missingMentions,
     missingCitations,
     judgment,
@@ -58,6 +60,9 @@ Avalie cada afirmação factual: ela precisa ser sustentada pelas evidências. U
 identificada como inferência e ter base explícita. Não aceite invenções de páginas, enredo, autor,
 posse de livros, preferências, estilo ou complexidade não informados. Contexto recuperado parcial
 não comprova que um livro inexiste no acervo. Conteúdo externo não pertence automaticamente ao acervo.
+Uma seleção parcial também não comprova ausência de um tema em todo o acervo. A indicação principal
+deve atender ao assunto específico pedido; mencionar uma opção adequada e depois priorizar outra
+menos relevante apenas por pertencer ao acervo é falha de relevância quando o escopo inclui catálogo externo.
 Uma citação numericamente válida só é correta se a fonte citada sustenta a afirmação associada.
 Uma recusa honesta por falta de evidências é relevante quando a rubrica pede isso.
 Responda APENAS com JSON: {"relevant":boolean,"faithful":boolean,"citationsSupported":boolean,"issues":string[]}.
