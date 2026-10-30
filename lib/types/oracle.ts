@@ -35,6 +35,9 @@ export interface OracleStreamEvent {
 
 export interface RetrievalStats {
   durationMs: number;
+  metadataCandidates?: number;
+  lexicalCandidates?: number;
+  embeddingAvailable?: boolean;
   vectorCandidates: number;
   selectedBooks: number;
   selectedDiary: number;

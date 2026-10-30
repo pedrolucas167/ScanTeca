@@ -1,6 +1,7 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { readOracleCompletion, saveOracleAnswer } from "@/modules/oracle";
+import { readOracleCompletion, saveOracleAnswer, retrieveBooks, VECTOR_CANDIDATE_LIMIT,
+  createEvidenceRegistry, validateCitations } from "@/modules/oracle";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
@@ -16,8 +17,6 @@ import {
   shouldExecuteTool,
   type RoutingDecision,
 } from "@/lib/jev-routing";
-import { jevExtractFilters, filtersToWhereClause } from "@/lib/jev-filtering";
-import { jevRerank, mergeAndRerank } from "@/lib/jev-reranking";
 import { z } from "zod";
 import {
   isCorruptedHistoryMessage,
@@ -91,7 +90,6 @@ interface ExternalResearchMemory {
 
 const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.7;
-const MAX_CONTEXT_BOOKS = 4;
 const MAX_DIARY_ENTRIES = 8;
 const MAX_RAG_MEMORIES = 6;
 const MAX_TOKENS_CHAT = Number(process.env.ORACLE_MAX_TOKENS || 800);
@@ -526,25 +524,18 @@ export async function POST(request: NextRequest) {
     const retrievalStartedAt = Date.now();
     const questionEmbedding = await generateEmbedding(retrievalQuery);
 
-    if (!questionEmbedding) {
-      return new Response(
-        JSON.stringify({ error: "Falha ao gerar embedding da pergunta" }),
-        { status: 502, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    const vector = `[${questionEmbedding.join(",")}]`;
+    const vector = `[${questionEmbedding?.join(",") ?? ""}]`;
     const [similarBooks, semanticDiary, semanticReviews, semanticExternal] = await Promise.all([
-      prisma.$queryRaw<SimilarBook[]>`
+      questionEmbedding ? prisma.$queryRaw<SimilarBook[]>`
       SELECT id, title, author, "publishedDate", synopsis, genre,
              status::text as status, rating,
              embedding <=> ${vector}::vector AS distance
       FROM "Book"
       WHERE "userId" = ${userId} AND embedding IS NOT NULL
       ORDER BY embedding <=> ${vector}::vector
-      LIMIT 5
-      `,
-      prisma.$queryRaw<DiaryMemory[]>`
+      LIMIT ${VECTOR_CANDIDATE_LIMIT}
+      ` : Promise.resolve([] as SimilarBook[]),
+      questionEmbedding ? prisma.$queryRaw<DiaryMemory[]>`
         SELECT d.id, d.type, d.content, d.page, d.tags,
                b.title AS "bookTitle", b.author AS "bookAuthor",
                d.embedding <=> ${vector}::vector AS distance
@@ -555,8 +546,8 @@ export async function POST(request: NextRequest) {
           AND d.embedding IS NOT NULL
         ORDER BY d.embedding <=> ${vector}::vector
         LIMIT ${MAX_RAG_MEMORIES}
-      `,
-      prisma.$queryRaw<ReviewMemory[]>`
+      ` : Promise.resolve([] as DiaryMemory[]),
+      questionEmbedding ? prisma.$queryRaw<ReviewMemory[]>`
         SELECT r.id, r.content, r.rating,
                b.title AS "bookTitle", b.author AS "bookAuthor",
                r.embedding <=> ${vector}::vector AS distance
@@ -566,8 +557,8 @@ export async function POST(request: NextRequest) {
           AND r.embedding IS NOT NULL
         ORDER BY r.embedding <=> ${vector}::vector
         LIMIT ${MAX_RAG_MEMORIES}
-      `,
-      prisma.$queryRaw<ExternalResearchMemory[]>`
+      ` : Promise.resolve([] as ReviewMemory[]),
+      questionEmbedding ? prisma.$queryRaw<ExternalResearchMemory[]>`
         SELECT id, source, title, content, type,
                embedding <=> ${vector}::vector AS distance
         FROM "ExternalResearchData"
@@ -575,16 +566,12 @@ export async function POST(request: NextRequest) {
           AND embedding IS NOT NULL
         ORDER BY embedding <=> ${vector}::vector
         LIMIT ${MAX_RAG_MEMORIES}
-      `,
+      ` : Promise.resolve([] as ExternalResearchMemory[]),
     ]);
 
-    const relevantBooks = similarBooks.filter(
-      (b) => Number(b.distance) < DISTANCE_THRESHOLD
-    );
-
-    // Jev Metadata Filtering - extract structured filters from query
-    const metadataFilters = await jevExtractFilters(retrievalQuery);
-    const whereClause = filtersToWhereClause(metadataFilters, userId);
+    const { books: contextBooks, metadataCandidates, lexicalCandidates } = await retrieveBooks(userId, retrievalQuery, similarBooks, mode);
+    const evidence = createEvidenceRegistry();
+    const sources = evidence.sources;
 
     interface ExternalBook {
       title: string;
@@ -618,121 +605,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Use Jev filters to fetch additional books
-    const hasFilters = Object.keys(metadataFilters).length > 0;
-    
-    let contextBooks = relevantBooks;
-    
-    if (hasFilters) {
-      const metaRows = await prisma.book.findMany({
-        where: whereClause,
-        take: 8,
-      });
-      
-      // Convert to BookCandidate format for Jev reranking
-      const semanticCandidates = relevantBooks.map((b) => ({
-        id: b.id,
-        title: b.title,
-        author: b.author,
-        publishedDate: b.publishedDate,
-        synopsis: b.synopsis,
-        genre: b.genre,
-        status: b.status,
-        rating: b.rating,
-        distance: Number(b.distance),
-      }));
-      
-      const metadataCandidates = metaRows
-        .filter((b) => !relevantBooks.some((rb) => rb.id === b.id))
-        .map((b) => ({
-          id: b.id,
-          title: b.title,
-          author: b.author,
-          publishedDate: b.publishedDate,
-          synopsis: b.synopsis,
-          genre: b.genre,
-          status: String(b.status),
-          rating: b.rating,
-          distance: undefined, // No semantic match for metadata-only results
-        }));
-      
-      // Use Jev reranking to merge and score results
-      const reranked = await mergeAndRerank(
-        retrievalQuery,
-        semanticCandidates,
-        metadataCandidates,
-        { mode, threshold: 40, maxResults: MAX_CONTEXT_BOOKS }
-      );
-      
-      // Map reranked results back to SimilarBook format
-      const allCandidates = [...semanticCandidates, ...metadataCandidates];
-      contextBooks = reranked.flatMap((r) => {
-          const candidate = allCandidates.find((c) => c.id === r.id);
-          // Metadata matches narrow retrieval but are not evidence by
-          // themselves unless the book also has a semantic match.
-          if (!candidate || candidate.distance === undefined) return [];
-          return [{
-            id: candidate.id,
-            title: candidate.title,
-            author: candidate.author,
-            publishedDate: candidate.publishedDate,
-            synopsis: candidate.synopsis,
-            genre: candidate.genre,
-            status: candidate.status,
-            rating: candidate.rating,
-            distance: candidate.distance ?? 1,
-            relevance: r.relevance,
-          }];
-        });
-    } else {
-      // No filters, just use semantic results with Jev reranking
-      const candidates = relevantBooks.map((b) => ({
-        id: b.id,
-        title: b.title,
-        author: b.author,
-        publishedDate: b.publishedDate,
-        synopsis: b.synopsis,
-        genre: b.genre,
-        status: b.status,
-        rating: b.rating,
-        distance: Number(b.distance),
-      }));
-      
-      const reranked = await jevRerank(retrievalQuery, candidates, {
-        mode,
-        threshold: 40,
-        maxResults: MAX_CONTEXT_BOOKS,
-      });
-      
-      contextBooks = reranked.flatMap((r) => {
-          const candidate = candidates.find((c) => c.id === r.id);
-          if (!candidate) return [];
-          return [{
-            id: candidate.id,
-            title: candidate.title,
-            author: candidate.author,
-            publishedDate: candidate.publishedDate,
-            synopsis: candidate.synopsis,
-            genre: candidate.genre,
-            status: candidate.status,
-            rating: candidate.rating,
-            distance: candidate.distance,
-            relevance: r.relevance,
-          }];
-        });
-    }
-
     const context =
       contextBooks.length > 0
         ? contextBooks
             .map(
-              (b, i) =>
-                `${i + 1}. "${b.title}" — ${b.author}` +
+              (b) => evidence.add({ id: b.id, title: b.title, author: b.author, status: b.status,
+                  genre: b.genre, relevance: b.relevance, matchedBy: b.matchedBy,
+                  evidence: b.synopsis?.slice(0, 500) ?? `Título: ${b.title}; autor: ${b.author}; status: ${b.status}` },
+                `"${b.title}" — ${b.author}` +
                 (b.publishedDate ? ` (${b.publishedDate})` : "") +
                 (b.genre ? ` [${b.genre}]` : "") +
                 `\n   Status: ${b.status === "READ" ? "Lido" : b.status === "READING" ? "Lendo" : b.status === "TO_READ" ? "A ler" : "Desejo"}` +
                 (b.rating ? ` | Avaliação: ${b.rating}/5` : "") +
-                (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 500)}` : "")
+                (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 500)}` : ""))
             )
             .join("\n\n")
         : "Nenhum livro relevante encontrado no acervo.";
@@ -787,18 +672,25 @@ export async function POST(request: NextRequest) {
           .map((entry) => {
             const title = "bookTitle" in entry ? entry.bookTitle : entry.book.title;
             const page = entry.page;
-            return `- [${entry.type}] "${title}"${page ? `, pág. ${page}` : ""}: ${entry.content.slice(0, 500)}`;
+            const author = "bookAuthor" in entry ? entry.bookAuthor : entry.book.author;
+            return evidence.add({ id: entry.id, title, author, sourceType: "diary", status: "MEMORY",
+              matchedBy: "memória do diário", evidence: entry.content.slice(0, 500) },
+              `- [${entry.type}] "${title}"${page ? `, pág. ${page}` : ""}: ${entry.content.slice(0, 500)}`);
           })
           .join("\n")}`
       : "";
     const reviewSection = relevantReviews.length
       ? `\n\nAvaliações relevantes:\n${relevantReviews
-          .map((review) => `- "${review.bookTitle}" — ${review.bookAuthor}${review.rating ? ` (${review.rating}/5)` : ""}: ${review.content.slice(0, 500)}`)
+          .map((review) => evidence.add({ id: review.id, title: review.bookTitle, author: review.bookAuthor,
+            sourceType: "review", status: "REVIEW", matchedBy: "avaliação do leitor", evidence: review.content.slice(0, 500) },
+            `- "${review.bookTitle}" — ${review.bookAuthor}${review.rating ? ` (${review.rating}/5)` : ""}: ${review.content.slice(0, 500)}`))
           .join("\n")}`
       : "";
     const externalSection = relevantExternal.length
       ? `\n\nPesquisa externa relevante:\n${relevantExternal
-          .map((data) => `- [${data.source} - ${data.type}] "${data.title}": ${data.content.slice(0, 500)}`)
+          .map((data) => evidence.add({ id: data.id, title: data.title, author: data.source, external: true,
+            matchedBy: "pesquisa externa", evidence: data.content.slice(0, 500) },
+            `- [${data.source} - ${data.type}] "${data.title}": ${data.content.slice(0, 500)}`))
           .join("\n")}`
       : "";
 
@@ -819,6 +711,7 @@ export async function POST(request: NextRequest) {
 
     const retrievalStats = {
       durationMs: Date.now() - retrievalStartedAt,
+      metadataCandidates, lexicalCandidates, embeddingAvailable: Boolean(questionEmbedding),
       vectorCandidates:
         similarBooks.length + semanticDiary.length + semanticReviews.length + semanticExternal.length,
       selectedBooks: contextBooks.length,
@@ -833,10 +726,11 @@ export async function POST(request: NextRequest) {
       externalBooks.length > 0
         ? `\n\nSugestões fora do acervo (o leitor NÃO possui estes livros):\n${externalBooks
             .map(
-              (b, i) =>
-                `${contextBooks.length + i + 1}. "${b.title}" — ${b.author} [FORA DO ACERVO]` +
+              (b, i) => evidence.add({ id: `ext-${i}`, title: b.title, author: b.author, external: true,
+                genre: b.genre, matchedBy: "catálogo externo", evidence: b.description?.slice(0, 300) ?? null },
+                `"${b.title}" — ${b.author} [FORA DO ACERVO]` +
                 (b.genre ? ` [${b.genre}]` : "") +
-                (b.description ? `\n   Sinopse: ${b.description.slice(0, 300)}` : "")
+                (b.description ? `\n   Sinopse: ${b.description.slice(0, 300)}` : ""))
             )
             .join("\n\n")}`
         : "";
@@ -870,8 +764,8 @@ REGRAS CRÍTICAS PARA EVITAR ALUCINAÇÕES:
 FORMATAÇÃO DE CITAÇÕES:
 - Quando mencionar informações específicas de uma fonte, inclua o número da fonte entre colchetes, ex: [1], [2]
 - Use citações quando mencionar: sinopses, autores específicos, datas de publicação, gêneros, avaliações, ou conteúdo do diário
-- Não precisa citar informações genéricas ou常识 literária
-- As fontes são numeradas na ordem em que aparecem no contexto
+- Diferencie fatos de inferências; identifique uma inferência e cite a evidência que a motivou
+- Use somente os identificadores numéricos explícitos de cada fonte, mesmo quando aparecerem fora de ordem
 
 Modo atual: ${mode}.
 Instrução específica: ${modeInstructions[mode]}
@@ -923,78 +817,6 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
-        const sources: {
-          id: string;
-          title: string;
-          author: string;
-          status: string;
-          genre: string | null;
-          relevance: number | null;
-          matchedBy: string;
-          evidence: string | null;
-          sourceType?: "book" | "diary" | "review";
-          external?: boolean;
-        }[] = contextBooks.map((b) => {
-          const distance = Number(b.distance);
-          const vectorMatch = distance > 0 && distance < DISTANCE_THRESHOLD;
-          const relevance = b.relevance ?? (vectorMatch
-            ? Math.max(0, Math.min(100, Math.round((1 - distance) * 100)))
-            : null);
-          const matchedBy = vectorMatch
-            ? "similaridade semântica"
-            : hasFilters
-              ? "filtros de metadados"
-              : "metadados do acervo";
-          return {
-            id: b.id,
-            title: b.title,
-            author: b.author,
-            status: b.status,
-            genre: b.genre,
-            relevance,
-            matchedBy,
-            evidence: b.synopsis?.slice(0, 180) ?? null,
-          };
-        });
-        for (const memory of relevantDiary) {
-          sources.push({
-            id: memory.id,
-            title: memory.bookTitle,
-            author: memory.bookAuthor,
-            status: "MEMORY",
-            genre: null,
-            relevance: Math.round((1 - Number(memory.distance)) * 100),
-            matchedBy: "memória do diário",
-            evidence: memory.content.slice(0, 180),
-            sourceType: "diary",
-          });
-        }
-        for (const review of relevantReviews) {
-          sources.push({
-            id: review.id,
-            title: review.bookTitle,
-            author: review.bookAuthor,
-            status: "REVIEW",
-            genre: null,
-            relevance: Math.round((1 - Number(review.distance)) * 100),
-            matchedBy: "avaliação do leitor",
-            evidence: review.content.slice(0, 180),
-            sourceType: "review",
-          });
-        }
-        for (const [i, b] of externalBooks.entries()) {
-          sources.push({
-            id: `ext-${i}`,
-            title: b.title,
-            author: b.author,
-            status: "EXTERNAL",
-            genre: b.genre,
-            relevance: null,
-            matchedBy: "catálogo externo",
-            evidence: b.description?.slice(0, 180) ?? null,
-            external: true,
-          });
-        }
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ sessionId })}\n\n`)
         );
@@ -1008,20 +830,11 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           encoder.encode(`data: ${JSON.stringify({ retrievalStats })}\n\n`)
         );
 
-        // Extract citations from the response text
-        const extractCitations = (text: string): number[] => {
-          const citationRegex = /\[(\d+)\]/g;
-          const citations = new Set<number>();
-          let match;
-          while ((match = citationRegex.exec(text)) !== null) {
-            if (match[1]) citations.add(parseInt(match[1], 10));
-          }
-          return Array.from(citations).sort((a, b) => a - b);
-        };
-
         try {
           const fullText = await readOracleCompletion(llmRes.body!, { signal: generationSignal });
-          const quality = validateOracleResponse(fullText);
+          const citationCheck = validateCitations(fullText, sources.length);
+          const quality = citationCheck.valid ? validateOracleResponse(fullText)
+            : { valid: false, reason: "citação sem fonte correspondente" };
           const outputText = quality.valid
             ? fullText.trim()
             : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
@@ -1032,14 +845,14 @@ ${profile ? `\n\nO que você já sabe sobre este leitor:\n${profile}` : ""}`;
           generationSignal.throwIfAborted();
           if (quality.valid) {
             await saveOracleAnswer({ userId, sessionId, mode, content: outputText,
-              sources, replacesId: previousAnswer?.id });
+              sources: sources.map(source => ({ ...source })), replacesId: previousAnswer?.id });
             if (conversationHistory.length >= 4) {
               await updateReaderProfile(userId, setting?.oracleProfile, trimmed, outputText, apiKey, generationSignal);
             }
           }
           generationSignal.throwIfAborted();
           // Extract and send citations
-          const citations = extractCitations(outputText);
+          const citations = validateCitations(outputText, sources.length).citations;
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
           );

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn().mockResolvedValue({ userId: "test-owner" }) }));
 vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn().mockResolvedValue(null), rateLimits: {} }));
 vi.mock("@/lib/embeddings", () => ({ generateEmbedding: vi.fn().mockResolvedValue([0.1]) }));
+vi.mock("@/modules/oracle/history", () => ({ saveOracleAnswer: vi.fn().mockResolvedValue({ id: "answer" }) }));
 vi.mock("@/lib/prisma", () => {
   const model = { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({ id: "cm123456789012345678901234" }), count: vi.fn().mockResolvedValue(1) };
@@ -13,9 +14,12 @@ vi.mock("@/lib/prisma", () => {
 import { POST } from "./route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
+import { saveOracleAnswer } from "@/modules/oracle";
+import { generateEmbedding } from "@/lib/embeddings";
+import * as retrieval from "@/modules/oracle";
 
 beforeEach(() => { vi.stubEnv("OPENROUTER_API_KEY", "test-key"); });
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("audio transcription in every Oracle response path", () => {
   it.each([
     ["Oi, tudo bem?", "chat"],
@@ -36,6 +40,55 @@ describe("audio transcription in every Oracle response path", () => {
     expect(body).toContain(transcriptEvent);
     expect(body.indexOf(transcriptEvent)).toBeLessThan(body.indexOf('data: {"text":'));
     expect(body).toContain("data: [DONE]");
+  });
+});
+
+describe("grounded answers and evidence", () => {
+  const book = { id: "dune", title: "Duna", author: "Frank Herbert", publishedDate: "1965",
+    genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
+
+  it.each([false, true])("keeps prompt and displayed source numbers aligned (invalid citation: %s)", async invalid => {
+    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    vi.mocked(generateEmbedding).mockResolvedValueOnce(null);
+    vi.mocked(saveOracleAnswer).mockClear();
+    let prompt = "";
+    vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
+      prompt = String(options.body);
+      const text = `Duna aborda ecologia em um planeta desértico [${invalid ? 2 : 1}].`;
+      return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`);
+    }));
+    const response = await POST(questionRequest("Quais temas aparecem em Duna?"));
+    const body = await response.text();
+    expect(prompt).toContain('[1]');
+    expect(body).toContain('"id":"dune"');
+    expect(body).toContain('"embeddingAvailable":false');
+    if (invalid) {
+      expect(body).toContain("Não consegui gerar uma resposta confiável");
+      expect(saveOracleAnswer).not.toHaveBeenCalled();
+    } else {
+      expect(body).toContain('"citations":[1]');
+      expect(saveOracleAnswer).toHaveBeenCalledWith(expect.objectContaining({ sources: [expect.objectContaining({ id: "dune" })] }));
+    }
+  });
+
+  it("uses identical references for book, diary, review and external research in the actual route", async () => {
+    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "diary", bookTitle: "Duna", bookAuthor: "Herbert", type: "NOTE", page: 20, content: "Minha anotação", distance: 0.2 }])
+      .mockResolvedValueOnce([{ id: "review", bookTitle: "Duna", bookAuthor: "Herbert", rating: 4, content: "Minha avaliação", distance: 0.2 }])
+      .mockResolvedValueOnce([{ id: "research", title: "Pesquisa", source: "Wikipedia", type: "article", content: "Pesquisa registrada", distance: 0.2 }]);
+    let prompt = "";
+    vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
+      prompt = JSON.parse(String(options.body)).messages.at(-1).content;
+      return new Response('data: {"choices":[{"delta":{"content":"As fontes consultadas são [1], [2], [3] e [4]."}}]}\n\ndata: [DONE]\n\n');
+    }));
+    const body = await (await POST(questionRequest("Quais temas aparecem em Duna?"))).text();
+    const events = body.split("\n\n").filter(line => line.startsWith("data: {")).map(line => JSON.parse(line.slice(6)));
+    expect(events.find(event => event.sources).sources.map((source: { id: string }) => source.id)).toEqual(["dune", "diary", "review", "research"]);
+    expect(prompt).toContain('[1] "Duna"');
+    expect(prompt).toContain('[2] - [NOTE]');
+    expect(prompt).toContain('[3] - "Duna"');
+    expect(prompt).toContain('[4] - [Wikipedia');
   });
 });
 
