@@ -280,7 +280,7 @@ export default function OraclePage() {
 
   const sendMessage = async (
     question: string,
-    opts?: { regenerate?: boolean }
+    opts?: { regenerate?: boolean; retry?: boolean }
   ) => {
     if (!question || loadingRef.current || recording || transcribing) return;
     const previousMessages = opts?.regenerate ? messages : null;
@@ -354,7 +354,10 @@ export default function OraclePage() {
         stopReveal();
         setMessages(previousMessages);
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          setError("Não foi possível gerar novamente. A resposta anterior foi preservada.");
+          setError(opts?.retry
+            ? err instanceof Error ? err.message : "Não foi possível concluir a nova tentativa."
+            : "Não foi possível gerar novamente. A resposta anterior foi preservada.");
+          if (opts?.retry) setFailedSend({ kind: "text", question, streamed: true });
         }
       } else if (err instanceof DOMException && err.name === "AbortError") {
         // Usuário parou a geração — mantém o que já foi revelado.
@@ -655,7 +658,7 @@ export default function OraclePage() {
     }
     if (failed.streamed) {
       // A pergunta já está na tela e no servidor — só regenera a resposta.
-      void sendMessage(failed.question, { regenerate: true });
+      void sendMessage(failed.question, { regenerate: true, retry: true });
     } else {
       // Nada chegou: remove a pergunta órfã e reenvia do zero.
       setMessages((prev) =>

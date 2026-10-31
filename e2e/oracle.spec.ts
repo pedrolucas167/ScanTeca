@@ -259,3 +259,39 @@ test("falha de envio mantém a pergunta e permite tentar novamente", async ({ pa
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
   expect(attempts).toBe(2);
 });
+
+test("segunda falha após aceitar a pergunta mantém a opção de tentar novamente", async ({ page }) => {
+  const requests: { regenerate?: boolean; sessionId?: string }[] = [];
+  const acceptedSession = "cm123456789012345678901234";
+  await page.route("**/api/oracle", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1) {
+      await route.fulfill({ contentType: "text/event-stream", body:
+        `data: ${JSON.stringify({ sessionId: acceptedSession })}\n\ndata: ${JSON.stringify({ error: "Falha após receber a pergunta" })}\n\n` });
+    } else if (requests.length === 2) {
+      await route.fulfill({ status: 503, json: { error: "Segunda falha temporária" } });
+    } else {
+      await route.fulfill({ contentType: "text/event-stream", body: stream });
+    }
+  });
+  await bootstrap(page);
+  await openOracle(page);
+  await page.getByRole("textbox", { name: "Sua mensagem" }).fill("Pergunta confirmada que deve ser preservada");
+  await page.getByRole("button", { name: "Enviar mensagem" }).click();
+  const retry = page.getByRole("button", { name: "Tentar novamente", exact: true });
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect.poll(() => requests.length).toBe(2);
+  await expect(page.getByRole("button", { name: "Parar geração" })).toHaveCount(0);
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect(page.getByText(answer, { exact: true })).toBeVisible();
+  await expect(page.getByText("Pergunta confirmada que deve ser preservada", { exact: true })).toHaveCount(1);
+  await expect(retry).toHaveCount(0);
+  expect(requests).toHaveLength(3);
+  expect(requests.slice(1)).toEqual([
+    expect.objectContaining({ regenerate: true, sessionId: acceptedSession }),
+    expect.objectContaining({ regenerate: true, sessionId: acceptedSession }),
+  ]);
+});
