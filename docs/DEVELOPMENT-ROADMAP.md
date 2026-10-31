@@ -1,26 +1,28 @@
 # Roadmap de modularização — ScanTeca
 
 Continuação do Oráculo em 30/10/2026: [roadmap de qualidade](./ORACLE-QUALITY-ROADMAP.md).
-A modularização do fluxo fundamentado foi concluída e está em PR de revisão;
-avaliação representativa, aceite humano e publicação continuam separados.
+A modularização do fluxo fundamentado foi concluída, integrada e publicada.
+A próxima etapa é o aceite autenticado do Oráculo e a avaliação representativa,
+com critérios registrados no roadmap específico; essas validações ainda não
+estão concluídas.
 
 Registro histórico iniciado em 13/10/2026. Estratégia: migração incremental no mesmo Next.js,
 PostgreSQL e deploy. Estimativas em dias de engenharia focada de uma pessoa,
 incluindo revisão e testes; não são prazos de calendário ou compromissos.
 
-## Pendências reavaliadas — 30/10/2026
+## Pendências reavaliadas — 31/10/2026
 
-A revisão atual do Oráculo está no
+O pacote atual do Oráculo foi integrado pelo
 [PR de recuperação fundamentada e memória controlável](https://github.com/pedrolucas167/ScanTeca/pull/178),
-em rascunho. Os checks de build, integração, cobertura, segurança e políticas
-passaram no commit de conclusão da modularização. A falha inicial da prévia
-Vercel foi identificada como falta de configuração de banco/autenticação para
-essa branch; sua configuração isolada está registrada no guia operacional.
-Isso não confirma publicação em produção.
+em 31/10/2026. Os checks de build, integração, cobertura, segurança e políticas
+passaram. O deployment de produção correspondente ao merge foi confirmado na
+Vercel, e o smoke das quatro rotas públicas passou localmente e no Actions.
+A prévia isolada foi corrigida separadamente, conforme o guia operacional.
+O smoke público não comprova o aceite autenticado nem a qualidade representativa.
 
 | Ordem sugerida | Frente | O que ainda precisa de aceite |
 | --- | --- | --- |
-| Atual | Oráculo | Concluir revisão do PR e preview, ampliar os casos de qualidade com acervo representativo e revisão humana, validar voz e medir latência/custos no deployment integrado |
+| Próxima etapa marcada | Oráculo | Aceite autenticado com persistência e isolamento entre contas; avaliação com acervo fictício representativo e revisão humana explícita. Voz e métricas de produção continuam separadas |
 | Próximo pacote de código | Comunidade e privacidade | Consolidar regras de visibilidade, bloqueio e moderação entre feed, perfis, clubes e discussões, com cenários autenticados entre duas contas |
 | Seguinte | Jobs e notificações | Verificar execução real dos crons e recuperação em produção; tratar vazão do backlog e idempotência dos lembretes |
 | Operação e interface | Providers e experiência | Exercitar câmera/scanner, metadados reais, uploads, push em dispositivo e voz; separar melhor responsabilidades da interface do Oráculo |
