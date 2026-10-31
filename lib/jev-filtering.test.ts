@@ -105,3 +105,18 @@ it("rating mínimo não impõe um máximo", async () => {
   const filters = await jevExtractFilters("Livros com pelo menos 4 estrelas");
   expect(filters.rating_max).toBeUndefined();
 });
+
+it("interpreta páginas e não lidos sem confundir com livros concluídos", async () => {
+  expect(await jevExtractFilters("+500 páginas não lidas")).toMatchObject({ pages_min: 501, status: "TO_READ" });
+  expect(await jevExtractFilters("Livros com até 200 páginas")).toMatchObject({ pages_max: 200 });
+  expect(await jevExtractFilters("Livros com menos de 200 páginas")).toMatchObject({ pages_max: 199 });
+});
+
+it("aplica as duas extremidades de um intervalo de anos", () => {
+  expect(filtersToWhereClause({ year: { min: 1980, max: 1989 } }, "owner")).toEqual({
+    userId: "owner", AND: [
+      { publishedDate: { gte: "1980" } },
+      { publishedDate: { lte: "1989-12-31" } },
+    ],
+  });
+});

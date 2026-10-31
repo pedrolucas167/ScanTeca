@@ -103,6 +103,54 @@ Pode ser iniciado manualmente e pelo evento de deployment de produção concluí
 Ele não altera dados, não publica outra versão e não executa rollback. Uma falha
 exige inspeção; eventual reversão deve ser decidida pelo mantenedor.
 
+## Migrações de banco
+
+### Preview isolado do roadmap do Oráculo
+
+O preview do PR de qualidade do Oráculo compilou, mas falhou ao coletar páginas
+porque a branch não tinha `DATABASE_URL`. Variáveis de outros previews estavam
+limitadas às próprias branches e não eram herdadas por este PR. O ambiente
+tampouco tinha as duas chaves Clerk necessárias para essa branch.
+
+Após autorização explícita para armazenar essas credenciais na hospedagem do
+preview, foram configuradas somente `DATABASE_URL`,
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` e `CLERK_SECRET_KEY` no alvo Preview e na
+branch Git `feat/oracle-quality-roadmap`, no projeto Vercel `scanteca`.
+As chaves Clerk são exclusivamente de desenvolvimento. Valores não foram
+impressos, versionados ou gravados em relatórios.
+
+O banco fica na branch Neon `preview-oracle-178`, criada com `--schema-only`
+a partir de produção, sem copiar registros. Metadados confirmaram
+`init_source=parent-schema` e a associação exclusiva do endpoint. Uma conexão
+independente confirmou zero livros, entradas de diário, avaliações, mensagens
+do Oráculo e configurações de leitor, além das duas colunas de memória.
+A branch expira automaticamente em 07/11/2026; dados de teste nesse preview
+não devem ser tratados como persistentes.
+
+Essa operação não alterou variáveis nem banco de produção e não transferiu
+chave do provedor de IA para o preview. O relatório local, sem valores de
+credenciais, é `reports/oracle-preview-configuration.json`.
+Confirme uma nova execução da integração Git/Vercel e o deployment correspondente
+antes de considerar o preview corrigido. A configuração não é evidência de
+deploy bem-sucedido por si só.
+
+Confirme o projeto, a branch e o endpoint por metadados da API Neon antes de
+executar qualquer migração de produção. O arquivo `.neon` identifica o contexto
+vinculado; o `.env` pode apontar para outro ambiente e não comprova o destino.
+Na conferência de 30/10/2026, `.neon` indicava `production`, enquanto o `.env`
+apontava para `dev`.
+
+Use a CLI oficial autenticada para obter somente a conexão do banco escolhido,
+sem exportar todos os segredos da hospedagem. Passe a conexão ao processo Prisma
+sem imprimi-la ou versioná-la. Inspecione primeiro o histórico e as migrações
+pendentes; execute `prisma migrate deploy` somente quando o conjunto pendente
+corresponder ao pacote aprovado. Não use `prisma db push` em produção.
+
+Depois, confira colunas e histórico em uma conexão independente e execute o smoke
+público. O registro da migração de memória está em
+[ORACLE-PERSONALIZATION.md](./ORACLE-PERSONALIZATION.md). Aplicar o schema não
+substitui o deploy da aplicação por PR e merge na `main`.
+
 ## Releases
 
 Release proposal inicia em modo `plan`, sem escrita. Os modos de criação de PR e

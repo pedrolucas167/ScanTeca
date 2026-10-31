@@ -5,11 +5,12 @@ import Link from "next/link";
 import Markdown from "./Markdown";
 import { Icon } from "@/components/ui/Icon";
 import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
+import { OracleMemoryDialog } from "@/components/oracle/OracleMemoryDialog";
 import { OracleComposer } from "@/components/oracle/OracleComposer";
 import { useOracleViewport } from "@/components/oracle/useOracleViewport";
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { consumeOracleEvents } from "@/lib/oracle-stream";
-import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, type OracleMode } from "@/lib/constants/oracle";
+import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, ORACLE_STAGE_LABELS, type OracleMode } from "@/lib/constants/oracle";
 import type { Source, Message, OracleSession, OracleArtifact, OracleStreamEvent } from "@/lib/types/oracle";
 
 export default function OraclePage() {
@@ -36,10 +37,7 @@ export default function OraclePage() {
   const playbackRateRef = useRef(playbackRate);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [stats, setStats] = useState({ total: 0, indexed: 0 });
-  const [profile, setProfile] = useState("");
-  const [profileDraft, setProfileDraft] = useState("");
   const [showProfile, setShowProfile] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
   const [selectedCompare, setSelectedCompare] = useState<Source[]>([]);
   const [actionBookId, setActionBookId] = useState<string | null>(null);
   const [mode, setMode] = useState<OracleMode>("EXPLORE");
@@ -130,10 +128,6 @@ export default function OraclePage() {
             indexed: Number(data.stats.indexed) || 0,
           });
         }
-        if (data?.profile) {
-          setProfile(data.profile);
-          setProfileDraft(data.profile);
-        }
         setSessions(data?.sessions ?? []);
         setArtifacts(data?.artifacts ?? []);
       })
@@ -186,7 +180,8 @@ export default function OraclePage() {
   const readOracleStream = async (res: Response): Promise<string> => {
     let fullText = "";
     await consumeOracleEvents<OracleStreamEvent>(res.body, (json) => {
-      receivedAnyRef.current = true;
+      if (json.stage && Object.hasOwn(ORACLE_STAGE_LABELS, json.stage)) setGenerationStage(ORACLE_STAGE_LABELS[json.stage]);
+      if (json.sessionId || json.transcript || json.text || json.action) receivedAnyRef.current = true;
       if (isOracleAction(json.action)) {
         const action = json.action;
         setMessages(previous => previous.map((message, index) => index === previous.length - 1 && message.role === "assistant" ? { ...message, action } : message));
@@ -222,7 +217,6 @@ export default function OraclePage() {
             });
           }
           if (json.sources) {
-            setGenerationStage("Organizando evidências...");
             setMessages((prev) => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -262,7 +256,6 @@ export default function OraclePage() {
             });
           }
           if (json.text) {
-            setGenerationStage("Redigindo uma resposta...");
 
 
             fullText += json.text;
@@ -287,7 +280,7 @@ export default function OraclePage() {
 
   const sendMessage = async (
     question: string,
-    opts?: { regenerate?: boolean }
+    opts?: { regenerate?: boolean; retry?: boolean }
   ) => {
     if (!question || loadingRef.current || recording || transcribing) return;
     const previousMessages = opts?.regenerate ? messages : null;
@@ -361,7 +354,10 @@ export default function OraclePage() {
         stopReveal();
         setMessages(previousMessages);
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          setError("Não foi possível gerar novamente. A resposta anterior foi preservada.");
+          setError(opts?.retry
+            ? err instanceof Error ? err.message : "Não foi possível concluir a nova tentativa."
+            : "Não foi possível gerar novamente. A resposta anterior foi preservada.");
+          if (opts?.retry) setFailedSend({ kind: "text", question, streamed: true });
         }
       } else if (err instanceof DOMException && err.name === "AbortError") {
         // Usuário parou a geração — mantém o que já foi revelado.
@@ -662,7 +658,7 @@ export default function OraclePage() {
     }
     if (failed.streamed) {
       // A pergunta já está na tela e no servidor — só regenera a resposta.
-      void sendMessage(failed.question, { regenerate: true });
+      void sendMessage(failed.question, { regenerate: true, retry: true });
     } else {
       // Nada chegou: remove a pergunta órfã e reenvia do zero.
       setMessages((prev) =>
@@ -789,27 +785,6 @@ export default function OraclePage() {
     void sendMessage(
       `Compare os livros "${first.title}", de ${first.author}, e "${second.title}", de ${second.author}. Analise temas, estilo, diferenças e para qual momento de leitura cada um é mais indicado.`
     );
-  };
-
-  const saveProfile = async (nextProfile: string | null) => {
-    setSavingProfile(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/library-settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ oracleProfile: nextProfile }),
-      });
-      if (!response.ok) throw new Error("Não foi possível atualizar a memória");
-      const value = nextProfile?.trim() ?? "";
-      setProfile(value);
-      setProfileDraft(value);
-      setShowProfile(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao atualizar memória");
-    } finally {
-      setSavingProfile(false);
-    }
   };
 
   const startNewSession = () => {
@@ -962,7 +937,7 @@ export default function OraclePage() {
               const index = speeds.findIndex(speed => Math.abs(speed - previous) < 0.01);
               return speeds[(index + 1) % speeds.length] ?? 1;
             })}
-            onOpenMemory={() => { setProfileDraft(profile); setShowProfile(true); }}
+            onOpenMemory={() => setShowProfile(true)}
             onClear={() => setShowClearConfirm(true)} canClear={messages.length > 0}
           />
         </div>
@@ -1076,24 +1051,7 @@ export default function OraclePage() {
         </div>
       )}
 
-      {showProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-outline-variant/30 bg-surface-container p-6 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-headline-sm text-headline-sm font-semibold text-on-surface">Memória do leitor</h2>
-                <p className="mt-1 font-body-sm text-on-surface-variant">Edite o que o Oráculo aprendeu sobre suas preferências e objetivos.</p>
-              </div>
-              <button onClick={() => setShowProfile(false)} aria-label="Fechar" className="rounded-full p-1 text-outline hover:bg-surface-container-high"><Icon decorative name="close" /></button>
-            </div>
-            <textarea value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} maxLength={2000} rows={8} placeholder="Preferências, autores, gêneros, temas e objetivos de leitura..." className="w-full resize-y rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 font-body-sm text-on-surface outline-none focus:border-primary" />
-            <div className="mt-4 flex flex-wrap justify-between gap-2">
-              <button onClick={() => void saveProfile(null)} disabled={savingProfile || !profile} className="rounded-full border border-error/30 px-4 py-2 text-sm text-error disabled:opacity-40">Esquecer tudo</button>
-              <div className="flex gap-2"><button onClick={() => setShowProfile(false)} className="rounded-full border border-outline-variant/40 px-4 py-2 text-sm">Cancelar</button><button onClick={() => void saveProfile(profileDraft)} disabled={savingProfile} className="rounded-full bg-primary-container px-4 py-2 text-sm font-semibold text-on-primary-container disabled:opacity-50">{savingProfile ? "Salvando..." : "Salvar memória"}</button></div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showProfile && <OracleMemoryDialog onClose={() => setShowProfile(false)} />}
 
       {/* Clear confirmation dialog */}
       {showClearConfirm && (
@@ -1207,7 +1165,7 @@ export default function OraclePage() {
                 </div>
                 <div className="min-w-0 w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && msg.content === "" ? (
-                  <div className="flex items-center gap-2 py-1 min-h-[60px]" aria-label="Oráculo digitando">
+                  <div className="flex items-center gap-2 py-1 min-h-[60px]" role="status" aria-live="polite" aria-label="Andamento da consulta">
                     <div
                       className="flex items-center gap-1.5"
                     >

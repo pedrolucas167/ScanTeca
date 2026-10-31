@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
+import { createServer } from "node:http";
 import type { Source } from "../lib/types/oracle";
 
 // These cases control API responses; service-worker activation must not reload
@@ -25,6 +26,79 @@ async function openOracle(page: Page) {
   await page.goto("/oracle", { waitUntil: "domcontentloaded" });
   await clerk.loaded({ page });
 }
+
+test("andamento chega antes da resposta e permite acompanhar a busca", async ({ page }) => {
+  const gate = Promise.withResolvers<void>();
+  const fixture = createServer(async (request, response) => {
+    response.setHeader("Access-Control-Allow-Origin", "*");
+    response.setHeader("Access-Control-Allow-Headers", "content-type");
+    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    if (request.method === "OPTIONS") { response.writeHead(204).end(); return; }
+    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+    response.write('data: {"stage":"search"}\n\n');
+    await gate.promise;
+    if (!response.destroyed) response.end(stream);
+  });
+  await new Promise<void>(resolve => fixture.listen(0, "127.0.0.1", resolve));
+  const address = fixture.address();
+  if (!address || typeof address === "string") throw new Error("Fixture local não iniciou.");
+  try {
+    await page.route("**/api/oracle", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.continue({ url: `http://127.0.0.1:${address.port}/api/oracle` });
+    });
+    await bootstrap(page);
+    await openOracle(page);
+    await page.getByRole("textbox", { name: "Sua mensagem" }).fill("Encontre uma conexão entre memória e cidade");
+    await page.getByRole("button", { name: "Enviar mensagem" }).click();
+    await expect(page.getByRole("status", { name: "Andamento da consulta" })).toContainText("Buscando livros na sua estante...");
+    await expect(page.getByText(answer, { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Parar geração" })).toBeVisible();
+    gate.resolve();
+    await expect(page.getByRole("main", { name: "Conversa com o Oráculo" }).getByText(answer, { exact: true })).toBeVisible();
+  } finally {
+    gate.resolve();
+    fixture.closeAllConnections();
+    await new Promise<void>((resolve, reject) => fixture.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test("memória do leitor permite corrigir, pausar e apagar preferências", async ({ page }) => {
+  let memory: { oracleProfile: string | null; oracleMemoryEnabled: boolean; oracleProfileVersion: number } = {
+    oracleProfile: "Prefiro poesia", oracleMemoryEnabled: true, oracleProfileVersion: 2,
+  };
+  await bootstrap(page);
+  await page.route("**/api/library-settings", async route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      expect(body.oracleProfileVersion).toBe(memory.oracleProfileVersion);
+      memory = { ...body, oracleProfileVersion: memory.oracleProfileVersion + 1 };
+    }
+    await route.fulfill({ json: { setting: memory } });
+  });
+  await openOracle(page);
+  const settings = page.getByRole("button", { name: "Ajustes da conversa" });
+  await settings.click();
+  await page.getByRole("button", { name: "Minha memória" }).click();
+  const dialog = page.getByRole("dialog", { name: "Memória do leitor" });
+  const field = dialog.getByRole("textbox", { name: "Preferências e objetivos" });
+  await expect(field).toHaveValue("Prefiro poesia");
+  await field.fill("Prefiro contos curtos");
+  await dialog.getByRole("checkbox", { name: "Aprender com as próximas conversas" }).uncheck();
+  await dialog.getByRole("button", { name: "Salvar memória" }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Memória salva.");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(settings).toBeFocused();
+  await settings.click();
+  await page.getByRole("button", { name: "Minha memória" }).click();
+  await expect(field).toHaveValue("Prefiro contos curtos");
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await dialog.getByRole("button", { name: "Apagar memória e pausar" }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Memória apagada. Aprendizado pausado.");
+  await expect(field).toHaveValue("");
+  await expect(dialog.getByRole("checkbox")).not.toBeChecked();
+});
 
 test("chat reserva espaço às mensagens e mantém o compositor no viewport", async ({ page }) => {
   let sends = 0;
@@ -184,4 +258,40 @@ test("falha de envio mantém a pergunta e permite tentar novamente", async ({ pa
   await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
   expect(attempts).toBe(2);
+});
+
+test("segunda falha após aceitar a pergunta mantém a opção de tentar novamente", async ({ page }) => {
+  const requests: { regenerate?: boolean; sessionId?: string }[] = [];
+  const acceptedSession = "cm123456789012345678901234";
+  await page.route("**/api/oracle", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1) {
+      await route.fulfill({ contentType: "text/event-stream", body:
+        `data: ${JSON.stringify({ sessionId: acceptedSession })}\n\ndata: ${JSON.stringify({ error: "Falha após receber a pergunta" })}\n\n` });
+    } else if (requests.length === 2) {
+      await route.fulfill({ status: 503, json: { error: "Segunda falha temporária" } });
+    } else {
+      await route.fulfill({ contentType: "text/event-stream", body: stream });
+    }
+  });
+  await bootstrap(page);
+  await openOracle(page);
+  await page.getByRole("textbox", { name: "Sua mensagem" }).fill("Pergunta confirmada que deve ser preservada");
+  await page.getByRole("button", { name: "Enviar mensagem" }).click();
+  const retry = page.getByRole("button", { name: "Tentar novamente", exact: true });
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect.poll(() => requests.length).toBe(2);
+  await expect(page.getByRole("button", { name: "Parar geração" })).toHaveCount(0);
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect(page.getByText(answer, { exact: true })).toBeVisible();
+  await expect(page.getByText("Pergunta confirmada que deve ser preservada", { exact: true })).toHaveCount(1);
+  await expect(retry).toHaveCount(0);
+  expect(requests).toHaveLength(3);
+  expect(requests.slice(1)).toEqual([
+    expect.objectContaining({ regenerate: true, sessionId: acceptedSession }),
+    expect.objectContaining({ regenerate: true, sessionId: acceptedSession }),
+  ]);
 });

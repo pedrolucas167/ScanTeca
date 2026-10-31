@@ -1,4 +1,4 @@
-import type { OracleMode } from "@/lib/constants/oracle";
+import type { OracleMode, OracleStage } from "@/lib/constants/oracle";
 import type { OracleAction } from "@/lib/oracle-actions";
 
 export interface Source {
@@ -24,6 +24,7 @@ export interface Message {
 }
 
 export interface OracleStreamEvent {
+  stage?: OracleStage;
   transcript?: string;
   sessionId?: string;
   sources?: Source[];
@@ -35,6 +36,9 @@ export interface OracleStreamEvent {
 
 export interface RetrievalStats {
   durationMs: number;
+  metadataCandidates?: number;
+  lexicalCandidates?: number;
+  embeddingAvailable?: boolean;
   vectorCandidates: number;
   selectedBooks: number;
   selectedDiary: number;

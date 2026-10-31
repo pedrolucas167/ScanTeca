@@ -37,3 +37,40 @@ it.each([0, -1, 1.5, "24"])("rejeita meta inválida (%s)", async value => {
   expect((await POST(request(value))).status).toBe(400);
   expect(prisma.librarySetting.upsert).not.toHaveBeenCalled();
 });
+
+const memoryRequest = (body: unknown) => new NextRequest("http://localhost/api/library-settings", {
+  method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+});
+
+it("apaga o perfil e pausa o aprendizado, invalidando atualizações automáticas", async () => {
+  vi.mocked(prisma.librarySetting.findUnique).mockResolvedValue({ oracleProfileVersion: 2 } as never);
+  expect((await POST(memoryRequest({ oracleProfile: null, oracleProfileVersion: 2, userId: "other" }))).status).toBe(200);
+  expect(prisma.librarySetting.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "u1" },
+    update: { oracleProfile: null, oracleMemoryEnabled: false, oracleProfileVersion: { increment: 1 } },
+  }));
+});
+
+it("preserva a memória ao pausar apenas o aprendizado", async () => {
+  vi.mocked(prisma.librarySetting.findUnique).mockResolvedValue({ oracleProfileVersion: 4 } as never);
+  expect((await POST(memoryRequest({ oracleMemoryEnabled: false, oracleProfileVersion: 4 }))).status).toBe(200);
+  expect(prisma.librarySetting.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    update: { oracleMemoryEnabled: false, oracleProfileVersion: { increment: 1 } },
+  }));
+});
+
+it("recusa edição de uma versão desatualizada", async () => {
+  vi.mocked(prisma.librarySetting.findUnique).mockResolvedValue({ oracleProfileVersion: 5 } as never);
+  expect((await POST(memoryRequest({ oracleProfile: "Meu rascunho", oracleProfileVersion: 4 }))).status).toBe(409);
+  expect(prisma.librarySetting.upsert).not.toHaveBeenCalled();
+});
+
+it("exige autenticação para alterar a memória", async () => {
+  vi.mocked(auth).mockResolvedValueOnce({ userId: null } as never);
+  expect((await POST(memoryRequest({ oracleProfile: null }))).status).toBe(401);
+  expect(prisma.librarySetting.upsert).not.toHaveBeenCalled();
+});
+
+it.each([{ oracleMemoryEnabled: "false" }, { oracleProfileVersion: -1 }, { oracleProfile: "x".repeat(2001) }])("rejeita controles de memória inválidos", async body => {
+  expect((await POST(memoryRequest(body))).status).toBe(400);
+  expect(prisma.librarySetting.upsert).not.toHaveBeenCalled();
+});

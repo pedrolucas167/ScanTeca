@@ -11,6 +11,13 @@ function stream(text: string) {
 }
 const answer = 'data: {"choices":[{"delta":{"content":"Olá, leitor"}}]}\n\n';
 describe("Oracle provider completion", () => {
+  it("captures final accounting after the finish reason without treating it as a second answer", async () => {
+    const onUsage = vi.fn();
+    const body = answer + 'data: {"choices":[{"finish_reason":"stop","delta":{}}]}\n\n' +
+      'data: {"choices":[{"finish_reason":"stop","delta":{}}],"usage":{"prompt_tokens":42,"completion_tokens":5,"cost":0.0002}}\n\ndata: [DONE]\n\n';
+    expect(await readOracleCompletion(stream(body), { onUsage })).toBe("Olá, leitor");
+    expect(onUsage).toHaveBeenCalledExactlyOnceWith({ inputTokens: 42, outputTokens: 5, costUsd: 0.0002 });
+  });
   it("reports incremental text while still requiring completion", async () => {
     const onDelta = vi.fn();
     await expect(readOracleCompletion(stream(answer + "data: [DONE]"), { onDelta })).resolves.toBe("Olá, leitor");

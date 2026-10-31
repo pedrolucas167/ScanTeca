@@ -1,9 +1,10 @@
 import { fetchWithTimeout } from "./fetch-with-timeout";
+import { parseOracleUsage, type OracleUsage } from "./oracle-usage";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const EMBEDDING_MODEL = "openai/text-embedding-3-small";
 
-export async function generateEmbedding(text: string): Promise<number[] | null> {
+export async function generateEmbedding(text: string, options: { signal?: AbortSignal; onUsage?: (usage: OracleUsage) => void } = {}): Promise<number[] | null> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.warn("[embeddings] OPENROUTER_API_KEY não configurada");
@@ -14,7 +15,9 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   if (!input) return null;
 
   try {
+    options.signal?.throwIfAborted();
     const res = await fetchWithTimeout(`${OPENROUTER_BASE}/embeddings`, {
+      signal: options.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -27,17 +30,21 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      console.error("[embeddings] OpenRouter error:", res.status, err);
+      await res.body?.cancel().catch(() => undefined);
+      console.error("[embeddings] OpenRouter error:", res.status);
       return null;
     }
 
     const data = await res.json();
+    const usage = parseOracleUsage(data?.usage);
+    if (usage) options.onUsage?.(usage);
     const embedding = data?.data?.[0]?.embedding;
-    if (!Array.isArray(embedding)) return null;
+    if (!Array.isArray(embedding) || embedding.length !== 1536 ||
+        !embedding.every(value => typeof value === "number" && Number.isFinite(value)) ||
+        !embedding.some(value => value !== 0)) return null;
     return embedding as number[];
-  } catch (err) {
-    console.error("[embeddings] fetch error:", err);
+  } catch {
+    if (!options.signal?.aborted) console.error("[embeddings] Não foi possível gerar o vetor de busca.");
     return null;
   }
 }

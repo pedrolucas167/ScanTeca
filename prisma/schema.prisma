@@ -336,6 +336,8 @@ model LibrarySetting {
   shareId       String? @unique
   shareEnabled  Boolean @default(false)
   oracleProfile String?
+  oracleMemoryEnabled Boolean @default(true)
+  oracleProfileVersion Int @default(0)
   yearlyGoal    Int?
   accentTheme   String?
 }

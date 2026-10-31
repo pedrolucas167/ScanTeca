@@ -1,8 +1,42 @@
 # Roadmap de modularização — ScanTeca
 
+Continuação do Oráculo em 30/10/2026: [roadmap de qualidade](./ORACLE-QUALITY-ROADMAP.md).
+A modularização do fluxo fundamentado foi concluída e está em PR de revisão;
+avaliação representativa, aceite humano e publicação continuam separados.
+
 Registro histórico iniciado em 13/10/2026. Estratégia: migração incremental no mesmo Next.js,
 PostgreSQL e deploy. Estimativas em dias de engenharia focada de uma pessoa,
 incluindo revisão e testes; não são prazos de calendário ou compromissos.
+
+## Pendências reavaliadas — 30/10/2026
+
+A revisão atual do Oráculo está no
+[PR de recuperação fundamentada e memória controlável](https://github.com/pedrolucas167/ScanTeca/pull/178),
+em rascunho. Os checks de build, integração, cobertura, segurança e políticas
+passaram no commit de conclusão da modularização. A falha inicial da prévia
+Vercel foi identificada como falta de configuração de banco/autenticação para
+essa branch; sua configuração isolada está registrada no guia operacional.
+Isso não confirma publicação em produção.
+
+| Ordem sugerida | Frente | O que ainda precisa de aceite |
+| --- | --- | --- |
+| Atual | Oráculo | Concluir revisão do PR e preview, ampliar os casos de qualidade com acervo representativo e revisão humana, validar voz e medir latência/custos no deployment integrado |
+| Próximo pacote de código | Comunidade e privacidade | Consolidar regras de visibilidade, bloqueio e moderação entre feed, perfis, clubes e discussões, com cenários autenticados entre duas contas |
+| Seguinte | Jobs e notificações | Verificar execução real dos crons e recuperação em produção; tratar vazão do backlog e idempotência dos lembretes |
+| Operação e interface | Providers e experiência | Exercitar câmera/scanner, metadados reais, uploads, push em dispositivo e voz; separar melhor responsabilidades da interface do Oráculo |
+| Operacional opcional | Releases | Confirmar ambiente e token dedicado antes de habilitar os modos de escrita do fluxo de releases |
+
+Há trabalho implementado nessas frentes: a fila já usa claim/lease atômicos,
+retentativas e IDs determinísticos; há entradas por `after` e cron. O que falta
+não é reimplementar tudo, mas concluir a operação verificada e os critérios de
+idempotência. Clubes já possuem operações transacionais, enquanto a política
+de acesso social continua distribuída entre seus consumidores.
+
+O E2E autenticado de Biblioteca, Leitura e privacidade já foi integrado e não deve
+ser confundido com uma pendência de implementação. Ele usa serviços isolados e
+providers simulados; não substitui validação de câmera, providers e dispositivo
+reais. As estimativas e números abaixo preservam o registro histórico, não uma
+nova estimativa para os pacotes atuais.
 
 ## Estado atual — 28/10/2026
 

@@ -18,6 +18,8 @@ export interface MetadataFilters {
   rating_max?: number;
   title_contains?: string;
   collection?: string;
+  pages_min?: number;
+  pages_max?: number;
 }
 
 const GENRE_PATTERNS = [
@@ -55,6 +57,10 @@ const AUTHOR_PATTERNS = [
 export async function jevExtractFilters(query: string): Promise<MetadataFilters> {
   const filters: MetadataFilters = {};
   const trimmed = query.trim().toLowerCase();
+  const minPages = trimmed.match(/(?:mais de\s*|\+\s*)(\d+)\s*p[áa]ginas/i);
+  const maxPages = trimmed.match(/(?:menos de|at[ée])\s*(\d+)\s*p[áa]ginas/i);
+  if (minPages) filters.pages_min = Number(minPages[1]) + 1;
+  if (maxPages) filters.pages_max = Number(maxPages[1]) - (/menos de/i.test(maxPages[0]) ? 1 : 0);
 
   // Extract genre
   const genre = extractGenre(trimmed);
@@ -178,6 +184,7 @@ function extractYear(query: string): number | { min?: number; max?: number } | n
  * Extract reading status from query
  */
 function extractStatus(query: string): "READ" | "READING" | "TO_READ" | "WISHLIST" | null {
+  if (/n[ãa]o lid[oa]s?|ainda n[ãa]o li/i.test(query)) return "TO_READ";
   if (/lido|terminado|concluído|finalizado|acabei|já li/i.test(query)) {
     return "READ";
   }
@@ -281,19 +288,23 @@ export function filtersToWhereClause(filters: MetadataFilters, userId: string): 
     } else {
       const dateConditions: Prisma.BookWhereInput[] = [];
       if (filters.year.min !== undefined) {
-        dateConditions.push({ publishedDate: { gte: `${filters.year.min}-01-01` } });
+        dateConditions.push({ publishedDate: { gte: String(filters.year.min) } });
       }
       if (filters.year.max !== undefined) {
         dateConditions.push({ publishedDate: { lte: `${filters.year.max}-12-31` } });
       }
       if (dateConditions.length > 0) {
-        where.OR = dateConditions;
+        where.AND = dateConditions;
       }
     }
   }
 
   if (filters.status) {
     where.status = filters.status;
+  }
+
+  if (filters.pages_min !== undefined || filters.pages_max !== undefined) {
+    where.pages = { gte: filters.pages_min, lte: filters.pages_max };
   }
 
   if (filters.rating_min !== undefined || filters.rating_max !== undefined) {
