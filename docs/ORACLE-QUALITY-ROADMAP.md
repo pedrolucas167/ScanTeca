@@ -10,7 +10,7 @@ de ampliar personalização e operação. Implementação local não confirma de
 | 3. Avaliação | Perguntas de referência para busca e citações; depois avaliar relevância e fidelidade com acervo representativo e modelo real | Última rodada sintética real: 10/10; caso externo repetido mais três vezes com o mesmo prompt: 3/3; falhas anteriores preservadas no histórico; acervo representativo e revisão humana independente pendentes |
 | 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Código implementado e validado; migração aplicada na branch Neon production em 30/10/2026; publicação da aplicação via PR ainda pendente |
 | 5. Desempenho e experiência | Medir latência e tokens por etapa; mostrar andamento da consulta; avaliar custos com dados reais | Métricas opcionais, progresso SSE, cancelamento e aprendizado após resposta implementados; cenário sintético com streaming e custo real validado; medição em produção pendente |
-| 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Preparação transacional de sessões e consultas de contexto extraídas e validadas com PostgreSQL/pgvector; busca, evidências, conclusão, métricas, pipeline, persistência e aprendizado já extraídos; montagem textual, orquestração da geração e endpoints de sessões/artefatos ainda pendentes |
+| 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Concluída no fluxo fundamentado e nos recursos de sessões/artefatos: contexto textual, reescrita, geração, orquestração e operações extraídas; 431 testes unitários, 100 de integração e 14 de navegador aprovados; voz segue fora do escopo funcional completo |
 
 ## Primeiro corte
 

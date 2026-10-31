@@ -98,3 +98,8 @@ Microfone, TTS e o fluxo separado de voz não receberam revisão funcional compl
 neste corte. O build e o navegador também sinalizam deprecações preexistentes de
 middleware/autenticação, cuja migração não foi incluída nestas correções.
 Esta revisão técnica não encerra o roadmap nem comprova publicação em produção.
+
+A modularização pendente acima foi concluída posteriormente para o fluxo
+fundamentado e os recursos de sessões e artefatos. O estado e a validação mais
+recentes estão em [ORACLE-MODULES.md](./ORACLE-MODULES.md). Os resultados desta
+revisão permanecem como registro do corte anterior.

@@ -36,7 +36,7 @@ com erro; ela não é interpretada como ausência de evidências. O cancelamento
 é conferido antes e depois das leituras. Consultas Prisma já iniciadas podem
 terminar no banco, mas seu resultado não segue para a próxima etapa após o aborto.
 
-## Validação e limites
+## Validação e limites do primeiro corte
 
 Os testes de integração usam exclusivamente PostgreSQL local com pgvector,
 na base descartável `scanteca_reading_test`, porta 55439. As fixtures contêm
@@ -59,6 +59,70 @@ inconsistentes entre registros para verificar o isolamento.
 
 Os testes verificam comportamento e isolamento das consultas; não estimam
 qualidade semântica, relevância em acervos grandes ou desempenho em produção.
-A montagem textual do contexto, reescrita da pergunta e orquestração da geração
-continuam na rota. Separá-las e revisar os endpoints de sessões e artefatos
-permanece como continuação da modularização.
+A montagem textual, reescrita, geração e os recursos HTTP ainda estavam na rota
+nesse primeiro corte. A extração posterior está registrada a seguir.
+
+## Conclusão da modularização do fluxo fundamentado
+
+A rota principal agora mantém autenticação, validação da requisição, limite de
+uso, transcrição de entrada e registro de `after` no escopo HTTP. A preparação
+da sessão permanece antes do SSE, preservando os erros HTTP de propriedade e
+duplicidade. Os módulos não importam Next ou Clerk.
+
+| Módulo | Responsabilidade |
+| --- | --- |
+| `session.ts` | Schemas e operações de sessão, preparação transacional, listagem, detalhe, alteração e exclusão por dono |
+| `artifacts.ts` | Schema, listagem e gravação de artefatos, conferindo a sessão na mesma transação da inserção |
+| `home.ts` | Histórico, sugestões e estatísticas iniciais; limpeza do histórico por leitor |
+| `context.ts` | Consultas do contexto e memórias vetoriais por leitor |
+| `context-format.ts` | Texto de contexto e numeração compartilhada das fontes, sem mutar as entradas |
+| `rewrite.ts` | Reescrita contextual, uso informado e fallback para a pergunta original |
+| `query.ts` | Orquestração de recuperação, catálogo externo, montagem de mensagens e início da geração |
+| `generation.ts` | Chamada do modelo, conclusão explícita, validação, gravação atômica e aprendizado opcional após a resposta |
+| `responses.ts` | Respostas casuais, ações de navegação e fallback sem evidências |
+| `config.ts` | Configuração compartilhada de modelo e limites de geração |
+
+Os endpoints de sessões e artefatos delegam as operações a essa API pública.
+Um adaptador HTTP separado traduz erros de domínio e sanitiza erros inesperados.
+As criações também passaram a respeitar os limites nomeados das próprias rotas,
+em vez de consultar uma chave de broadcast inexistente.
+
+Os detalhes de sessão filtram mensagens, artefatos e contagens pelo leitor,
+incluindo a defesa contra registros com vínculos inconsistentes entre contas.
+Excluir uma conversa apaga suas mensagens e preserva os artefatos, desvinculados,
+conforme as relações existentes do banco. Limpar o histórico preserva sessões e
+artefatos e não toca nas mensagens de outro leitor.
+
+O registro de `after` continua na rota, com um agendador passado ao pipeline.
+A resposta continua retida até conclusão, validação e persistência. Uma falha
+na gravação não expõe texto como resposta válida nem agenda aprendizado.
+Cancelamento chega ao corpo do provedor. Respostas HTTP rejeitadas de geração
+e reescrita têm seus corpos liberados sem imprimir conteúdo no log.
+
+O prompt e os critérios de avaliação não foram alterados nesta extração.
+A avaliação sintética real anterior permanece registrada separadamente; não
+foi repetida como se validasse acervo representativo ou publicação.
+
+Validação final desta extração:
+
+- 431 testes unitários em 63 arquivos, com cobertura.
+- 100 testes de integração em 14 arquivos, com PostgreSQL/pgvector e Redis locais
+  exclusivos; 32 desses testes cobrem os módulos do Oráculo.
+- 14 testes de navegador do Oráculo, em desktop e celular, com API controlada.
+- TypeScript aprovado e lint completo sem erros; 17 avisos preexistentes fora
+  dos arquivos deste pacote.
+- Política de cobertura aprovada sem reduzir a base; cobertura de linhas nos
+  módulos: 86,55%; cobertura global: 37,53%.
+- Política de workflows e verificação de segredos aprovadas.
+- Build `npx next build --webpack` aprovado, incluindo TypeScript, 51 páginas
+  e coleta final de arquivos.
+
+Testes novos cobrem os limites HTTP, falta de autenticação, propriedade forjada,
+erros sanitizados, ciclo de vida de recursos, isolamento de registros aninhados,
+fontes numeradas entre seções, deduplicação, falha de persistência, cancelamento
+do provedor e fallback de reescrita. A cobertura global permanece parcial.
+
+Esse escopo conclui a etapa 6 para o fluxo fundamentado e os recursos de sessões
+e artefatos. Microfone, TTS e a rota separada de voz continuam fora da revisão
+funcional completa. Acervo representativo, revisão humana independente e aceite
+autenticado em produção continuam pendentes; modularização não implica deploy.
