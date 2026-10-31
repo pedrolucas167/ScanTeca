@@ -47,10 +47,10 @@ ambiental, citando a fonte.
 
 ## Migração e validação
 
-Antes de publicar a aplicação, aplicar a migração
+A validação inicial usou o PostgreSQL descartável, em
+`127.0.0.1:55439/scanteca_reading_test`. A migração
 `prisma/migrations/20261030230000_oracle_memory_controls/migration.sql`
-pelo fluxo de banco do projeto. O trabalho local preparou apenas o PostgreSQL
-descartável, em `127.0.0.1:55439/scanteca_reading_test`.
+foi posteriormente aplicada em produção, conforme o registro abaixo.
 
 Os testes incluem a aplicação do SQL em uma tabela com perfil preexistente,
 validando a preservação do conteúdo e os valores padrão, dentro de uma transação
@@ -82,3 +82,32 @@ Validação técnica:
 - Dois testes de navegador aprovados, em desktop e celular.
 - ESLint nos arquivos alterados aprovado.
 - Build final `npx next build --webpack` aprovado, incluindo TypeScript e 51 páginas estáticas.
+
+## Migração aplicada em produção
+
+Concluída em **30/10/2026 às 21:34, America/Sao_Paulo**
+(`2026-10-31T00:34:11.755Z`). O destino foi confirmado pela API do Neon,
+acessada pela CLI oficial: projeto vinculado no arquivo `.neon`, branch
+`production`, banco `neondb`. A conferência mostrou que o `.env` local apontava
+para a branch `dev`; essa conexão não foi usada para migrar produção.
+
+Antes da execução, a inspeção somente leitura confirmou que a única migração
+pendente era `20261030230000_oracle_memory_controls`. A conexão específica de
+produção foi resolvida pela CLI Neon e fornecida somente ao ambiente do processo
+Prisma, sem ser salva ou impressa. `prisma migrate deploy` aplicou essa migração.
+
+Uma conexão independente confirmou:
+
+- `oracleMemoryEnabled`: booleano, `NOT NULL`, padrão `true`.
+- `oracleProfileVersion`: inteiro, `NOT NULL`, padrão `0`.
+- Registro concluído em `_prisma_migrations`, com `applied_steps_count = 1`.
+- Checksum SHA-256 `c6b5af43dfdf876d9c8333c37ebdbf87b7df7737f8f1e7291abe83d10652fe5d`, igual ao arquivo versionado.
+- Nenhuma migração pendente; consultas agregadas confirmaram os padrões nos registros existentes.
+
+Os relatórios locais, ignorados pelo Git, são
+`reports/oracle-production-migration-applied.json` e `reports/deploy/results.json`.
+O smoke público retornou 200 em `/`, `/feed`, `/manifest.json` e `/favicon.svg`.
+
+Esse registro confirma a atualização do banco. A publicação do código da aplicação
+continua pelo fluxo de PR, checks e merge na `main`; a migração não publica a
+interface nova por si só.

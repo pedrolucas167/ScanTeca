@@ -103,6 +103,25 @@ Pode ser iniciado manualmente e pelo evento de deployment de produção concluí
 Ele não altera dados, não publica outra versão e não executa rollback. Uma falha
 exige inspeção; eventual reversão deve ser decidida pelo mantenedor.
 
+## Migrações de banco
+
+Confirme o projeto, a branch e o endpoint por metadados da API Neon antes de
+executar qualquer migração de produção. O arquivo `.neon` identifica o contexto
+vinculado; o `.env` pode apontar para outro ambiente e não comprova o destino.
+Na conferência de 30/10/2026, `.neon` indicava `production`, enquanto o `.env`
+apontava para `dev`.
+
+Use a CLI oficial autenticada para obter somente a conexão do banco escolhido,
+sem exportar todos os segredos da hospedagem. Passe a conexão ao processo Prisma
+sem imprimi-la ou versioná-la. Inspecione primeiro o histórico e as migrações
+pendentes; execute `prisma migrate deploy` somente quando o conjunto pendente
+corresponder ao pacote aprovado. Não use `prisma db push` em produção.
+
+Depois, confira colunas e histórico em uma conexão independente e execute o smoke
+público. O registro da migração de memória está em
+[ORACLE-PERSONALIZATION.md](./ORACLE-PERSONALIZATION.md). Aplicar o schema não
+substitui o deploy da aplicação por PR e merge na `main`.
+
 ## Releases
 
 Release proposal inicia em modo `plan`, sem escrita. Os modos de criação de PR e

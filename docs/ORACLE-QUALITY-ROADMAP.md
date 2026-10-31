@@ -8,7 +8,7 @@ de ampliar personalização e operação. Implementação local não confirma de
 | 1. Busca híbrida | Combinar candidatos semânticos, título/autor e filtros; aceitar livros sem embedding; manter isolamento de conta | Implementação inicial local |
 | 2. Evidências | Uma numeração compartilhada entre contexto e fontes; rejeitar referências inexistentes; distinguir inferências no prompt | Implementação inicial local |
 | 3. Avaliação | Perguntas de referência para busca e citações; depois avaliar relevância e fidelidade com acervo representativo e modelo real | Nove cenários sintéticos executados no modelo real: 8/9 na última rodada revisada; resposta problemática bloqueada; avaliação de acervo representativo pendente |
-| 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Implementado localmente: pausa, edição e apagamento com controle de versão; interface e concorrência testadas; cenário de recomendação personalizada aprovado no modelo real |
+| 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Código implementado e validado; migração aplicada na branch Neon production em 30/10/2026; publicação da aplicação via PR ainda pendente |
 | 5. Desempenho e experiência | Medir latência e tokens por etapa; mostrar andamento da consulta; avaliar custos com dados reais | Pendente; contagens de candidatos adicionadas nesta etapa |
 | 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Busca, evidências e aprendizado de perfil extraídos; editor de memória separado da página; restante pendente |
 
@@ -35,7 +35,8 @@ de ampliar personalização e operação. Implementação local não confirma de
 
 A continuação de personalização está em
 [ORACLE-PERSONALIZATION.md](./ORACLE-PERSONALIZATION.md). A migração de controles
-de memória precisa ser aplicada antes de publicar essa versão. O cenário novo
+de memória foi aplicada e verificada em produção; a publicação do código segue
+separada pelo fluxo de PR. O cenário novo
 de preferências foi avaliado separadamente; os números históricos abaixo e a
 avaliação geral de nove cenários não foram substituídos por esse resultado.
 
