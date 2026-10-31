@@ -29,6 +29,8 @@ describe("Oracle evidence references", () => {
     "É o único livro de ficção científica na sua biblioteca [1].",
     "A única obra do seu acervo é Jardins da Maré [1].",
     "Em seu acervo pessoal, não possuímos um título que se encaixe diretamente na descrição de navegação por rios.",
+    "No seu acervo atual, não há livros que abordem especificamente a navegação por rios.",
+    "Na sua biblioteca não existem obras sobre rios.",
   ])("rejects unsupported inventory-wide absence: %s", text => {
     expect(validateInventoryClaims(text).valid).toBe(false);
   });
