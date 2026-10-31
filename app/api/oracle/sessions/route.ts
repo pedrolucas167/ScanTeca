@@ -1,44 +1,36 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { listOracleSessions, createOracleSession, createOracleSessionSchema } from "@/modules/oracle";
+import { oracleHttpError } from "@/lib/oracle-http-error";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 
-const createSessionSchema = z.object({
-  title: z.string().trim().min(1).max(120).default("Nova conversa"),
-  mode: z.enum(["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE"]).default("EXPLORE"),
-});
-
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
 
-  const sessions = await prisma.oracleSession.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    take: 50,
-    include: { _count: { select: { messages: true, artifacts: true } } },
-  });
-  return Response.json({ sessions });
+    const sessions = await listOracleSessions(userId);
+    return Response.json({ sessions });
+  } catch (error) { return oracleHttpError(error, "sessions GET"); }
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) return Response.json({ error: "Não autorizado" }, { status: 401 });
 
-  const rateLimit = await rateLimitGuard(request, {
-    route: "oracle/sessions",
-    userId,
-    userLimit: rateLimits["broadcast"]?.userLimit ?? 10, ipLimit: rateLimits["broadcast"]?.ipLimit ?? 20, windowMs: rateLimits["broadcast"]?.windowMs,
-  });
-  if (rateLimit) return rateLimit;
+    const rateLimit = await rateLimitGuard(request, {
+      route: "oracle/sessions",
+      userId,
+      userLimit: rateLimits["oracle/sessions"]?.userLimit ?? 10, ipLimit: rateLimits["oracle/sessions"]?.ipLimit ?? 20, windowMs: rateLimits["oracle/sessions"]?.windowMs,
+    });
+    if (rateLimit) return rateLimit;
 
-  const parsed = await readJson(request, createSessionSchema);
-  if (!parsed.ok) return parsed.response;
+    const parsed = await readJson(request, createOracleSessionSchema);
+    if (!parsed.ok) return parsed.response;
 
-  const session = await prisma.oracleSession.create({
-    data: { userId, ...parsed.data },
-  });
-  return Response.json({ session }, { status: 201 });
+    const session = await createOracleSession(userId, parsed.data);
+    return Response.json({ session }, { status: 201 });
+  } catch (error) { return oracleHttpError(error, "sessions POST"); }
 }

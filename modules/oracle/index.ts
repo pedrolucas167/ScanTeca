@@ -1,5 +1,8 @@
 export { readOracleCompletion } from "./completion";
 export { prepareOracleSession, OracleSessionError } from "./session";
+export { createOracleSessionSchema, updateOracleSessionSchema, listOracleSessions, createOracleSession,
+  findOracleSession, updateOracleSession, deleteOracleSession } from "./session";
+export { oracleArtifactSchema, listOracleArtifacts, saveOracleArtifact } from "./artifacts";
 export { loadOracleContext, retrieveOracleMemories, MAX_DIARY_ENTRIES } from "./context";
 export { saveOracleAnswer, getOracleRegenerationTarget } from "./history";
 export { retrieveBooks, VECTOR_CANDIDATE_LIMIT } from "./retrieval";

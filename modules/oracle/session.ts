@@ -1,6 +1,40 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { OracleMode } from "@/lib/constants/oracle";
+import { z } from "zod";
+
+const sessionMode = z.enum(["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE"]);
+export const createOracleSessionSchema = z.object({
+  title: z.string().trim().min(1).max(120).default("Nova conversa"),
+  mode: sessionMode.default("EXPLORE"),
+});
+export const updateOracleSessionSchema = z.object({
+  title: z.string().trim().min(1).max(120).optional(), mode: sessionMode.optional(),
+});
+
+export function listOracleSessions(userId: string) {
+  return prisma.oracleSession.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 50,
+    include: { _count: { select: { messages: true, artifacts: true } } } });
+}
+
+export function createOracleSession(userId: string, input: z.infer<typeof createOracleSessionSchema>) {
+  return prisma.oracleSession.create({ data: { userId, ...input } });
+}
+
+export function findOracleSession(userId: string, id: string) {
+  return prisma.oracleSession.findFirst({ where: { id, userId }, include: {
+    messages: { where: { userId }, orderBy: { createdAt: "asc" } },
+    artifacts: { where: { userId }, orderBy: { updatedAt: "desc" } },
+  } });
+}
+
+export async function updateOracleSession(userId: string, id: string, input: z.infer<typeof updateOracleSessionSchema>) {
+  return (await prisma.oracleSession.updateMany({ where: { id, userId }, data: input })).count === 1;
+}
+
+export async function deleteOracleSession(userId: string, id: string) {
+  return (await prisma.oracleSession.deleteMany({ where: { id, userId } })).count === 1;
+}
 
 export class OracleSessionError extends Error {
   constructor(public readonly code: "NOT_FOUND" | "DUPLICATE_REQUEST") {
