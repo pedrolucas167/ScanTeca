@@ -105,7 +105,62 @@ ampliar os casos e validar o avaliador com revisão humana independente. Os cen�
 fictícios e a checagem adicionada não demonstram qualidade geral ou segurança contra
 todas as formas de instruções maliciosas em fontes.
 
-## Validação da implementação
+## Revalidação com streaming — 30/10/2026, horário local
+
+Foram executadas duas rodadas completas com os dez cenários sintéticos atuais,
+incluindo personalização, usando `npm run eval:oracle -- --live --stream`.
+Nenhum dado de leitor real foi consultado e não houve gravação no banco.
+
+O avaliador automático marcou **10/10 em ambas**, mas a inspeção pelo agente
+encontrou afirmações sem apoio em uma seleção parcial:
+
+- Na primeira, o caso de posse desconhecida descreveu um título recuperado como
+  o único livro de ficção científica do leitor.
+- Na segunda, o caso externo declarou que o acervo não possuía um título sobre
+  navegação, apesar de receber somente uma seleção de fontes.
+
+A checagem compartilhada pela aplicação e avaliação passou a detectar a forma
+exclusiva de inventário e as variantes de ausência com o verbo possuir. Os testes
+reproduzem as duas respostas capturadas, mesmo com julgamento automático favorável.
+Aplicar a checagem reforçada às respostas salvas resulta em **9/10 para cada
+rodada**, sem chamadas adicionais. A inspeção também observou uma recomendação
+secundária com ligação especulativa ao tema; o prompt agora orienta preferir uma
+única indicação sustentada a acrescentar opções com conteúdo especulado.
+
+| Execução | Resultado revisado | Custo informado, geração + avaliador |
+| --- | --- | --- |
+| Primeira rodada, dez cenários | 9/10 | US$ 0,0075045 |
+| Segunda rodada, dez cenários | 9/10 | US$ 0,0082879 |
+| Reavaliação final somente do caso externo | 0/1, bloqueada | US$ 0,0010218 |
+
+Na reavaliação direcionada após o último ajuste do prompt, o modelo voltou a
+afirmar ausência no acervo inteiro. O avaliador aceitou essa resposta, mas a
+checagem determinística a rejeitou. A aplicação usa a mesma checagem antes de
+exibir e persistir uma resposta válida; seu fallback de confiabilidade continua
+necessário. Não houve reparação automática nem sucesso do caso externo nessa
+última execução. Não foi repetida uma rodada completa após o ajuste final.
+
+Relatórios locais ignorados pelo Git:
+
+- `reports/oracle-evaluation-2026-10-31T01-44-28-735Z.json` e seu
+  `-deterministic-review.json`.
+- `reports/oracle-evaluation-2026-10-31T01-46-27-277Z.json` e seu
+  `-deterministic-review.json`.
+- `reports/oracle-evaluation-2026-10-31T01-47-55-068Z.json`.
+
+O custo informado total dessas três execuções foi US$ 0,0168142, sem valores
+ausentes nos relatórios. Os critérios mudaram durante o trabalho, impedindo
+comparar os percentuais como um benchmark estável. Esta inspeção foi feita pelo
+agente e não substitui revisão humana independente. A heurística não cobre todas
+as paráfrases; o teste sintético continua insuficiente para validar um acervo
+representativo ou a aplicação autenticada em produção.
+
+Validação técnica desta correção: 56 testes aprovados em quatro arquivos
+(evidências, avaliação, prompt e rota). A rota comprova que a afirmação exclusiva
+inválida recebe fallback e não é persistida. Build, integração PostgreSQL e testes
+de navegador anteriores não foram repetidos neste corte de validação textual.
+
+## Validação da implementação inicial
 
 - `npm test -- --maxWorkers=2 --testTimeout=20000`: 330 testes aprovados em 52 arquivos.
 - `npx tsc --noEmit`: aprovado.
