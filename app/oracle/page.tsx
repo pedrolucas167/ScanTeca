@@ -10,7 +10,7 @@ import { OracleComposer } from "@/components/oracle/OracleComposer";
 import { useOracleViewport } from "@/components/oracle/useOracleViewport";
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { consumeOracleEvents } from "@/lib/oracle-stream";
-import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, type OracleMode } from "@/lib/constants/oracle";
+import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, ORACLE_STAGE_LABELS, type OracleMode } from "@/lib/constants/oracle";
 import type { Source, Message, OracleSession, OracleArtifact, OracleStreamEvent } from "@/lib/types/oracle";
 
 export default function OraclePage() {
@@ -180,7 +180,8 @@ export default function OraclePage() {
   const readOracleStream = async (res: Response): Promise<string> => {
     let fullText = "";
     await consumeOracleEvents<OracleStreamEvent>(res.body, (json) => {
-      receivedAnyRef.current = true;
+      if (json.stage && Object.hasOwn(ORACLE_STAGE_LABELS, json.stage)) setGenerationStage(ORACLE_STAGE_LABELS[json.stage]);
+      if (json.sessionId || json.transcript || json.text || json.action) receivedAnyRef.current = true;
       if (isOracleAction(json.action)) {
         const action = json.action;
         setMessages(previous => previous.map((message, index) => index === previous.length - 1 && message.role === "assistant" ? { ...message, action } : message));
@@ -216,7 +217,6 @@ export default function OraclePage() {
             });
           }
           if (json.sources) {
-            setGenerationStage("Organizando evidências...");
             setMessages((prev) => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -256,7 +256,6 @@ export default function OraclePage() {
             });
           }
           if (json.text) {
-            setGenerationStage("Redigindo uma resposta...");
 
 
             fullText += json.text;
@@ -1163,7 +1162,7 @@ export default function OraclePage() {
                 </div>
                 <div className="min-w-0 w-full space-y-space-md rounded-2xl rounded-tl-xs border border-outline-variant/30 bg-surface-container-low p-space-md shadow-sm transition-[background-color,box-shadow,border-color,transform] duration-300 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-container-low/90 hover:shadow-lg hover:shadow-primary/5">
                   {loading && i === messages.length - 1 && msg.content === "" ? (
-                  <div className="flex items-center gap-2 py-1 min-h-[60px]" aria-label="Oráculo digitando">
+                  <div className="flex items-center gap-2 py-1 min-h-[60px]" role="status" aria-live="polite" aria-label="Andamento da consulta">
                     <div
                       className="flex items-center gap-1.5"
                     >

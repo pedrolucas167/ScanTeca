@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
+import { createServer } from "node:http";
 import type { Source } from "../lib/types/oracle";
 
 // These cases control API responses; service-worker activation must not reload
@@ -25,6 +26,42 @@ async function openOracle(page: Page) {
   await page.goto("/oracle", { waitUntil: "domcontentloaded" });
   await clerk.loaded({ page });
 }
+
+test("andamento chega antes da resposta e permite acompanhar a busca", async ({ page }) => {
+  const gate = Promise.withResolvers<void>();
+  const fixture = createServer(async (request, response) => {
+    response.setHeader("Access-Control-Allow-Origin", "*");
+    response.setHeader("Access-Control-Allow-Headers", "content-type");
+    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    if (request.method === "OPTIONS") { response.writeHead(204).end(); return; }
+    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+    response.write('data: {"stage":"search"}\n\n');
+    await gate.promise;
+    if (!response.destroyed) response.end(stream);
+  });
+  await new Promise<void>(resolve => fixture.listen(0, "127.0.0.1", resolve));
+  const address = fixture.address();
+  if (!address || typeof address === "string") throw new Error("Fixture local não iniciou.");
+  try {
+    await page.route("**/api/oracle", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.continue({ url: `http://127.0.0.1:${address.port}/api/oracle` });
+    });
+    await bootstrap(page);
+    await openOracle(page);
+    await page.getByRole("textbox", { name: "Sua mensagem" }).fill("Encontre uma conexão entre memória e cidade");
+    await page.getByRole("button", { name: "Enviar mensagem" }).click();
+    await expect(page.getByRole("status", { name: "Andamento da consulta" })).toContainText("Buscando livros na sua estante...");
+    await expect(page.getByText(answer, { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Parar geração" })).toBeVisible();
+    gate.resolve();
+    await expect(page.getByRole("main", { name: "Conversa com o Oráculo" }).getByText(answer, { exact: true })).toBeVisible();
+  } finally {
+    gate.resolve();
+    fixture.closeAllConnections();
+    await new Promise<void>((resolve, reject) => fixture.close(error => error ? reject(error) : resolve()));
+  }
+});
 
 test("memória do leitor permite corrigir, pausar e apagar preferências", async ({ page }) => {
   let memory: { oracleProfile: string | null; oracleMemoryEnabled: boolean; oracleProfileVersion: number } = {
