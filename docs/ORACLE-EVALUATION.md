@@ -160,6 +160,53 @@ Validação técnica desta correção: 56 testes aprovados em quatro arquivos
 inválida recebe fallback e não é persistida. Build, integração PostgreSQL e testes
 de navegador anteriores não foram repetidos neste corte de validação textual.
 
+## Ajuste final do caso externo — 30/10/2026, horário local
+
+O primeiro ajuste de formato passou em três execuções isoladas do caso externo,
+mas a rodada completa seguinte voltou a produzir uma afirmação de ausência,
+desta vez no plural, e atribuiu ao leitor uma apreciação não declarada por um
+livro cadastrado. Essa rodada não foi aceita como sucesso: a revisão com a
+checagem ampliada resulta em 9/10. Os resultados isolados não substituem a
+rodada completa nem demonstram estabilidade geral.
+
+Relatórios dessa etapa intermediária: `01-49-58-531Z`, `01-50-15-080Z` e
+`01-50-37-946Z` para os testes isolados; rodada completa em
+`reports/oracle-evaluation-2026-10-31T01-50-36-475Z.json`, acompanhada do
+`-deterministic-review.json`. Todos ficam ignorados pelo Git.
+
+A correção final remove a premissa de que o assistente conhece os gostos do
+leitor, distingue cadastro de livro de preferência e informa quando não há
+perfil declarado. Para indicações externas, pede uma resposta curta com título,
+autor, motivo documentado e o estado externo daquele título, sem diagnosticar
+o restante do acervo. O bloqueio também cobre ausência no plural.
+
+Com a versão final, sem alterar prompt ou critérios entre as execuções:
+
+- Rodada completa: **10/10 aprovados**, sem erros de provedor.
+- Três execuções isoladas adicionais do caso externo: **3/3 aprovadas**.
+- Inspeção pelo agente: as quatro respostas externas finais indicam a obra
+  pertinente e sua condição externa, sem generalizar a ausência de livros no
+  acervo nem atribuir preferências não declaradas.
+- Testes direcionados: **58 aprovados** em quatro arquivos.
+- ESLint dos arquivos alterados: aprovado.
+- Custo informado das quatro execuções finais: **US$ 0,0088832**.
+
+Relatórios finais locais:
+
+- `reports/oracle-evaluation-2026-10-31T01-52-17-108Z.json` (rodada completa).
+- `reports/oracle-evaluation-2026-10-31T01-53-12-764Z.json`.
+- `reports/oracle-evaluation-2026-10-31T01-53-34-545Z.json`.
+- `reports/oracle-evaluation-2026-10-31T01-53-35-656Z.json`.
+- `reports/oracle-external-validation-summary.json` (confirma o mesmo hash do
+  prompt externo e agrega os resultados e custos das quatro execuções).
+
+Esta correção atende ao caso sintético observado. Não garante ausência de outras
+alucinações ou estabilidade em produção. A revisão foi feita pelo agente, sem
+revisão humana independente. Continuam pendentes acervo representativo,
+validação autenticada de produção, modularização restante e publicação. Nenhum
+deploy ou nova migração foi executado. As rodadas com falha permanecem registradas;
+não foram substituídas nem selecionadas somente as respostas favoráveis.
+
 ## Validação da implementação inicial
 
 - `npm test -- --maxWorkers=2 --testTimeout=20000`: 330 testes aprovados em 52 arquivos.
