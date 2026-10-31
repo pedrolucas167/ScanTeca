@@ -41,6 +41,11 @@ A preparação da conversa e o isolamento das consultas de contexto estão em
 [ORACLE-MODULES.md](./ORACLE-MODULES.md), com transações e consultas vetoriais
 verificadas em PostgreSQL local descartável.
 
+A revisão técnica posterior está em [ORACLE-REVIEW.md](./ORACLE-REVIEW.md), com
+correções de tentativas repetidas e embeddings inválidos, 403 testes unitários,
+92 de integração e 14 de navegador aprovados. Essa revisão pelo agente não
+substitui aceite com acervo representativo ou revisão humana independente.
+
 A continuação de personalização está em
 [ORACLE-PERSONALIZATION.md](./ORACLE-PERSONALIZATION.md). A migração de controles
 de memória foi aplicada e verificada em produção; a publicação do código segue
