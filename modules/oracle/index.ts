@@ -1,4 +1,7 @@
 export { readOracleCompletion } from "./completion";
+export { answerOracleQuestion } from "./query";
+export { directChatResponse, toolExecutionResponse } from "./responses";
+export { getOracleHome, clearOracleHistory } from "./home";
 export { prepareOracleSession, OracleSessionError } from "./session";
 export { createOracleSessionSchema, updateOracleSessionSchema, listOracleSessions, createOracleSession,
   findOracleSession, updateOracleSession, deleteOracleSession } from "./session";

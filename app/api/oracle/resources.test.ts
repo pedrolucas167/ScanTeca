@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn(), rateLimits: {
   "oracle/sessions": { userLimit: 60, ipLimit: 120, windowMs: 60000 },
@@ -8,6 +8,7 @@ vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn(), rateLimits: {
 vi.mock("@/modules/oracle", async original => ({ ...await original<typeof import("@/modules/oracle")>(),
   listOracleSessions: vi.fn(), createOracleSession: vi.fn(), findOracleSession: vi.fn(),
   updateOracleSession: vi.fn(), deleteOracleSession: vi.fn(), listOracleArtifacts: vi.fn(), saveOracleArtifact: vi.fn(),
+  getOracleHome: vi.fn(), clearOracleHistory: vi.fn(),
 }));
 import { auth } from "@clerk/nextjs/server";
 import { rateLimitGuard } from "@/lib/rate-limit";
@@ -15,6 +16,7 @@ import * as oracle from "@/modules/oracle";
 import * as sessions from "./sessions/route";
 import * as session from "./sessions/[id]/route";
 import * as artifacts from "./artifacts/route";
+import * as main from "./route";
 
 const id = "cm123456789012345678901234";
 const context = () => ({ params: Promise.resolve({ id }) });
@@ -37,11 +39,13 @@ describe("Oracle resource HTTP boundaries", () => {
     ["update session", () => session.PATCH(request("PATCH"), context())],
     ["delete session", () => session.DELETE(request("DELETE"), context())],
     ["list artifacts", () => artifacts.GET()], ["save artifact", () => artifacts.POST(request())],
+    ["load home", () => main.GET(request("GET"))], ["clear history", () => main.DELETE()],
   ] as const)("rejects unauthenticated %s before domain work", async (_name, call) => {
     vi.mocked(auth).mockResolvedValueOnce({ userId: null } as Awaited<ReturnType<typeof auth>>);
     expect((await call()).status).toBe(401);
     for (const method of [oracle.listOracleSessions, oracle.createOracleSession, oracle.findOracleSession,
-      oracle.updateOracleSession, oracle.deleteOracleSession, oracle.listOracleArtifacts, oracle.saveOracleArtifact]) {
+      oracle.updateOracleSession, oracle.deleteOracleSession, oracle.listOracleArtifacts, oracle.saveOracleArtifact,
+      oracle.getOracleHome, oracle.clearOracleHistory]) {
       expect(method).not.toHaveBeenCalled();
     }
   });
@@ -58,7 +62,7 @@ describe("Oracle resource HTTP boundaries", () => {
     expect(rateLimitGuard).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ route: "oracle/artifacts", userLimit: 60, ipLimit: 120 }));
   });
   it("does not write after rate limiting or invalid input", async () => {
-    vi.mocked(rateLimitGuard).mockResolvedValueOnce(Response.json({ error: "Limite" }, { status: 429 }));
+    vi.mocked(rateLimitGuard).mockResolvedValueOnce(NextResponse.json({ error: "Limite" }, { status: 429 }));
     expect((await sessions.POST(request())).status).toBe(429);
     expect((await artifacts.POST(request("POST", { type: "INVALID" }))).status).toBe(400);
     expect(oracle.createOracleSession).not.toHaveBeenCalled();
@@ -86,5 +90,14 @@ describe("Oracle resource HTTP boundaries", () => {
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain("fixture-private");
     expect(error).toHaveBeenCalledExactlyOnceWith("[oracle] sessions GET failed");
+  });
+  it("loads and clears history only for the authenticated owner", async () => {
+    vi.mocked(oracle.getOracleHome).mockResolvedValueOnce({ messages: [], suggestions: [], stats: { total: 0, indexed: 0 },
+      profile: null, sessions: [], artifacts: [], activeSessionId: id });
+    vi.mocked(oracle.clearOracleHistory).mockResolvedValueOnce({ count: 1 });
+    expect((await main.GET(new NextRequest(`http://localhost/api/oracle?sessionId=${id}`))).status).toBe(200);
+    expect((await main.DELETE()).status).toBe(200);
+    expect(oracle.getOracleHome).toHaveBeenCalledWith("owner", id);
+    expect(oracle.clearOracleHistory).toHaveBeenCalledWith("owner");
   });
 });

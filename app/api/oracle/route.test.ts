@@ -6,6 +6,9 @@ vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn().mockResolvedValue(n
 vi.mock("@/lib/embeddings", () => ({ generateEmbedding: vi.fn().mockResolvedValue([0.1]) }));
 vi.mock("@/modules/oracle/history", () => ({ saveOracleAnswer: vi.fn().mockResolvedValue({ id: "answer" }),
   getOracleRegenerationTarget: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/modules/oracle/retrieval", async original => ({ ...await original<typeof import("@/modules/oracle/retrieval")>(),
+  retrieveBooks: vi.fn().mockResolvedValue({ books: [], metadataCandidates: 0, lexicalCandidates: 0 }) }));
+vi.mock("@/modules/oracle/profile", () => ({ updateReaderProfile: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/prisma", () => {
   const model = { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({ id: "cm123456789012345678901234" }), count: vi.fn().mockResolvedValue(1) };
@@ -53,7 +56,7 @@ describe("grounded answers and evidence", () => {
     vi.stubEnv("PERFORMANCE_DIAGNOSTICS", "1");
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const invalid = kind !== "valid";
-    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
     vi.mocked(generateEmbedding).mockResolvedValueOnce(null);
     vi.mocked(saveOracleAnswer).mockClear();
     let prompt = "";
@@ -101,8 +104,8 @@ describe("grounded answers and evidence", () => {
   it("learns preferences only through the post-response callback", async () => {
     const history = Array.from({ length: 4 }, (_, index) => ({ id: `old-${index}`, role: "user", content: "Prefiro histórias curtas sobre natureza" }));
     vi.mocked(prisma.oracleMessage.findMany).mockResolvedValueOnce(history as never);
-    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
-    const learn = vi.spyOn(retrieval, "updateReaderProfile").mockResolvedValue(undefined);
+    vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    const learn = vi.mocked(retrieval.updateReaderProfile).mockResolvedValue(undefined);
     vi.mocked(after).mockClear();
     vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
       if (!JSON.parse(String(options.body)).stream) return Response.json({ choices: [{ message: { content: "Temas de Duna" } }] });
@@ -119,7 +122,7 @@ describe("grounded answers and evidence", () => {
 
   it("reports a post-start provider failure through a safe SSE error", async () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
     vi.mocked(saveOracleAnswer).mockClear();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "private provider detail" }, { status: 502 })));
     const response = await POST(questionRequest("Quais temas aparecem em Duna?"));
@@ -132,7 +135,7 @@ describe("grounded answers and evidence", () => {
   });
 
   it("uses identical references for book, diary, review and external research in the actual route", async () => {
-    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
     vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: "diary", bookTitle: "Duna", bookAuthor: "Herbert", type: "NOTE", page: 20, content: "Minha anotação", distance: 0.2 }])
       .mockResolvedValueOnce([{ id: "review", bookTitle: "Duna", bookAuthor: "Herbert", rating: 4, content: "Minha avaliação", distance: 0.2 }])

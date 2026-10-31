@@ -14,7 +14,7 @@ export const updateOracleSessionSchema = z.object({
 
 export function listOracleSessions(userId: string) {
   return prisma.oracleSession.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 50,
-    include: { _count: { select: { messages: true, artifacts: true } } } });
+    include: { _count: { select: { messages: { where: { userId } }, artifacts: { where: { userId } } } } } });
 }
 
 export function createOracleSession(userId: string, input: z.infer<typeof createOracleSessionSchema>) {

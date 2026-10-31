@@ -10,6 +10,7 @@ vi.mock("@/lib/prisma", async () => {
 import { prisma } from "@/lib/prisma";
 import { createOracleSession, listOracleSessions, findOracleSession, updateOracleSession, deleteOracleSession } from "./session";
 import { saveOracleArtifact, listOracleArtifacts } from "./artifacts";
+import { getOracleHome, clearOracleHistory } from "./home";
 
 const userId = "oracle-resources-integration-owner";
 const otherId = "oracle-resources-integration-other";
@@ -60,5 +61,27 @@ describe("Oracle resource ownership and lifecycle in PostgreSQL", () => {
     const session = await findOracleSession(userId, sessionId);
     expect(session?.messages).toEqual([]);
     expect(session?.artifacts).toEqual([]);
+    expect((await listOracleSessions(userId))[0]?._count).toEqual({ messages: 0, artifacts: 0 });
+  });
+  it("loads home history only from an owned session", async () => {
+    await prisma.oracleMessage.create({ data: { userId, sessionId, role: "user", content: "Pergunta própria" } });
+    const home = await getOracleHome(userId, sessionId);
+    expect(home.messages.map(message => message.content)).toEqual(["Pergunta própria"]);
+    expect(home.stats).toEqual({ total: 0, indexed: 0 });
+    expect(home.sessions.map(session => session.userId)).toEqual([userId]);
+    await expect(getOracleHome(otherId, sessionId)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+  it("clears only the reader's messages while preserving sessions and artifacts", async () => {
+    const otherSession = (await listOracleSessions(otherId))[0]!;
+    await prisma.oracleMessage.createMany({ data: [
+      { userId, sessionId, role: "user", content: "Própria" },
+      { userId: otherId, sessionId: otherSession.id, role: "user", content: "Alheia" },
+    ] });
+    const saved = await saveOracleArtifact(userId, artifact());
+    await clearOracleHistory(userId);
+    expect(await prisma.oracleMessage.count({ where: { userId } })).toBe(0);
+    expect(await prisma.oracleMessage.count({ where: { userId: otherId } })).toBe(1);
+    expect(await findOracleSession(userId, sessionId)).not.toBeNull();
+    expect((await listOracleArtifacts(userId)).map(item => item.id)).toEqual([saved.id]);
   });
 });
