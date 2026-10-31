@@ -39,10 +39,12 @@ export async function generateEmbedding(text: string, options: { signal?: AbortS
     const usage = parseOracleUsage(data?.usage);
     if (usage) options.onUsage?.(usage);
     const embedding = data?.data?.[0]?.embedding;
-    if (!Array.isArray(embedding)) return null;
+    if (!Array.isArray(embedding) || embedding.length !== 1536 ||
+        !embedding.every(value => typeof value === "number" && Number.isFinite(value)) ||
+        !embedding.some(value => value !== 0)) return null;
     return embedding as number[];
-  } catch (err) {
-    if (!options.signal?.aborted) console.error("[embeddings] fetch error:", err);
+  } catch {
+    if (!options.signal?.aborted) console.error("[embeddings] Não foi possível gerar o vetor de busca.");
     return null;
   }
 }
