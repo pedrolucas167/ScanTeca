@@ -159,6 +159,19 @@ function questionRequest(question: string, signal?: AbortSignal) {
 }
 
 describe("Oracle actions and interrupted providers", () => {
+  it.each([
+    ["NOT_FOUND", 404], ["DUPLICATE_REQUEST", 409],
+  ] as const)("returns %s before starting providers or SSE", async (code, status) => {
+    vi.spyOn(retrieval, "prepareOracleSession").mockRejectedValueOnce(new retrieval.OracleSessionError(code));
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    vi.mocked(after).mockClear();
+    const response = await POST(questionRequest("Quais livros sobre astronomia posso ler?"));
+    expect(response.status).toBe(status);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
   it("rejects unauthenticated requests before providers or persistence", async () => {
     vi.mocked(auth).mockResolvedValueOnce({ userId: null } as Awaited<ReturnType<typeof auth>>);
     const fetch = vi.fn();

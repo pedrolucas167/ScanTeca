@@ -1,11 +1,11 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { readOracleCompletion, saveOracleAnswer, getOracleRegenerationTarget, retrieveBooks, VECTOR_CANDIDATE_LIMIT,
+import { readOracleCompletion, saveOracleAnswer, getOracleRegenerationTarget, retrieveBooks,
+  loadOracleContext, retrieveOracleMemories, MAX_DIARY_ENTRIES, prepareOracleSession, OracleSessionError,
   createEvidenceRegistry, validateCitations, validateInventoryClaims, buildOracleSystemPrompt, updateReaderProfile, createOraclePipeline } from "@/modules/oracle";
 import { parseOracleUsage, type OracleUsage } from "@/lib/oracle-usage";
 import { NextRequest, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embeddings";
 import { searchGoogleBooks } from "@/lib/recommendations";
@@ -19,10 +19,7 @@ import {
   type RoutingDecision,
 } from "@/lib/jev-routing";
 import { z } from "zod";
-import {
-  isCorruptedHistoryMessage,
-  validateOracleResponse,
-} from "@/lib/oracle-quality";
+import { validateOracleResponse } from "@/lib/oracle-quality";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
@@ -47,52 +44,7 @@ const CHAT_MODEL =
   process.env.ORACLE_CHAT_MODEL || "google/gemini-2.5-flash";
 const STT_MODEL = process.env.ORACLE_STT_MODEL || "openai/whisper-1";
 
-interface SimilarBook {
-  id: string;
-  title: string;
-  author: string;
-  publishedDate: string | null;
-  synopsis: string | null;
-  genre: string | null;
-  status: string;
-  rating: number | null;
-  distance: number;
-  relevance?: number;
-}
-
-interface DiaryMemory {
-  id: string;
-  type: string;
-  content: string;
-  page: number | null;
-  tags: string[];
-  bookTitle: string;
-  bookAuthor: string;
-  distance: number;
-}
-
-interface ReviewMemory {
-  id: string;
-  content: string;
-  rating: number | null;
-  bookTitle: string;
-  bookAuthor: string;
-  distance: number;
-}
-
-interface ExternalResearchMemory {
-  id: string;
-  source: string;
-  title: string;
-  content: string;
-  type: string;
-  distance: number;
-}
-
-const HISTORY_LIMIT = 8;
 const DISTANCE_THRESHOLD = 0.7;
-const MAX_DIARY_ENTRIES = 8;
-const MAX_RAG_MEMORIES = 6;
 const MAX_TOKENS_CHAT = Number(process.env.ORACLE_MAX_TOKENS || 800);
 const MAX_TOKENS_REWRITE = 60;
 
@@ -361,105 +313,27 @@ export async function POST(request: NextRequest) {
     if (shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
     if (!apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
     if (shouldDirectChat(routing)) return directChatResponse(trimmed, apiKey, request.signal);
-    let sessionId = requestedSessionId ?? null;
-    let currentRequestMessageId: string | null = null;
+    let prepared: Awaited<ReturnType<typeof prepareOracleSession>>;
     try {
-      sessionId = await prisma.$transaction(async (tx) => {
-        let currentSessionId = sessionId;
-        if (currentSessionId) {
-          const ownsSession = await tx.oracleSession.count({
-            where: { id: currentSessionId, userId },
-          });
-          if (!ownsSession) throw new Error("Conversa não encontrada");
-        } else {
-          const session = await tx.oracleSession.create({
-            data: { userId, title: trimmed.slice(0, 80), mode },
-          });
-          currentSessionId = session.id;
-        }
-
-        if (!regenerate) {
-          const message = await tx.oracleMessage.create({
-            data: {
-              userId,
-              sessionId: currentSessionId,
-              role: "user",
-              content: trimmed,
-              requestId,
-            },
-          });
-          currentRequestMessageId = message.id;
-        }
-        return currentSessionId;
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      prepared = await prepareOracleSession({ userId, question: trimmed, mode,
+        sessionId: requestedSessionId, requestId, regenerate });
     } catch (error) {
-      if (error instanceof Error && error.message === "Conversa não encontrada") {
-        return Response.json({ error: error.message }, { status: 404 });
-      }
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        return Response.json(
-          { error: "Esta pergunta já está sendo processada." },
-          { status: 409 }
-        );
+      if (error instanceof OracleSessionError) {
+        return Response.json({ error: error.message }, { status: error.code === "NOT_FOUND" ? 404 : 409 });
       }
       throw error;
     }
+    const { sessionId, currentRequestMessageId } = prepared;
 
     // Retain the old answer until its replacement can be saved atomically.
-    const previousAnswer = regenerate ? await getOracleRegenerationTarget(userId, sessionId!) : null;
+    const previousAnswer = regenerate ? await getOracleRegenerationTarget(userId, sessionId) : null;
 
     return createOraclePipeline({ signal: request.signal, schedule: job => after(job),
-      initialEvents: [{ sessionId: sessionId! }, { transcript: trimmed }], run: async pipeline => {
+      initialEvents: [{ sessionId }, { transcript: trimmed }], run: async pipeline => {
       const { signal, stage, metrics } = pipeline;
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      weekAgo.setHours(0, 0, 0, 0);
-
-      const [historyDesc, setting, readingNow, weekLogs, diaryEntries] = await metrics.measure("context", () => Promise.all([
-        prisma.oracleMessage.findMany({
-          where: { userId, sessionId, ...(previousAnswer ? { id: { not: previousAnswer.id } } : {}) },
-          orderBy: { createdAt: "desc" },
-          take: HISTORY_LIMIT,
-        }),
-        prisma.librarySetting.findUnique({ where: { userId } }),
-        prisma.book.findMany({
-          where: { userId, status: "READING" },
-          select: {
-            title: true,
-            author: true,
-            currentPage: true,
-            pages: true,
-            startedAt: true,
-          },
-        }),
-        prisma.readingLog.findMany({
-          where: { userId, date: { gte: weekAgo } },
-          select: { date: true, pages: true },
-        }),
-        prisma.diaryEntry.findMany({
-          where: { userId, ragEnabled: true },
-          orderBy: { createdAt: "desc" },
-          take: MAX_DIARY_ENTRIES,
-          select: {
-            type: true,
-            content: true,
-            page: true,
-            id: true,
-            book: { select: { title: true, author: true } },
-          },
-        }),
-      ]));
-      signal.throwIfAborted();
-
-      // The current question is already persisted above. It is sent separately
-      // in the final prompt and must not be duplicated in the conversation.
-      const conversationHistory = historyDesc.filter((message, index) => {
-        if (message.role === "assistant" && isCorruptedHistoryMessage(message.content)) {
-          return false;
-        }
-        if (currentRequestMessageId) return message.id !== currentRequestMessageId;
-        return !(index === 0 && message.role === "user" && message.content === trimmed);
-      });
+      const { conversationHistory, setting, readingNow, weekLogs, diaryEntries } = await metrics.measure("context", () =>
+        loadOracleContext({ userId, sessionId, question: trimmed, currentRequestMessageId,
+          replacesId: previousAnswer?.id, signal }));
 
       const retrievalQuery = await metrics.measure("rewrite", () => contextualizeQuestion(
         trimmed, conversationHistory, apiKey, { signal, onUsage: usage => metrics.recordUsage("rewrite", usage) }
@@ -471,51 +345,8 @@ export async function POST(request: NextRequest) {
       }));
       signal.throwIfAborted();
 
-      const vector = `[${questionEmbedding?.join(",") ?? ""}]`;
-      const [similarBooks, semanticDiary, semanticReviews, semanticExternal] = await metrics.measure("retrieval", () => Promise.all([
-        questionEmbedding ? prisma.$queryRaw<SimilarBook[]>`
-        SELECT id, title, author, "publishedDate", synopsis, genre,
-               status::text as status, rating,
-               embedding <=> ${vector}::vector AS distance
-        FROM "Book"
-        WHERE "userId" = ${userId} AND embedding IS NOT NULL
-        ORDER BY embedding <=> ${vector}::vector
-        LIMIT ${VECTOR_CANDIDATE_LIMIT}
-        ` : Promise.resolve([] as SimilarBook[]),
-        questionEmbedding ? prisma.$queryRaw<DiaryMemory[]>`
-          SELECT d.id, d.type, d.content, d.page, d.tags,
-                 b.title AS "bookTitle", b.author AS "bookAuthor",
-                 d.embedding <=> ${vector}::vector AS distance
-          FROM "DiaryEntry" d
-          JOIN "Book" b ON b.id = d."bookId"
-          WHERE d."userId" = ${userId}
-            AND d."ragEnabled" = true
-            AND d.embedding IS NOT NULL
-          ORDER BY d.embedding <=> ${vector}::vector
-          LIMIT ${MAX_RAG_MEMORIES}
-        ` : Promise.resolve([] as DiaryMemory[]),
-        questionEmbedding ? prisma.$queryRaw<ReviewMemory[]>`
-          SELECT r.id, r.content, r.rating,
-                 b.title AS "bookTitle", b.author AS "bookAuthor",
-                 r.embedding <=> ${vector}::vector AS distance
-          FROM "Review" r
-          JOIN "Book" b ON b.id = r."bookId"
-          WHERE b."userId" = ${userId}
-            AND r.embedding IS NOT NULL
-          ORDER BY r.embedding <=> ${vector}::vector
-          LIMIT ${MAX_RAG_MEMORIES}
-        ` : Promise.resolve([] as ReviewMemory[]),
-        questionEmbedding ? prisma.$queryRaw<ExternalResearchMemory[]>`
-          SELECT id, source, title, content, type,
-                 embedding <=> ${vector}::vector AS distance
-          FROM "ExternalResearchData"
-          WHERE "userId" = ${userId}
-            AND embedding IS NOT NULL
-          ORDER BY embedding <=> ${vector}::vector
-          LIMIT ${MAX_RAG_MEMORIES}
-        ` : Promise.resolve([] as ExternalResearchMemory[]),
-      ]));
-      signal.throwIfAborted();
+      const { similarBooks, semanticDiary, semanticReviews, semanticExternal } = await metrics.measure("retrieval", () =>
+        retrieveOracleMemories(userId, questionEmbedding, signal));
 
       const { books: contextBooks, metadataCandidates, lexicalCandidates } = await metrics.measure("retrieval", () => retrieveBooks(userId, retrievalQuery, similarBooks, mode));
       const evidence = createEvidenceRegistry();

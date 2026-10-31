@@ -1,4 +1,6 @@
 export { readOracleCompletion } from "./completion";
+export { prepareOracleSession, OracleSessionError } from "./session";
+export { loadOracleContext, retrieveOracleMemories, MAX_DIARY_ENTRIES } from "./context";
 export { saveOracleAnswer, getOracleRegenerationTarget } from "./history";
 export { retrieveBooks, VECTOR_CANDIDATE_LIMIT } from "./retrieval";
 export { createEvidenceRegistry, validateCitations, validateInventoryClaims } from "./evidence";
