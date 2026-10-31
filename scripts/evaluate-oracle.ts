@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
-import { buildEvaluationContext, buildOracleSystemPrompt, checkEvaluationAnswer,
+import { buildEvaluationContext, buildOracleSystemPrompt, checkEvaluationAnswer, readOracleCompletion,
   parseOracleJudgment, ORACLE_JUDGE_PROMPT } from "@/modules/oracle";
 import { oracleEvaluationCases } from "@/tests/oracle-evaluation-fixtures";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -17,6 +17,7 @@ type CompletionResult = {
   answer: string;
   durationMs: number;
   usage: z.infer<typeof completionSchema>["usage"] | null;
+  firstDeltaMs?: number | null;
 };
 interface CaseResult {
   id: string;
@@ -36,9 +37,11 @@ interface CaseResult {
 async function main() {
   const args = process.argv.slice(2);
   let live = false;
+  let streamed = false;
   let caseId: string | undefined;
   for (let index = 0; index < args.length; index++) {
     if (args[index] === "--live") live = true;
+    else if (args[index] === "--stream") streamed = true;
     else if (args[index] === "--case" && args[index + 1] && !caseId) caseId = args[++index];
     else throw new Error("Argumento inválido.");
   }
@@ -52,13 +55,27 @@ async function main() {
   const timestamp = new Date().toISOString();
   const cases: CaseResult[] = [];
 
-  async function complete(targetModel: string, messages: { role: "system" | "user"; content: string }[], temperature: number) {
+  async function complete(targetModel: string, messages: { role: "system" | "user"; content: string }[], temperature: number, stream = false): Promise<CompletionResult> {
     const started = performance.now();
     const response = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "X-Title": "Scanteca Oracle Evaluation" },
-      body: JSON.stringify({ model: targetModel, messages, temperature, max_tokens: maxTokens, stream: false }),
+      body: JSON.stringify({ model: targetModel, messages, temperature, max_tokens: maxTokens, stream }),
     }, 60_000);
     if (!response.ok) throw new Error(`Provedor respondeu HTTP ${response.status}`);
+    if (stream) {
+      if (!response.body) throw new Error("Resposta incompleta do provedor");
+      let usage: CompletionResult["usage"] = null;
+      let firstDeltaMs: number | null = null;
+      const answer = await readOracleCompletion(response.body, {
+        onDelta(text) { if (text && firstDeltaMs === null) firstDeltaMs = Math.round(performance.now() - started); },
+        onUsage(value) {
+          usage = { ...(value.inputTokens !== null ? { prompt_tokens: value.inputTokens } : {}),
+            ...(value.outputTokens !== null ? { completion_tokens: value.outputTokens } : {}),
+            ...(value.costUsd !== null ? { cost: value.costUsd } : {}) };
+        },
+      });
+      return { answer, durationMs: Math.round(performance.now() - started), firstDeltaMs, usage };
+    }
     const data = completionSchema.parse(await response.json());
     const choice = data.choices[0]!;
     if (choice.finish_reason !== "stop") throw new Error("Resposta incompleta do provedor");
@@ -78,7 +95,7 @@ async function main() {
     let judge: Awaited<ReturnType<typeof complete>> | null = null;
     try {
       generation = await complete(model, [{ role: "system", content: systemPrompt },
-        { role: "user", content: `Evidências recuperadas:\n${context.content}\n\nPergunta do usuário: ${testCase.question}` }], 0.3);
+        { role: "user", content: `Evidências recuperadas:\n${context.content}\n\nPergunta do usuário: ${testCase.question}` }], 0.3, streamed);
       judge = await complete(judgeModel, [{ role: "system", content: ORACLE_JUDGE_PROMPT },
         { role: "user", content: JSON.stringify({ question: testCase.question, evidence: context.content, profile: testCase.profile ?? null, answer: generation.answer, rubric: testCase.rubric }) }], 0);
       const evaluation = checkEvaluationAnswer(testCase, generation.answer, parseOracleJudgment(judge.answer));
@@ -109,10 +126,10 @@ async function main() {
   const directory = join(process.cwd(), "reports");
   await mkdir(directory, { recursive: true });
   const output = join(directory, `oracle-evaluation-${timestamp.replace(/[:.]/g, "-")}.json`);
-  await writeFile(output, JSON.stringify({ version: 2, timestamp, live, model, judgeModel, maxTokens,
+  await writeFile(output, JSON.stringify({ version: 3, timestamp, live, streamedGeneration: streamed, model, judgeModel, maxTokens,
     fixtureHash: createHash("sha256").update(JSON.stringify(oracleEvaluationCases)).digest("hex"),
     judgePromptHash: createHash("sha256").update(ORACLE_JUDGE_PROMPT).digest("hex"),
-    limitations: "Synthetic fixed contexts; no database retrieval, authenticated HTTP, streaming or human judgment validation. Automated judge may share the generation model and can be wrong.",
+    limitations: "Synthetic fixed contexts; no database retrieval, authenticated HTTP, application progress, deferred learning or human judgment validation. Provider generation streams only when streamedGeneration is true. Automated judge may share the generation model and can be wrong.",
     summary, cases }, null, 2));
   process.stdout.write(`${JSON.stringify(summary)}\nRelatório: ${output}\n`);
   if (live && (summary.failed || summary.errors)) process.exitCode = 1;
