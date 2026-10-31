@@ -1,6 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+/** A failed new question must not turn a retry into replacement of an older answer. */
+export async function getOracleRegenerationTarget(userId: string, sessionId: string) {
+  const last = await prisma.oracleMessage.findFirst({ where: { userId, sessionId },
+    orderBy: { createdAt: "desc" }, select: { id: true, role: true } });
+  return last?.role === "assistant" ? { id: last.id } : null;
+}
+
 export async function saveOracleAnswer(input: {
   userId: string;
   sessionId: string;

@@ -16,3 +16,13 @@ export const ORACLE_MODES = [
 ] as const;
 
 export type OracleMode = (typeof ORACLE_MODES)[number]["id"];
+
+export const ORACLE_STAGE_LABELS = {
+  context: "Consultando suas leituras...",
+  search: "Buscando livros na sua estante...",
+  external: "Consultando o catálogo externo...",
+  generation: "Preparando a resposta...",
+  validation: "Conferindo a resposta e as fontes...",
+  persistence: "Salvando a conversa...",
+} as const;
+export type OracleStage = keyof typeof ORACLE_STAGE_LABELS;

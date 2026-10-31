@@ -46,6 +46,19 @@ it("degrada para busca vazia ao exceder timeout sem repetir fetch", async () => 
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
+it("propaga o cancelamento da consulta sem iniciar buscas adicionais", async () => {
+  const controller = new AbortController();
+  const fetchMock = vi.fn((_url, options) => new Promise<Response>((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  const searching = searchGoogleBooks("Livro", controller.signal);
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+  controller.abort();
+  expect(await searching).toEqual([]);
+  expect(fetchMock.mock.calls[0]?.[1].signal.aborted).toBe(true);
+});
+
 it("inicia buscas de perfil enquanto IA espera, com até três buscas por grupo", async () => {
   let releaseLLM!: () => void;
   const llm = new Promise<Response>((resolve) => {

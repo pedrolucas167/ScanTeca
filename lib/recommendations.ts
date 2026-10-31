@@ -302,7 +302,7 @@ function googleBookEdition(item: GoogleBooksItem): string {
   return "Edição padrão";
 }
 
-export async function searchGoogleBooks(query: string): Promise<GoogleBooksItem[]> {
+export async function searchGoogleBooks(query: string, requestSignal?: AbortSignal): Promise<GoogleBooksItem[]> {
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
   const q = encodeURIComponent(query);
   const makeUrl = (lang: string) =>
@@ -311,7 +311,7 @@ export async function searchGoogleBooks(query: string): Promise<GoogleBooksItem[
       : `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=12${lang}`;
 
   // One budget for retries, response bodies and the language fallback together.
-  const signal = AbortSignal.timeout(6000);
+  const signal = requestSignal ? AbortSignal.any([requestSignal, AbortSignal.timeout(6000)]) : AbortSignal.timeout(6000);
   try {
     const ptRes = await fetchWithRetry(makeUrl("&langRestrict=pt"), {
       maxRetries: 2,
@@ -333,8 +333,8 @@ export async function searchGoogleBooks(query: string): Promise<GoogleBooksItem[
       }
     }
     return data.items || [];
-  } catch (error) {
-    console.error("[recommendations] Google Books search error:", error);
+  } catch {
+    if (!requestSignal?.aborted) console.error("[recommendations] Google Books search error");
     return [];
   }
 }
@@ -598,7 +598,7 @@ async function enrichWithGoogleBooks(
 async function mapInBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = [];
   for (let i = 0; i < items.length; i += 3) {
-    results.push(...await Promise.all(items.slice(i, i + 3).map(run)));
+    results.push(...await Promise.all(items.slice(i, i + 3).map(item => run(item))));
   }
   return results;
 }

@@ -11,7 +11,7 @@ vi.mock("@/lib/prisma", async () => {
 });
 
 import { prisma } from "@/lib/prisma";
-import { saveOracleAnswer } from "./history";
+import { saveOracleAnswer, getOracleRegenerationTarget } from "./history";
 const userId = "oracle-integration-owner";
 let sessionId: string;
 let replacesId: string;
@@ -25,6 +25,20 @@ beforeEach(async () => {
 afterAll(() => prisma.$disconnect());
 const input = () => ({ userId, sessionId, replacesId, mode: "EXPLORE", content: "Nova resposta", sources: [] });
 describe("Oracle history in PostgreSQL", () => {
+  it("selects an existing final answer for explicit regeneration", async () => {
+    expect(await getOracleRegenerationTarget(userId, sessionId)).toEqual({ id: replacesId });
+  });
+  it("preserves an older answer when retrying after a newer unanswered question", async () => {
+    await prisma.oracleMessage.create({ data: { userId, sessionId, role: "user", content: "Nova pergunta com falha de geração" } });
+    const target = await getOracleRegenerationTarget(userId, sessionId);
+    expect(target).toBeNull();
+    await saveOracleAnswer({ ...input(), replacesId: target?.id });
+    expect(await prisma.oracleMessage.findUnique({ where: { id: replacesId } })).toMatchObject({ content: "Resposta anterior" });
+    expect(await prisma.oracleMessage.count({ where: { sessionId } })).toBe(3);
+  });
+  it("does not select another account's answer", async () => {
+    expect(await getOracleRegenerationTarget("another-owner", sessionId)).toBeNull();
+  });
   it("replaces an answer atomically", async () => {
     await saveOracleAnswer(input());
     expect(await prisma.oracleMessage.findMany({where:{sessionId}})).toMatchObject([{content:"Nova resposta"}]);

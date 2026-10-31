@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
+vi.mock("next/server", async importOriginal => ({ ...await importOriginal<typeof import("next/server")>(), after: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn().mockResolvedValue({ userId: "test-owner" }) }));
 vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn().mockResolvedValue(null), rateLimits: {} }));
 vi.mock("@/lib/embeddings", () => ({ generateEmbedding: vi.fn().mockResolvedValue([0.1]) }));
-vi.mock("@/modules/oracle/history", () => ({ saveOracleAnswer: vi.fn().mockResolvedValue({ id: "answer" }) }));
+vi.mock("@/modules/oracle/history", () => ({ saveOracleAnswer: vi.fn().mockResolvedValue({ id: "answer" }),
+  getOracleRegenerationTarget: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/prisma", () => {
   const model = { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({ id: "cm123456789012345678901234" }), count: vi.fn().mockResolvedValue(1) };
@@ -48,6 +50,8 @@ describe("grounded answers and evidence", () => {
     genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
 
   it.each(["valid", "citation", "inventory"])("checks the grounded response before persistence (%s)", async kind => {
+    vi.stubEnv("PERFORMANCE_DIAGNOSTICS", "1");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const invalid = kind !== "valid";
     vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
     vi.mocked(generateEmbedding).mockResolvedValueOnce(null);
@@ -57,13 +61,18 @@ describe("grounded answers and evidence", () => {
       prompt = String(options.body);
       const text = kind === "inventory" ? "Em seu acervo pessoal, não há um livro que trate de navegação por rios [1]."
         : `Duna aborda ecologia em um planeta desértico [${invalid ? 2 : 1}].`;
-      return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`);
+      return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: {"choices":[],"usage":{"prompt_tokens":42,"completion_tokens":5,"cost":0.0002}}\n\ndata: [DONE]\n\n`);
     }));
     const response = await POST(questionRequest("Quais temas aparecem em Duna?"));
     const body = await response.text();
     expect(prompt).toContain('[1]');
     expect(body).toContain('"id":"dune"');
     expect(body).toContain('"embeddingAvailable":false');
+    expect(body).not.toMatch(/inputTokens|costUsd|prompt_tokens/);
+    expect(info).toHaveBeenCalledWith("oracle-performance", expect.objectContaining({
+      outcome: invalid ? "rejected" : "completed",
+      usage: { generation: { inputTokens: 42, outputTokens: 5, costUsd: 0.0002 } },
+    }));
     if (invalid) {
       expect(body).toContain("Não consegui gerar uma resposta confiável");
       expect(saveOracleAnswer).not.toHaveBeenCalled();
@@ -71,6 +80,54 @@ describe("grounded answers and evidence", () => {
       expect(body).toContain('"citations":[1]');
       expect(saveOracleAnswer).toHaveBeenCalledWith(expect.objectContaining({ sources: [expect.objectContaining({ id: "dune" })] }));
     }
+  });
+
+  it("returns accepted-session progress before context finishes and cancels pending retrieval", async () => {
+    const gate = Promise.withResolvers<never[]>();
+    vi.mocked(prisma.oracleMessage.findMany).mockReturnValueOnce(gate.promise as never);
+    vi.mocked(generateEmbedding).mockClear();
+    const response = await POST(questionRequest("Quais temas aparecem em Duna?"));
+    const reader = response.body!.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toContain('"sessionId":');
+    expect(generateEmbedding).not.toHaveBeenCalled();
+    await reader.cancel();
+    gate.resolve([]);
+    await Promise.resolve();
+    expect(generateEmbedding).not.toHaveBeenCalled();
+  });
+
+  it("learns preferences only through the post-response callback", async () => {
+    const history = Array.from({ length: 4 }, (_, index) => ({ id: `old-${index}`, role: "user", content: "Prefiro histórias curtas sobre natureza" }));
+    vi.mocked(prisma.oracleMessage.findMany).mockResolvedValueOnce(history as never);
+    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    const learn = vi.spyOn(retrieval, "updateReaderProfile").mockResolvedValue(undefined);
+    vi.mocked(after).mockClear();
+    vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
+      if (!JSON.parse(String(options.body)).stream) return Response.json({ choices: [{ message: { content: "Temas de Duna" } }] });
+      return new Response('data: {"choices":[{"delta":{"content":"Duna aborda ecologia em um planeta desértico [1]."}}]}\n\ndata: [DONE]\n\n');
+    }));
+    const body = await (await POST(questionRequest("Quais temas aparecem em Duna?"))).text();
+    expect(body).toContain("data: [DONE]");
+    expect(learn).not.toHaveBeenCalled();
+    const callback = vi.mocked(after).mock.calls[0]?.[0];
+    expect(typeof callback).toBe("function");
+    if (typeof callback === "function") await callback();
+    expect(learn).toHaveBeenCalledWith(expect.objectContaining({ userId: "test-owner", question: "Quais temas aparecem em Duna?" }));
+  });
+
+  it("reports a post-start provider failure through a safe SSE error", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(retrieval, "retrieveBooks").mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    vi.mocked(saveOracleAnswer).mockClear();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "private provider detail" }, { status: 502 })));
+    const response = await POST(questionRequest("Quais temas aparecem em Duna?"));
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('"error":');
+    expect(body).not.toMatch(/private|\[DONE\]/);
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("private");
+    expect(saveOracleAnswer).not.toHaveBeenCalled();
   });
 
   it("uses identical references for book, diary, review and external research in the actual route", async () => {

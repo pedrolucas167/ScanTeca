@@ -1,8 +1,9 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { readOracleCompletion, saveOracleAnswer, retrieveBooks, VECTOR_CANDIDATE_LIMIT,
-  createEvidenceRegistry, validateCitations, validateInventoryClaims, buildOracleSystemPrompt, updateReaderProfile } from "@/modules/oracle";
-import { NextRequest } from "next/server";
+import { readOracleCompletion, saveOracleAnswer, getOracleRegenerationTarget, retrieveBooks, VECTOR_CANDIDATE_LIMIT,
+  createEvidenceRegistry, validateCitations, validateInventoryClaims, buildOracleSystemPrompt, updateReaderProfile, createOraclePipeline } from "@/modules/oracle";
+import { parseOracleUsage, type OracleUsage } from "@/lib/oracle-usage";
+import { NextRequest, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -190,14 +191,12 @@ async function toolExecutionResponse(routing: RoutingDecision, transcript: strin
   });
 }
 
-function groundedFallbackResponse(sessionId: string | null, transcript: string) {
+function groundedFallbackResponse() {
   const encoder = new TextEncoder();
   const message =
     "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.";
   const stream = new ReadableStream({
     start(controller) {
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sessionId })}\n\n`));
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ transcript })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: [] })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -217,11 +216,13 @@ function groundedFallbackResponse(sessionId: string | null, transcript: string) 
 async function contextualizeQuestion(
   question: string,
   history: { role: string; content: string }[],
-  apiKey: string
+  apiKey: string,
+  options: { signal?: AbortSignal; onUsage?: (usage: OracleUsage) => void } = {}
 ): Promise<string> {
   if (history.length === 0) return question;
   try {
-    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
+      signal: options.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -264,7 +265,10 @@ ${history
     if (!res.ok) return question;
     const data = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
+      usage?: unknown;
     };
+    const usage = parseOracleUsage(data.usage);
+    if (usage) options.onUsage?.(usage);
     const rewritten = data.choices?.[0]?.message?.content?.trim();
     return rewritten && rewritten.length > 0 && rewritten.length < 500
       ? rewritten
@@ -331,8 +335,8 @@ export async function POST(request: NextRequest) {
         }),
       }, 60_000);
       if (!sttRes.ok) {
-        const err = await sttRes.text();
-        console.error("[oracle] STT error:", sttRes.status, err);
+        await sttRes.body?.cancel().catch(() => undefined);
+        console.error("[oracle] STT error:", sttRes.status);
         return new Response(
           JSON.stringify({ error: "Não consegui transcrever o áudio" }),
           { status: 502, headers: { "Content-Type": "application/json" } }
@@ -402,395 +406,402 @@ export async function POST(request: NextRequest) {
     }
 
     // Retain the old answer until its replacement can be saved atomically.
-    const previousAnswer = regenerate ? await prisma.oracleMessage.findFirst({
-      where: { userId, sessionId, role: "assistant" },
-      orderBy: { createdAt: "desc" }, select: { id: true },
-    }) : null;
+    const previousAnswer = regenerate ? await getOracleRegenerationTarget(userId, sessionId!) : null;
 
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    weekAgo.setHours(0, 0, 0, 0);
+    return createOraclePipeline({ signal: request.signal, schedule: job => after(job),
+      initialEvents: [{ sessionId: sessionId! }, { transcript: trimmed }], run: async pipeline => {
+      const { signal, stage, metrics } = pipeline;
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      weekAgo.setHours(0, 0, 0, 0);
 
-    const [historyDesc, setting, , readingNow, weekLogs, diaryEntries] = await Promise.all([
-      prisma.oracleMessage.findMany({
-        where: { userId, sessionId, ...(previousAnswer ? { id: { not: previousAnswer.id } } : {}) },
-        orderBy: { createdAt: "desc" },
-        take: HISTORY_LIMIT,
-      }),
-      prisma.librarySetting.findUnique({ where: { userId } }),
-      Promise.resolve(null),
-      prisma.book.findMany({
-        where: { userId, status: "READING" },
-        select: {
-          title: true,
-          author: true,
-          currentPage: true,
-          pages: true,
-          startedAt: true,
-        },
-      }),
-      prisma.readingLog.findMany({
-        where: { userId, date: { gte: weekAgo } },
-        select: { date: true, pages: true },
-      }),
-      prisma.diaryEntry.findMany({
-        where: { userId, ragEnabled: true },
-        orderBy: { createdAt: "desc" },
-        take: MAX_DIARY_ENTRIES,
-        select: {
-          type: true,
-          content: true,
-          page: true,
-          id: true,
-          book: { select: { title: true, author: true } },
-        },
-      }),
-    ]);
+      const [historyDesc, setting, readingNow, weekLogs, diaryEntries] = await metrics.measure("context", () => Promise.all([
+        prisma.oracleMessage.findMany({
+          where: { userId, sessionId, ...(previousAnswer ? { id: { not: previousAnswer.id } } : {}) },
+          orderBy: { createdAt: "desc" },
+          take: HISTORY_LIMIT,
+        }),
+        prisma.librarySetting.findUnique({ where: { userId } }),
+        prisma.book.findMany({
+          where: { userId, status: "READING" },
+          select: {
+            title: true,
+            author: true,
+            currentPage: true,
+            pages: true,
+            startedAt: true,
+          },
+        }),
+        prisma.readingLog.findMany({
+          where: { userId, date: { gte: weekAgo } },
+          select: { date: true, pages: true },
+        }),
+        prisma.diaryEntry.findMany({
+          where: { userId, ragEnabled: true },
+          orderBy: { createdAt: "desc" },
+          take: MAX_DIARY_ENTRIES,
+          select: {
+            type: true,
+            content: true,
+            page: true,
+            id: true,
+            book: { select: { title: true, author: true } },
+          },
+        }),
+      ]));
+      signal.throwIfAborted();
 
-    // The current question is already persisted above. It is sent separately
-    // in the final prompt and must not be duplicated in the conversation.
-    const conversationHistory = historyDesc.filter((message, index) => {
-      if (message.role === "assistant" && isCorruptedHistoryMessage(message.content)) {
-        return false;
-      }
-      if (currentRequestMessageId) return message.id !== currentRequestMessageId;
-      return !(index === 0 && message.role === "user" && message.content === trimmed);
-    });
-
-    const retrievalQuery = await contextualizeQuestion(
-      trimmed,
-      conversationHistory,
-      apiKey
-    );
-    const retrievalStartedAt = Date.now();
-    const questionEmbedding = await generateEmbedding(retrievalQuery);
-
-    const vector = `[${questionEmbedding?.join(",") ?? ""}]`;
-    const [similarBooks, semanticDiary, semanticReviews, semanticExternal] = await Promise.all([
-      questionEmbedding ? prisma.$queryRaw<SimilarBook[]>`
-      SELECT id, title, author, "publishedDate", synopsis, genre,
-             status::text as status, rating,
-             embedding <=> ${vector}::vector AS distance
-      FROM "Book"
-      WHERE "userId" = ${userId} AND embedding IS NOT NULL
-      ORDER BY embedding <=> ${vector}::vector
-      LIMIT ${VECTOR_CANDIDATE_LIMIT}
-      ` : Promise.resolve([] as SimilarBook[]),
-      questionEmbedding ? prisma.$queryRaw<DiaryMemory[]>`
-        SELECT d.id, d.type, d.content, d.page, d.tags,
-               b.title AS "bookTitle", b.author AS "bookAuthor",
-               d.embedding <=> ${vector}::vector AS distance
-        FROM "DiaryEntry" d
-        JOIN "Book" b ON b.id = d."bookId"
-        WHERE d."userId" = ${userId}
-          AND d."ragEnabled" = true
-          AND d.embedding IS NOT NULL
-        ORDER BY d.embedding <=> ${vector}::vector
-        LIMIT ${MAX_RAG_MEMORIES}
-      ` : Promise.resolve([] as DiaryMemory[]),
-      questionEmbedding ? prisma.$queryRaw<ReviewMemory[]>`
-        SELECT r.id, r.content, r.rating,
-               b.title AS "bookTitle", b.author AS "bookAuthor",
-               r.embedding <=> ${vector}::vector AS distance
-        FROM "Review" r
-        JOIN "Book" b ON b.id = r."bookId"
-        WHERE b."userId" = ${userId}
-          AND r.embedding IS NOT NULL
-        ORDER BY r.embedding <=> ${vector}::vector
-        LIMIT ${MAX_RAG_MEMORIES}
-      ` : Promise.resolve([] as ReviewMemory[]),
-      questionEmbedding ? prisma.$queryRaw<ExternalResearchMemory[]>`
-        SELECT id, source, title, content, type,
-               embedding <=> ${vector}::vector AS distance
-        FROM "ExternalResearchData"
-        WHERE "userId" = ${userId}
-          AND embedding IS NOT NULL
-        ORDER BY embedding <=> ${vector}::vector
-        LIMIT ${MAX_RAG_MEMORIES}
-      ` : Promise.resolve([] as ExternalResearchMemory[]),
-    ]);
-
-    const { books: contextBooks, metadataCandidates, lexicalCandidates } = await retrieveBooks(userId, retrievalQuery, similarBooks, mode);
-    const evidence = createEvidenceRegistry();
-    const sources = evidence.sources;
-
-    interface ExternalBook {
-      title: string;
-      author: string;
-      description: string | null;
-      genre: string | null;
-    }
-    let externalBooks: ExternalBook[] = [];
-    if (scope === "all") {
-      try {
-        const ownedTitles = new Set(
-          (await prisma.book.findMany({
-            where: { userId },
-            select: { title: true },
-          })).map((b) => normalize(b.title).join(" "))
-        );
-        const items = await searchGoogleBooks(retrievalQuery);
-        externalBooks = items
-          .map((i) => ({
-            title: i.volumeInfo.title?.trim() ?? "",
-            author: i.volumeInfo.authors?.join(", ") || "Autor desconhecido",
-            description: i.volumeInfo.description ?? null,
-            genre: i.volumeInfo.categories?.[0] ?? null,
-          }))
-          .filter(
-            (b) => b.title && !ownedTitles.has(normalize(b.title).join(" "))
-          )
-          .slice(0, 4);
-      } catch (err) {
-        console.error("[oracle] external search error:", err);
-      }
-    }
-
-    const context =
-      contextBooks.length > 0
-        ? contextBooks
-            .map(
-              (b) => evidence.add({ id: b.id, title: b.title, author: b.author, status: b.status,
-                  genre: b.genre, relevance: b.relevance, matchedBy: b.matchedBy,
-                  evidence: b.synopsis?.slice(0, 500) ?? `Título: ${b.title}; autor: ${b.author}; status: ${b.status}` },
-                `"${b.title}" — ${b.author}` +
-                (b.publishedDate ? ` (${b.publishedDate})` : "") +
-                (b.genre ? ` [${b.genre}]` : "") +
-                `\n   Status: ${b.status === "READ" ? "Lido" : b.status === "READING" ? "Lendo" : b.status === "TO_READ" ? "A ler" : "Desejo"}` +
-                (b.rating ? ` | Avaliação: ${b.rating}/5` : "") +
-                (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 500)}` : ""))
-            )
-            .join("\n\n")
-        : "Nenhum livro relevante encontrado no acervo.";
-
-    const progressSection =
-      readingNow.length > 0
-        ? readingNow
-            .map((b) => {
-              const dias = b.startedAt
-                ? Math.max(
-                    1,
-                    Math.round(
-                      (Date.now() - b.startedAt.getTime()) / 86400000
-                    )
-                  )
-                : null;
-              return (
-                `- "${b.title}" — ${b.author}` +
-                (b.pages && b.currentPage
-                  ? ` | Progresso: pág. ${b.currentPage} de ${b.pages} (${Math.round((b.currentPage / b.pages) * 100)}%)`
-                  : "") +
-                (dias
-                  ? ` | lendo há ${dias} ${dias === 1 ? "dia" : "dias"}`
-                  : "")
-              );
-            })
-            .join("\n")
-        : "";
-
-    const weekPages = weekLogs.reduce((s, l) => s + l.pages, 0);
-    const weekDays = new Set(
-      weekLogs.map((l) => l.date.toISOString().slice(0, 10))
-    ).size;
-    const weekSection =
-      weekPages > 0
-        ? `\n\nAtividade recente do usuário: ${weekPages} páginas lidas nos últimos 7 dias, em ${weekDays} ${weekDays === 1 ? "dia" : "dias"} de leitura.`
-        : "";
-
-    const relevantDiary = semanticDiary.filter((entry) => Number(entry.distance) < DISTANCE_THRESHOLD);
-    const relevantReviews = semanticReviews.filter((review) => Number(review.distance) < DISTANCE_THRESHOLD);
-    const relevantExternal = semanticExternal.filter((data) => Number(data.distance) < DISTANCE_THRESHOLD);
-    const diaryIntent = /\b(diário|anotações?|memórias?|registros?|reflexões?)\b/i.test(
-      retrievalQuery
-    );
-    const diaryContextEntries = diaryIntent
-      ? [...relevantDiary, ...diaryEntries]
-      : relevantDiary;
-    const diarySection = diaryContextEntries.length
-      ? `\n\nMemórias do diário de leitura:\n${diaryContextEntries
-          .filter((entry, index, all) => all.findIndex((other) => ("id" in other ? other.id : "") === entry.id) === index)
-          .slice(0, MAX_DIARY_ENTRIES)
-          .map((entry) => {
-            const title = "bookTitle" in entry ? entry.bookTitle : entry.book.title;
-            const page = entry.page;
-            const author = "bookAuthor" in entry ? entry.bookAuthor : entry.book.author;
-            return evidence.add({ id: entry.id, title, author, sourceType: "diary", status: "MEMORY",
-              matchedBy: "memória do diário", evidence: entry.content.slice(0, 500) },
-              `- [${entry.type}] "${title}"${page ? `, pág. ${page}` : ""}: ${entry.content.slice(0, 500)}`);
-          })
-          .join("\n")}`
-      : "";
-    const reviewSection = relevantReviews.length
-      ? `\n\nAvaliações relevantes:\n${relevantReviews
-          .map((review) => evidence.add({ id: review.id, title: review.bookTitle, author: review.bookAuthor,
-            sourceType: "review", status: "REVIEW", matchedBy: "avaliação do leitor", evidence: review.content.slice(0, 500) },
-            `- "${review.bookTitle}" — ${review.bookAuthor}${review.rating ? ` (${review.rating}/5)` : ""}: ${review.content.slice(0, 500)}`))
-          .join("\n")}`
-      : "";
-    const externalSection = relevantExternal.length
-      ? `\n\nPesquisa externa relevante:\n${relevantExternal
-          .map((data) => evidence.add({ id: data.id, title: data.title, author: data.source, external: true,
-            matchedBy: "pesquisa externa", evidence: data.content.slice(0, 500) },
-            `- [${data.source} - ${data.type}] "${data.title}": ${data.content.slice(0, 500)}`))
-          .join("\n")}`
-      : "";
-
-    const progressIntent = /\b(lendo|leitura atual|em andamento|progresso|página|paginas|páginas)\b/i.test(
-      retrievalQuery
-    );
-    const hasGrounding =
-      contextBooks.length > 0 ||
-      relevantDiary.length > 0 ||
-      relevantReviews.length > 0 ||
-      relevantExternal.length > 0 ||
-      (diaryIntent && diaryEntries.length > 0) ||
-      (progressIntent && readingNow.length > 0) ||
-      externalBooks.length > 0;
-    if (!hasGrounding) {
-      return groundedFallbackResponse(sessionId, trimmed);
-    }
-
-    const retrievalStats = {
-      durationMs: Date.now() - retrievalStartedAt,
-      metadataCandidates, lexicalCandidates, embeddingAvailable: Boolean(questionEmbedding),
-      vectorCandidates:
-        similarBooks.length + semanticDiary.length + semanticReviews.length + semanticExternal.length,
-      selectedBooks: contextBooks.length,
-      selectedDiary: relevantDiary.length,
-      selectedReviews: relevantReviews.length,
-      selectedExternal: relevantExternal.length,
-      externalBooks: externalBooks.length,
-      scope,
-    };
-
-    const externalContext =
-      externalBooks.length > 0
-        ? `\n\nSugestões fora do acervo (o leitor NÃO possui estes livros):\n${externalBooks
-            .map(
-              (b, i) => evidence.add({ id: `ext-${i}`, title: b.title, author: b.author, external: true,
-                genre: b.genre, matchedBy: "catálogo externo", evidence: b.description?.slice(0, 300) ?? null },
-                `"${b.title}" — ${b.author} [FORA DO ACERVO]` +
-                (b.genre ? ` [${b.genre}]` : "") +
-                (b.description ? `\n   Sinopse: ${b.description.slice(0, 300)}` : ""))
-            )
-            .join("\n\n")}`
-        : "";
-
-    const profile = setting?.oracleProfile?.trim();
-    const systemPrompt = buildOracleSystemPrompt({ mode, scope, profile });
-
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      ...conversationHistory.reverse().map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-      {
-        role: "user" as const,
-        content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}${reviewSection}${externalSection}\n\nPergunta do usuário: ${trimmed}`,
-      },
-    ];
-
-    const cancellation = new AbortController();
-  let consumerCancelled = false;
-    const generationSignal = AbortSignal.any([request.signal, cancellation.signal]);
-    const llmRes = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      signal: generationSignal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Scanteca Oráculo",
-      },
-      body: JSON.stringify({
-        model: CHAT_MODEL,
-        messages,
-        stream: true,
-        temperature,
-        max_tokens: MAX_TOKENS_CHAT,
-      }),
-    }, 60_000);
-
-    if (!llmRes.ok || !llmRes.body) {
-      const err = await llmRes.text();
-      console.error("[oracle] OpenRouter chat error:", llmRes.status, err);
-      return new Response(
-        JSON.stringify({ error: "Erro ao consultar o Oráculo" }),
-        { status: 502, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ sessionId })}\n\n`)
-        );
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ transcript: trimmed })}\n\n`)
-        );
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`)
-        );
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ retrievalStats })}\n\n`)
-        );
-
-        try {
-          const fullText = await readOracleCompletion(llmRes.body!, { signal: generationSignal });
-          const citationCheck = validateCitations(fullText, sources.length);
-          const inventoryCheck = validateInventoryClaims(fullText);
-          const quality = !citationCheck.valid ? { valid: false, reason: "citação sem fonte correspondente" }
-            : !inventoryCheck.valid ? { valid: false, reason: "ausência no acervo inferida de contexto parcial" }
-              : validateOracleResponse(fullText);
-          const outputText = quality.valid
-            ? fullText.trim()
-            : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
-          if (!quality.valid) {
-            console.warn("[oracle] response rejected:", quality.reason);
-          }
-
-          generationSignal.throwIfAborted();
-          if (quality.valid) {
-            await saveOracleAnswer({ userId, sessionId, mode, content: outputText,
-              sources: sources.map(source => ({ ...source })), replacesId: previousAnswer?.id });
-            if (conversationHistory.length >= 4) {
-              await updateReaderProfile({ userId, snapshot: { oracleProfile: setting?.oracleProfile ?? null,
-                oracleMemoryEnabled: setting?.oracleMemoryEnabled ?? true, oracleProfileVersion: setting?.oracleProfileVersion ?? 0 },
-                question: trimmed, apiKey, model: CHAT_MODEL, signal: generationSignal });
-            }
-          }
-          generationSignal.throwIfAborted();
-          // Extract and send citations
-          const citations = validateCitations(outputText, sources.length).citations;
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
-          );
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ citations })}\n\n`)
-          );
-        } catch (err) {
-          if (consumerCancelled) return;
-          console.error("[oracle] completion failed:", err);
-          controller.error(new Error("Não foi possível concluir a resposta. Tente novamente."));
-          return;
+      // The current question is already persisted above. It is sent separately
+      // in the final prompt and must not be duplicated in the conversation.
+      const conversationHistory = historyDesc.filter((message, index) => {
+        if (message.role === "assistant" && isCorruptedHistoryMessage(message.content)) {
+          return false;
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      },
-      cancel(reason) { consumerCancelled = true; cancellation.abort(reason); },
-    });
+        if (currentRequestMessageId) return message.id !== currentRequestMessageId;
+        return !(index === 0 && message.role === "user" && message.content === trimmed);
+      });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
-  } catch (error) {
-    console.error("Erro em POST /api/oracle:", error);
+      const retrievalQuery = await metrics.measure("rewrite", () => contextualizeQuestion(
+        trimmed, conversationHistory, apiKey, { signal, onUsage: usage => metrics.recordUsage("rewrite", usage) }
+      ));
+      const retrievalStartedAt = Date.now();
+      stage("search");
+      const questionEmbedding = await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
+        signal, onUsage: usage => metrics.recordUsage("embedding", usage),
+      }));
+      signal.throwIfAborted();
+
+      const vector = `[${questionEmbedding?.join(",") ?? ""}]`;
+      const [similarBooks, semanticDiary, semanticReviews, semanticExternal] = await metrics.measure("retrieval", () => Promise.all([
+        questionEmbedding ? prisma.$queryRaw<SimilarBook[]>`
+        SELECT id, title, author, "publishedDate", synopsis, genre,
+               status::text as status, rating,
+               embedding <=> ${vector}::vector AS distance
+        FROM "Book"
+        WHERE "userId" = ${userId} AND embedding IS NOT NULL
+        ORDER BY embedding <=> ${vector}::vector
+        LIMIT ${VECTOR_CANDIDATE_LIMIT}
+        ` : Promise.resolve([] as SimilarBook[]),
+        questionEmbedding ? prisma.$queryRaw<DiaryMemory[]>`
+          SELECT d.id, d.type, d.content, d.page, d.tags,
+                 b.title AS "bookTitle", b.author AS "bookAuthor",
+                 d.embedding <=> ${vector}::vector AS distance
+          FROM "DiaryEntry" d
+          JOIN "Book" b ON b.id = d."bookId"
+          WHERE d."userId" = ${userId}
+            AND d."ragEnabled" = true
+            AND d.embedding IS NOT NULL
+          ORDER BY d.embedding <=> ${vector}::vector
+          LIMIT ${MAX_RAG_MEMORIES}
+        ` : Promise.resolve([] as DiaryMemory[]),
+        questionEmbedding ? prisma.$queryRaw<ReviewMemory[]>`
+          SELECT r.id, r.content, r.rating,
+                 b.title AS "bookTitle", b.author AS "bookAuthor",
+                 r.embedding <=> ${vector}::vector AS distance
+          FROM "Review" r
+          JOIN "Book" b ON b.id = r."bookId"
+          WHERE b."userId" = ${userId}
+            AND r.embedding IS NOT NULL
+          ORDER BY r.embedding <=> ${vector}::vector
+          LIMIT ${MAX_RAG_MEMORIES}
+        ` : Promise.resolve([] as ReviewMemory[]),
+        questionEmbedding ? prisma.$queryRaw<ExternalResearchMemory[]>`
+          SELECT id, source, title, content, type,
+                 embedding <=> ${vector}::vector AS distance
+          FROM "ExternalResearchData"
+          WHERE "userId" = ${userId}
+            AND embedding IS NOT NULL
+          ORDER BY embedding <=> ${vector}::vector
+          LIMIT ${MAX_RAG_MEMORIES}
+        ` : Promise.resolve([] as ExternalResearchMemory[]),
+      ]));
+      signal.throwIfAborted();
+
+      const { books: contextBooks, metadataCandidates, lexicalCandidates } = await metrics.measure("retrieval", () => retrieveBooks(userId, retrievalQuery, similarBooks, mode));
+      const evidence = createEvidenceRegistry();
+      const sources = evidence.sources;
+
+      interface ExternalBook {
+        title: string;
+        author: string;
+        description: string | null;
+        genre: string | null;
+      }
+      let externalBooks: ExternalBook[] = [];
+      if (scope === "all") {
+        stage("external");
+        try { await metrics.measure("external", async () => {
+          const ownedTitles = new Set(
+            (await prisma.book.findMany({
+              where: { userId },
+              select: { title: true },
+            })).map((b) => normalize(b.title).join(" "))
+          );
+          const items = await searchGoogleBooks(retrievalQuery, signal);
+          externalBooks = items
+            .map((i) => ({
+              title: i.volumeInfo.title?.trim() ?? "",
+              author: i.volumeInfo.authors?.join(", ") || "Autor desconhecido",
+              description: i.volumeInfo.description ?? null,
+              genre: i.volumeInfo.categories?.[0] ?? null,
+            }))
+            .filter(
+              (b) => b.title && !ownedTitles.has(normalize(b.title).join(" "))
+            )
+            .slice(0, 4);
+        }); } catch {
+          if (!signal.aborted) console.error("[oracle] external search error");
+        }
+      }
+
+      const context =
+        contextBooks.length > 0
+          ? contextBooks
+              .map(
+                (b) => evidence.add({ id: b.id, title: b.title, author: b.author, status: b.status,
+                    genre: b.genre, relevance: b.relevance, matchedBy: b.matchedBy,
+                    evidence: b.synopsis?.slice(0, 500) ?? `Título: ${b.title}; autor: ${b.author}; status: ${b.status}` },
+                  `"${b.title}" — ${b.author}` +
+                  (b.publishedDate ? ` (${b.publishedDate})` : "") +
+                  (b.genre ? ` [${b.genre}]` : "") +
+                  `\n   Status: ${b.status === "READ" ? "Lido" : b.status === "READING" ? "Lendo" : b.status === "TO_READ" ? "A ler" : "Desejo"}` +
+                  (b.rating ? ` | Avaliação: ${b.rating}/5` : "") +
+                  (b.synopsis ? `\n   Sinopse: ${b.synopsis.slice(0, 500)}` : ""))
+              )
+              .join("\n\n")
+          : "Nenhum livro relevante encontrado no acervo.";
+
+      const progressSection =
+        readingNow.length > 0
+          ? readingNow
+              .map((b) => {
+                const dias = b.startedAt
+                  ? Math.max(
+                      1,
+                      Math.round(
+                        (Date.now() - b.startedAt.getTime()) / 86400000
+                      )
+                    )
+                  : null;
+                return (
+                  `- "${b.title}" — ${b.author}` +
+                  (b.pages && b.currentPage
+                    ? ` | Progresso: pág. ${b.currentPage} de ${b.pages} (${Math.round((b.currentPage / b.pages) * 100)}%)`
+                    : "") +
+                  (dias
+                    ? ` | lendo há ${dias} ${dias === 1 ? "dia" : "dias"}`
+                    : "")
+                );
+              })
+              .join("\n")
+          : "";
+
+      const weekPages = weekLogs.reduce((s, l) => s + l.pages, 0);
+      const weekDays = new Set(
+        weekLogs.map((l) => l.date.toISOString().slice(0, 10))
+      ).size;
+      const weekSection =
+        weekPages > 0
+          ? `\n\nAtividade recente do usuário: ${weekPages} páginas lidas nos últimos 7 dias, em ${weekDays} ${weekDays === 1 ? "dia" : "dias"} de leitura.`
+          : "";
+
+      const relevantDiary = semanticDiary.filter((entry) => Number(entry.distance) < DISTANCE_THRESHOLD);
+      const relevantReviews = semanticReviews.filter((review) => Number(review.distance) < DISTANCE_THRESHOLD);
+      const relevantExternal = semanticExternal.filter((data) => Number(data.distance) < DISTANCE_THRESHOLD);
+      const diaryIntent = /\b(diário|anotações?|memórias?|registros?|reflexões?)\b/i.test(
+        retrievalQuery
+      );
+      const diaryContextEntries = diaryIntent
+        ? [...relevantDiary, ...diaryEntries]
+        : relevantDiary;
+      const diarySection = diaryContextEntries.length
+        ? `\n\nMemórias do diário de leitura:\n${diaryContextEntries
+            .filter((entry, index, all) => all.findIndex((other) => ("id" in other ? other.id : "") === entry.id) === index)
+            .slice(0, MAX_DIARY_ENTRIES)
+            .map((entry) => {
+              const title = "bookTitle" in entry ? entry.bookTitle : entry.book.title;
+              const page = entry.page;
+              const author = "bookAuthor" in entry ? entry.bookAuthor : entry.book.author;
+              return evidence.add({ id: entry.id, title, author, sourceType: "diary", status: "MEMORY",
+                matchedBy: "memória do diário", evidence: entry.content.slice(0, 500) },
+                `- [${entry.type}] "${title}"${page ? `, pág. ${page}` : ""}: ${entry.content.slice(0, 500)}`);
+            })
+            .join("\n")}`
+        : "";
+      const reviewSection = relevantReviews.length
+        ? `\n\nAvaliações relevantes:\n${relevantReviews
+            .map((review) => evidence.add({ id: review.id, title: review.bookTitle, author: review.bookAuthor,
+              sourceType: "review", status: "REVIEW", matchedBy: "avaliação do leitor", evidence: review.content.slice(0, 500) },
+              `- "${review.bookTitle}" — ${review.bookAuthor}${review.rating ? ` (${review.rating}/5)` : ""}: ${review.content.slice(0, 500)}`))
+            .join("\n")}`
+        : "";
+      const externalSection = relevantExternal.length
+        ? `\n\nPesquisa externa relevante:\n${relevantExternal
+            .map((data) => evidence.add({ id: data.id, title: data.title, author: data.source, external: true,
+              matchedBy: "pesquisa externa", evidence: data.content.slice(0, 500) },
+              `- [${data.source} - ${data.type}] "${data.title}": ${data.content.slice(0, 500)}`))
+            .join("\n")}`
+        : "";
+
+      const progressIntent = /\b(lendo|leitura atual|em andamento|progresso|página|paginas|páginas)\b/i.test(
+        retrievalQuery
+      );
+      const hasGrounding =
+        contextBooks.length > 0 ||
+        relevantDiary.length > 0 ||
+        relevantReviews.length > 0 ||
+        relevantExternal.length > 0 ||
+        (diaryIntent && diaryEntries.length > 0) ||
+        (progressIntent && readingNow.length > 0) ||
+        externalBooks.length > 0;
+      if (!hasGrounding) {
+        return groundedFallbackResponse();
+      }
+
+      const retrievalStats = {
+        durationMs: Date.now() - retrievalStartedAt,
+        metadataCandidates, lexicalCandidates, embeddingAvailable: Boolean(questionEmbedding),
+        vectorCandidates:
+          similarBooks.length + semanticDiary.length + semanticReviews.length + semanticExternal.length,
+        selectedBooks: contextBooks.length,
+        selectedDiary: relevantDiary.length,
+        selectedReviews: relevantReviews.length,
+        selectedExternal: relevantExternal.length,
+        externalBooks: externalBooks.length,
+        scope,
+      };
+
+      const externalContext =
+        externalBooks.length > 0
+          ? `\n\nSugestões fora do acervo (o leitor NÃO possui estes livros):\n${externalBooks
+              .map(
+                (b, i) => evidence.add({ id: `ext-${i}`, title: b.title, author: b.author, external: true,
+                  genre: b.genre, matchedBy: "catálogo externo", evidence: b.description?.slice(0, 300) ?? null },
+                  `"${b.title}" — ${b.author} [FORA DO ACERVO]` +
+                  (b.genre ? ` [${b.genre}]` : "") +
+                  (b.description ? `\n   Sinopse: ${b.description.slice(0, 300)}` : ""))
+              )
+              .join("\n\n")}`
+          : "";
+
+      const profile = setting?.oracleProfile?.trim();
+      const systemPrompt = buildOracleSystemPrompt({ mode, scope, profile });
+
+      const messages = [
+        { role: "system" as const, content: systemPrompt },
+        ...conversationHistory.reverse().map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        {
+          role: "user" as const,
+          content: `Livros relevantes do acervo:\n${context}${externalContext}${progressSection ? `\n\nLeituras em andamento do usuário:\n${progressSection}` : ""}${weekSection}${diarySection}${reviewSection}${externalSection}\n\nPergunta do usuário: ${trimmed}`,
+        },
+      ];
+
+      const cancellation = new AbortController();
+      let consumerCancelled = false;
+      const generationSignal = AbortSignal.any([signal, cancellation.signal]);
+      stage("generation");
+      const llmRes = await metrics.measure("generation", () => fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
+        method: "POST",
+        signal: generationSignal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          "X-Title": "Scanteca Oráculo",
+        },
+        body: JSON.stringify({
+          model: CHAT_MODEL,
+          messages,
+          stream: true,
+          temperature,
+          max_tokens: MAX_TOKENS_CHAT,
+        }),
+      }, 60_000));
+
+      if (!llmRes.ok || !llmRes.body) {
+        await llmRes.body?.cancel().catch(() => undefined);
+        console.error("[oracle] OpenRouter chat error:", llmRes.status);
+        return new Response(
+          JSON.stringify({ error: "Erro ao consultar o Oráculo" }),
+          { status: 502, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`)
+          );
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ retrievalStats })}\n\n`)
+          );
+
+          try {
+            const fullText = await metrics.measure("generation", () => readOracleCompletion(llmRes.body!, {
+              signal: generationSignal, onUsage: usage => metrics.recordUsage("generation", usage),
+            }));
+            stage("validation");
+            const quality = await metrics.measure("validation", () => {
+              const citationCheck = validateCitations(fullText, sources.length);
+              const inventoryCheck = validateInventoryClaims(fullText);
+              return !citationCheck.valid ? { valid: false, reason: "citação sem fonte correspondente" }
+                : !inventoryCheck.valid ? { valid: false, reason: "ausência no acervo inferida de contexto parcial" }
+                  : validateOracleResponse(fullText);
+            });
+            const outputText = quality.valid
+              ? fullText.trim()
+              : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
+            if (!quality.valid) {
+              pipeline.reject();
+              console.warn("[oracle] response rejected:", quality.reason);
+            }
+
+            generationSignal.throwIfAborted();
+            if (quality.valid) {
+              stage("persistence");
+              await metrics.measure("persistence", () => saveOracleAnswer({ userId, sessionId, mode, content: outputText,
+                sources: sources.map(source => ({ ...source })), replacesId: previousAnswer?.id }));
+              if (conversationHistory.length >= 4 && setting?.oracleMemoryEnabled !== false) {
+                pipeline.defer(() => updateReaderProfile({ userId, snapshot: { oracleProfile: setting?.oracleProfile ?? null,
+                  oracleMemoryEnabled: setting?.oracleMemoryEnabled ?? true, oracleProfileVersion: setting?.oracleProfileVersion ?? 0 },
+                  question: trimmed, apiKey, model: CHAT_MODEL, signal: AbortSignal.timeout(8000) }));
+              }
+            }
+            generationSignal.throwIfAborted();
+            // Extract and send citations
+            const citations = validateCitations(outputText, sources.length).citations;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text: outputText })}\n\n`)
+            );
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ citations })}\n\n`)
+            );
+          } catch {
+            if (consumerCancelled) return;
+            console.error("[oracle] completion failed");
+            controller.error(new Error("Não foi possível concluir a resposta. Tente novamente."));
+            return;
+          }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+        cancel(reason) { consumerCancelled = true; cancellation.abort(reason); },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    } });
+  } catch {
+    console.error("Erro em POST /api/oracle");
     return new Response(
       JSON.stringify({ error: "Erro interno do servidor" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
