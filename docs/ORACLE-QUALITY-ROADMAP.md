@@ -3,14 +3,47 @@
 Iniciado em 30/10/2026. A ordem prioriza qualidade percebida e evidências antes
 de ampliar personalização e operação. Implementação local não confirma deploy.
 
+Entrega integrada na `main` em **31/10/2026** pelo
+[PR de recuperação fundamentada e memória controlável](https://github.com/pedrolucas167/ScanTeca/pull/178).
+O deployment de produção do merge foi confirmado na Vercel; CI da principal e
+smoke das quatro rotas públicas passaram. Esse aceite público não substitui os
+cenários autenticados e a avaliação representativa definidos abaixo.
+
 | Etapa | Entrega e aceite | Estado |
 | --- | --- | --- |
-| 1. Busca híbrida | Combinar candidatos semânticos, título/autor e filtros; aceitar livros sem embedding; manter isolamento de conta | Implementação inicial local |
-| 2. Evidências | Uma numeração compartilhada entre contexto e fontes; rejeitar referências inexistentes; distinguir inferências no prompt | Implementação inicial local |
+| 1. Busca híbrida | Combinar candidatos semânticos, título/autor e filtros; aceitar livros sem embedding; manter isolamento de conta | Implementada, testada e publicada em 31/10/2026; relevância em acervo representativo ainda em avaliação |
+| 2. Evidências | Uma numeração compartilhada entre contexto e fontes; rejeitar referências inexistentes; distinguir inferências no prompt | Implementadas, testadas e publicadas em 31/10/2026; checagens heurísticas não demonstram apoio semântico de toda afirmação |
 | 3. Avaliação | Perguntas de referência para busca e citações; depois avaliar relevância e fidelidade com acervo representativo e modelo real | Última rodada sintética real: 10/10; caso externo repetido mais três vezes com o mesmo prompt: 3/3; falhas anteriores preservadas no histórico; acervo representativo e revisão humana independente pendentes |
-| 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Código implementado e validado; migração aplicada na branch Neon production em 30/10/2026; publicação da aplicação via PR ainda pendente |
-| 5. Desempenho e experiência | Medir latência e tokens por etapa; mostrar andamento da consulta; avaliar custos com dados reais | Métricas opcionais, progresso SSE, cancelamento e aprendizado após resposta implementados; cenário sintético com streaming e custo real validado; medição em produção pendente |
+| 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Migração aplicada em produção em 30/10/2026 e aplicação publicada em 31/10/2026; aceite autenticado específico do Oráculo é a próxima etapa |
+| 5. Desempenho e experiência | Medir latência e tokens por etapa; mostrar andamento da consulta; avaliar custos com dados reais | Instrumentação opcional e progresso SSE publicados; cenário sintético com streaming e custo real validado; coleta de métricas em produção pendente |
 | 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Concluída no fluxo fundamentado e nos recursos de sessões/artefatos: contexto textual, reescrita, geração, orquestração e operações extraídas; 431 testes unitários, 100 de integração e 14 de navegador aprovados; voz segue fora do escopo funcional completo |
+
+## Próxima etapa — aceite autenticado e avaliação representativa
+
+**Prioridade atual:** validar o fluxo completo do Oráculo e a qualidade das
+respostas antes de considerar encerrado o roadmap. Esta etapa está planejada;
+seus critérios abaixo ainda não estão aprovados.
+
+- [ ] Criar cenários autenticados específicos do Oráculo com conta Clerk de
+  desenvolvimento e banco descartável: conversa, histórico, regeneração,
+  cancelamento, novas tentativas, memória e artefatos, verificando persistência.
+- [ ] Usar uma segunda conta para comprovar isolamento de conversas, memória e
+  artefatos, incluindo acesso direto às APIs e permanência dos dados do dono.
+- [ ] Ampliar o acervo fictício e as perguntas para cobrir gêneros, extensões,
+  títulos acentuados, livros sem embedding, preferências declaradas e catálogo
+  externo. Exercitar recuperação e formatação reais, além de contextos fixos.
+- [ ] Definir os critérios antes da rodada com modelo real; registrar todas as
+  respostas, fontes, falhas, latência e custo, sem selecionar só as favoráveis.
+- [ ] Submeter as respostas a revisão humana explícita, separando seu resultado
+  do julgamento automático e das checagens numéricas de citações.
+- [ ] Registrar o aceite autenticado possível em produção sem inserir dados de
+  teste nem alterar registros reais. Cenários de gravação ficam no ambiente
+  isolado; qualquer uso de dados reais exige autorização específica.
+
+Conclusão: evidência reproduzível dos cenários autenticados, relatório da rodada
+representativa e aceite humano registrados, com falhas e limitações explícitas.
+A instrumentação de produção, voz e as demais frentes do projeto continuam como
+validações separadas. Marcar esta etapa não inicia os testes nem a marca como feita.
 
 ## Primeiro corte
 
