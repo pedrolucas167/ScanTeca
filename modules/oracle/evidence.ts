@@ -27,8 +27,10 @@ export function validateInventoryClaims(text: string) {
     if (/nao (?:posso|podemos|e possivel) afirmar|nao sei se/.test(normalized)) return false;
     const scoped = /contexto|fontes? (?:recuperad|consultad|disponive)|selecao|amostra|livros? (?:recuperad|listad|apresentad)/.test(normalized);
     if (scoped) return false;
-    return /(?:seu|sua|nosso|nossa) (?:acervo|biblioteca|estante)/.test(normalized) &&
-      /nao (?:ha|tem|temos|existe|consta|contem) (?:um|uma|nenhum|nenhuma) (?:livro|obra|titulo|exemplar)/.test(normalized);
+    const absence = /(?:seu|sua|nosso|nossa) (?:acervo|biblioteca|estante)/.test(normalized) &&
+      /nao (?:ha|tem|temos|existe|consta|contem|possui|possuimos|possuo) (?:um|uma|nenhum|nenhuma) (?:livro|obra|titulo|exemplar)/.test(normalized);
+    const exhaustive = /(?:o|a) unic[oa] (?:livro|obra|titulo|exemplar)\b[^.!?]*(?:que consta\b|(?:n[ao]|em|d[ao]) (?:seu|sua|nosso|nossa) (?:acervo|biblioteca|estante))/.test(normalized);
+    return absence || exhaustive;
   });
   return { valid: claims.length === 0, claims };
 }

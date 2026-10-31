@@ -38,6 +38,16 @@ describe("Oracle evaluation scoring", () => {
     expect(() => parseOracleJudgment("Falha no provedor")).toThrow();
     expect(parseOracleJudgment(`\`\`\`json\n${JSON.stringify(judgment)}\n\`\`\``)).toEqual(judgment);
   });
+  it("rejects the captured exhaustive-inventory claim despite a favorable judge", () => {
+    const result = checkEvaluationAnswer(testCase,
+      'Não encontrei "O Farol de Vidro" no seu acervo. O único livro de ficção científica que consta é "Jardins da Maré" [1].', judgment);
+    expect(result.passed).toBe(false);
+    expect(result.unsupportedInventoryClaims).toHaveLength(1);
+  });
+  it("rejects the captured possession paraphrase despite a favorable judge", () => {
+    expect(checkEvaluationAnswer(testCase,
+      `${answer} Em seu acervo pessoal, não possuímos um título de navegação por rios.`, judgment).passed).toBe(false);
+  });
   it("checks empty context without inventing a source", () => {
     expect(buildEvaluationContext({ ...testCase, evidence: [] })).toEqual({ sources: [], content: "Nenhuma evidência encontrada no acervo." });
   });

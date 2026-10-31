@@ -49,7 +49,7 @@ describe("grounded answers and evidence", () => {
   const book = { id: "dune", title: "Duna", author: "Frank Herbert", publishedDate: "1965",
     genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
 
-  it.each(["valid", "citation", "inventory"])("checks the grounded response before persistence (%s)", async kind => {
+  it.each(["valid", "citation", "inventory", "inventory-exhaustive"])("checks the grounded response before persistence (%s)", async kind => {
     vi.stubEnv("PERFORMANCE_DIAGNOSTICS", "1");
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const invalid = kind !== "valid";
@@ -60,6 +60,7 @@ describe("grounded answers and evidence", () => {
     vi.stubGlobal("fetch", vi.fn(async (_url, options: RequestInit) => {
       prompt = String(options.body);
       const text = kind === "inventory" ? "Em seu acervo pessoal, não há um livro que trate de navegação por rios [1]."
+        : kind === "inventory-exhaustive" ? "O único livro de ficção científica que consta é Duna [1]."
         : `Duna aborda ecologia em um planeta desértico [${invalid ? 2 : 1}].`;
       return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: {"choices":[],"usage":{"prompt_tokens":42,"completion_tokens":5,"cost":0.0002}}\n\ndata: [DONE]\n\n`);
     }));
