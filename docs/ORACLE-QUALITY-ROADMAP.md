@@ -10,7 +10,7 @@ de ampliar personalização e operação. Implementação local não confirma de
 | 3. Avaliação | Perguntas de referência para busca e citações; depois avaliar relevância e fidelidade com acervo representativo e modelo real | Nove cenários sintéticos executados no modelo real: 8/9 na última rodada revisada; resposta problemática bloqueada; avaliação de acervo representativo pendente |
 | 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Código implementado e validado; migração aplicada na branch Neon production em 30/10/2026; publicação da aplicação via PR ainda pendente |
 | 5. Desempenho e experiência | Medir latência e tokens por etapa; mostrar andamento da consulta; avaliar custos com dados reais | Métricas opcionais, progresso SSE, cancelamento e aprendizado após resposta implementados; cenário sintético com streaming e custo real validado; medição em produção pendente |
-| 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Busca, evidências, conclusão, métricas, pipeline, persistência de respostas e aprendizado de perfil extraídos; editor de memória separado da página; extração restante pendente |
+| 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Preparação transacional de sessões e consultas de contexto extraídas e validadas com PostgreSQL/pgvector; busca, evidências, conclusão, métricas, pipeline, persistência e aprendizado já extraídos; montagem textual, orquestração da geração e endpoints de sessões/artefatos ainda pendentes |
 
 ## Primeiro corte
 
@@ -36,6 +36,10 @@ de ampliar personalização e operação. Implementação local não confirma de
 A etapa de desempenho e seus limites estão em
 [ORACLE-PERFORMANCE.md](./ORACLE-PERFORMANCE.md). Os números de testes abaixo
 registram o primeiro corte, não o total atual da branch.
+
+A preparação da conversa e o isolamento das consultas de contexto estão em
+[ORACLE-MODULES.md](./ORACLE-MODULES.md), com transações e consultas vetoriais
+verificadas em PostgreSQL local descartável.
 
 A continuação de personalização está em
 [ORACLE-PERSONALIZATION.md](./ORACLE-PERSONALIZATION.md). A migração de controles
