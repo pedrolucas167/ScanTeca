@@ -19,7 +19,7 @@ avaliação geral registrada abaixo.
 
 O prompt de geração é compartilhado com a rota da aplicação. A avaliação usa
 contextos fixos e não verifica recuperação no PostgreSQL, roteamento, histórico,
-autenticação ou streaming. O cenário sem evidências avalia o prompt; a aplicação
+autenticação ou o streaming HTTP da aplicação. O cenário sem evidências avalia o prompt; a aplicação
 normalmente desvia esse caso para uma resposta local antes de chamar o modelo.
 
 O avaliador usa `ORACLE_EVAL_JUDGE_MODEL` ou, se ausente, o mesmo modelo de geração.
@@ -33,6 +33,13 @@ Julgamento ausente, JSON inválido, timeout ou resposta truncada contam como err
 As execuções reais retornam código 1 se houver falha ou erro.
 
 ## Relatórios e limites
+
+Use `--stream` para gerar pelo parser de streaming compartilhado com a aplicação:
+`npm run eval:oracle -- --live --stream --case profile-preferences`.
+O julgamento continua sem streaming. Relatórios na versão 3 registram essa opção
+e `firstDeltaMs`, quando há texto do provedor. Essa medida não é o tempo até a
+exibição da resposta validada na interface. A execução direcionada e seus custos
+estão em [ORACLE-PERFORMANCE.md](./ORACLE-PERFORMANCE.md).
 
 Os arquivos JSON ficam em `reports/oracle-evaluation-<data>.json`, ignorados pelo
 Git. Contêm as perguntas, fontes fictícias, respostas, julgamento, hash do prompt,
