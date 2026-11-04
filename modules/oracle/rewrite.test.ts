@@ -24,10 +24,14 @@ describe("Oracle rewrite fallbacks", () => {
     vi.mocked(fetchWithTimeout).mockResolvedValueOnce(Response.json({ choices: [{ message: { content: "Quem escreveu Duna?" } }], usage: { prompt_tokens: 20, completion_tokens: 4 } }));
     const before = JSON.stringify(history);
     const onUsage = vi.fn();
-    const signal = new AbortController().signal;
+    const controller = new AbortController();
+    const signal = controller.signal;
     expect(await contextualizeQuestion("E o autor?", history, "fixture", { signal, onUsage })).toBe("Quem escreveu Duna?");
     expect(JSON.stringify(history)).toBe(before);
     expect(onUsage).toHaveBeenCalledWith({ inputTokens: 20, outputTokens: 4, costUsd: null });
-    expect(fetchWithTimeout).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ signal }));
+    const forwarded = vi.mocked(fetchWithTimeout).mock.calls[0]?.[1]?.signal;
+    expect(forwarded?.aborted).toBe(false);
+    controller.abort();
+    expect(forwarded?.aborted).toBe(true);
   });
 });

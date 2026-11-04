@@ -11,6 +11,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "eval:oracle": "tsx scripts/evaluate-oracle.ts",
+    "eval:oracle:free": "node scripts/run-oracle-free-benchmark.mjs",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:coverage": "vitest run --config vitest.integration.config.ts --coverage",

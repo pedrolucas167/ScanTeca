@@ -9,6 +9,7 @@ export { oracleArtifactSchema, listOracleArtifacts, saveOracleArtifact } from ".
 export { loadOracleContext, retrieveOracleMemories, MAX_DIARY_ENTRIES } from "./context";
 export { saveOracleAnswer, getOracleRegenerationTarget } from "./history";
 export { retrieveBooks, VECTOR_CANDIDATE_LIMIT } from "./retrieval";
+export { formatOracleContext } from "./context-format";
 export { createEvidenceRegistry, validateCitations, validateInventoryClaims } from "./evidence";
 export { buildOracleSystemPrompt } from "./prompt";
 export { updateReaderProfile } from "./profile";
