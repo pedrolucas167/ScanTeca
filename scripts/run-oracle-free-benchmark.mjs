@@ -2,6 +2,7 @@ import fs from "node:fs";
 import dotenv from "dotenv";
 import { spawnSync } from "node:child_process";
 
+async function main() {
 const local = {};
 for (const path of [".env", ".env.local", ".env.development.local"]) {
   if (fs.existsSync(path)) Object.assign(local, dotenv.parse(fs.readFileSync(path)));
@@ -31,7 +32,8 @@ if (live.length) {
   fs.writeFileSync("reports/oracle-free-quota.json", JSON.stringify({ checkedAt: new Date().toISOString(), quota, worstCaseCalls }, null, 2));
   if (typeof quota?.remaining === "number" && quota.remaining < worstCaseCalls) {
     console.error(`Rodada não iniciada: restam ${quota.remaining} chamadas gratuitas; o orçamento conservador desta rodada é ${worstCaseCalls}. Nenhum modelo pago será usado.`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 }
 const compose = ["compose", "--project-name", `scanteca-oracle-benchmark-${process.pid}`, "--file", "compose.e2e.yml"];
@@ -63,3 +65,9 @@ try {
     if (result.error || result.status !== 0) process.exitCode = 1;
   }
 }
+}
+
+main().catch(() => {
+  console.error("Não foi possível preparar o benchmark gratuito. Nenhuma chamada paga será feita.");
+  process.exitCode = 1;
+});
