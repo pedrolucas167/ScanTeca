@@ -24,8 +24,8 @@ try {
   run(process.execPath, ["scripts/prepare-test-database.mjs"]);
   run(process.execPath, ["node_modules/@playwright/test/cli.js", "install", "chromium"]);
   run(process.execPath, ["node_modules/prisma/build/index.js", "generate"]);
-  run(process.execPath, ["node_modules/next/dist/bin/next", "build"]);
-  run(process.execPath, ["scripts/run-e2e.mjs", "--project=authenticated", "--retries=0"]);
+  run(process.execPath, ["node_modules/next/dist/bin/next", "build", "--webpack"]);
+  run(process.execPath, ["scripts/run-e2e.mjs", "--project=authenticated", "--retries=0", ...process.argv.slice(2)]);
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;
