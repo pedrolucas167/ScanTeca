@@ -31,6 +31,10 @@ describe("Oracle evidence references", () => {
     "Em seu acervo pessoal, não possuímos um título que se encaixe diretamente na descrição de navegação por rios.",
     "No seu acervo atual, não há livros que abordem especificamente a navegação por rios.",
     "Na sua biblioteca não existem obras sobre rios.",
+    "O acervo da biblioteca não contém nenhum título relevante sobre vulcões.",
+    "Não há outros livros no acervo que possam ser sugeridos sobre vulcões.",
+    "Sua inclusão complementa a ausência de obras relevantes no acervo local.",
+    "Não há outros livros no acervo, portanto a recomendação é a única viável dentro das restrições do contexto fornecido.",
   ])("rejects unsupported inventory-wide absence: %s", text => {
     expect(validateInventoryClaims(text).valid).toBe(false);
   });
@@ -42,6 +46,7 @@ describe("Oracle evidence references", () => {
     "O único livro que consta nas fontes recuperadas é Jardins da Maré [1].",
     "Nesta seleção, a única obra da sua biblioteca é Jardins da Maré [1].",
     "Não posso afirmar que é o único livro na sua biblioteca.",
+    "No contexto fornecido não há outros livros sobre vulcões.",
   ])("preserves scoped uncertainty and explicit external sources: %s", text => {
     expect(validateInventoryClaims(text).valid).toBe(true);
   });

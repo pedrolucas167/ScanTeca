@@ -120,3 +120,14 @@ it("aplica as duas extremidades de um intervalo de anos", () => {
     ],
   });
 });
+
+it("não transforma palavras de títulos entre aspas em filtros de autor ou gênero", async () => {
+  const filters = await jevExtractFilters('Compare "O Farol de Vidro" e "Cartas do Mangue" usando as sinopses.');
+  expect(filters.author).toBeUndefined();
+  expect(filters.genre).toBeUndefined();
+  expect(filters.title_contains).toBe("o farol de vidro");
+  expect(await jevExtractFilters('Procure "Romance de 1984" por Lia Monte')).toMatchObject({ title_contains: "romance de 1984", author: "Lia Monte" });
+  const titleOnly = await jevExtractFilters('Procure "Romance de 1984"');
+  expect(titleOnly.genre).toBeUndefined();
+  expect(titleOnly.year).toBeUndefined();
+});
