@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { hkdfSync, randomUUID } from "node:crypto";
 import type { Redis } from "@upstash/redis";
 
 // Provisional development candidate, not a production quality approval.
@@ -58,7 +58,10 @@ const localStates = new Map<string, State>();
 export function createModelPool({ apiKey, models, redis, rpm = 20, daily = 50, now = Date.now }: {
   apiKey: string; models: string[]; redis: Redis | null; rpm?: number; daily?: number; now?: () => number;
 }) {
-  const prefix = `oracle:free:${createHash("sha256").update(apiKey).digest("hex").slice(0, 24)}`;
+  // API keys are high-entropy secrets, not user passwords. Derive a purpose-bound
+  // identifier without exposing the key or creating a password-verification hash.
+  const namespace = Buffer.from(hkdfSync("sha256", apiKey, "scanteca-openrouter-v1", "free-model-quota", 12)).toString("hex");
+  const prefix = `oracle:free:${namespace}`;
   const cooldownKey = (model: string) => `${prefix}:cooldown:${model}`;
   // Quotas are shared by credential, independently of pool membership/order.
   const globalKey = `${prefix}:cursor`;
