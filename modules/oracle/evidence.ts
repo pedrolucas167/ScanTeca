@@ -25,12 +25,14 @@ export function validateInventoryClaims(text: string) {
   const claims = text.split(/(?<=[.!?])\s+|\n+/u).filter(sentence => {
     const normalized = sentence.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[*_]/g, "");
     if (/nao (?:posso|podemos|e possivel) afirmar|nao sei se/.test(normalized)) return false;
-    const scoped = /contexto|fontes? (?:recuperad|consultad|disponive)|selecao|amostra|livros? (?:recuperad|listad|apresentad)/.test(normalized);
+    const scoped = /\b(?:no|na|neste|nesta|nesse|nessa) (?:contexto|selecao|amostra)\b|fontes? (?:recuperad|consultad|disponive)|livros? (?:recuperad|listad|apresentad)/.test(normalized);
     if (scoped) return false;
-    const absence = /(?:seu|sua|nosso|nossa) (?:acervo|biblioteca|estante)/.test(normalized) &&
-      /nao (?:ha|tem|temos|existe[m]?|consta[m]?|contem|possui|possuimos|possuo) (?:(?:um|uma|nenhum|nenhuma) )?(?:livros?|obras?|titulos?|exemplares?)\b/.test(normalized);
+    const inventory = /(?:seu|sua|nosso|nossa|o|a) (?:acervo|biblioteca|estante)\b/.test(normalized);
+    const absence = inventory &&
+      /nao (?:ha|tem|temos|existe[m]?|consta[m]?|contem|possui|possuimos|possuo) (?:(?:um|uma|nenhum|nenhuma|outros?|outras?) )?(?:livros?|obras?|titulos?|exemplares?)\b/.test(normalized);
+    const nominalAbsence = /ausencia de (?:livros?|obras?|titulos?|exemplares?)\b[^.!?]*\b(?:no|na|do|da) (?:acervo|biblioteca|estante)\b/.test(normalized);
     const exhaustive = /(?:o|a) unic[oa] (?:livro|obra|titulo|exemplar)\b[^.!?]*(?:que consta\b|(?:n[ao]|em|d[ao]) (?:seu|sua|nosso|nossa) (?:acervo|biblioteca|estante))/.test(normalized);
-    return absence || exhaustive;
+    return absence || nominalAbsence || exhaustive;
   });
   return { valid: claims.length === 0, claims };
 }

@@ -21,18 +21,20 @@ cenários autenticados e a avaliação representativa definidos abaixo.
 ## Próxima etapa — aceite autenticado e avaliação representativa
 
 **Prioridade atual:** validar o fluxo completo do Oráculo e a qualidade das
-respostas antes de considerar encerrado o roadmap. Esta etapa está planejada;
-seus critérios abaixo ainda não estão aprovados.
+respostas antes de considerar encerrado o roadmap. Em 04/11/2026, o aceite local
+autenticado passou em oito cenários (cinco específicos do Oráculo). A avaliação
+gratuita real começou, mas continua aberta por qualidade e esgotamento de cota;
+veja [resultados e decisão de custo](ORACLE-FREE-MODELS.md). Produção não mudou.
 
-- [ ] Criar cenários autenticados específicos do Oráculo com conta Clerk de
+- [x] Criar cenários autenticados específicos do Oráculo com conta Clerk de
   desenvolvimento e banco descartável: conversa, histórico, regeneração,
   cancelamento, novas tentativas, memória e artefatos, verificando persistência.
-- [ ] Usar uma segunda conta para comprovar isolamento de conversas, memória e
+- [x] Usar uma segunda conta para comprovar isolamento de conversas, memória e
   artefatos, incluindo acesso direto às APIs e permanência dos dados do dono.
 - [ ] Ampliar o acervo fictício e as perguntas para cobrir gêneros, extensões,
   títulos acentuados, livros sem embedding, preferências declaradas e catálogo
   externo. Exercitar recuperação e formatação reais, além de contextos fixos.
-- [ ] Definir os critérios antes da rodada com modelo real; registrar todas as
+- [x] Definir os critérios antes da rodada com modelo real; registrar todas as
   respostas, fontes, falhas, latência e custo, sem selecionar só as favoráveis.
 - [ ] Submeter as respostas a revisão humana explícita, separando seu resultado
   do julgamento automático e das checagens numéricas de citações.
@@ -43,7 +45,9 @@ seus critérios abaixo ainda não estão aprovados.
 Conclusão: evidência reproduzível dos cenários autenticados, relatório da rodada
 representativa e aceite humano registrados, com falhas e limitações explícitas.
 A instrumentação de produção, voz e as demais frentes do projeto continuam como
-validações separadas. Marcar esta etapa não inicia os testes nem a marca como feita.
+validações separadas. Os cenários autenticados usam IA simulada; o benchmark real
+usa corpus fictício e recuperação PostgreSQL, sem navegação autenticada ao vivo.
+Essas evidências são complementares e não encerram o aceite completo.
 
 ## Primeiro corte
 
