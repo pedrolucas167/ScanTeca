@@ -2,6 +2,11 @@ generator client {
   provider        = "prisma-client-js"
 }
 
+// Temporary integration probe; this branch must never be merged.
+model MigrationCiLiveProbe {
+  id Int @id
+}
+
 datasource db {
   provider   = "postgresql"
 }
