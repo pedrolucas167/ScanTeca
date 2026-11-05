@@ -24,6 +24,14 @@ test("duas pastas de mesmo timestamp falham mesmo com descrições diferentes", 
   assert.ok(codes(snapshot(), current).includes("DUPLICATE_VERSION"));
 });
 
+test("duplicata aponta o arquivo novo mesmo quando ele vem antes do antigo na ordenação", () => {
+  const base = snapshot();
+  const duplicate = initial.replace("_init", "_another");
+  const current = new Map([[duplicate, "SELECT 1;"], ...base]);
+  const error = inspectMigrationHistory(base, current).errors.find(error => error.code === "DUPLICATE_VERSION");
+  assert.equal(error.file, duplicate);
+});
+
 test("alterar, excluir ou renomear migration integrada exige restauração", () => {
   const current = snapshot();
   current.set(initial, "SELECT 1;");
@@ -82,6 +90,7 @@ test("anotações escapam comandos injetados em nomes e mensagens", () => {
   assert.match(result, /%2C/u);
   assert.match(result, /%0A/u);
   assert.match(result, /%25/u);
+  assert.match(result, /,line=1,/u);
 });
 
 test("recusa produção, parâmetros, fragmentos, porta e database errados antes do Prisma", () => {

@@ -39,7 +39,13 @@ export function inspectMigrationHistory(base, current) {
     const iso = `${version.slice(0, 4)}-${version.slice(4, 6)}-${version.slice(6, 8)}T${version.slice(8, 10)}:${version.slice(10, 12)}:${version.slice(12, 14)}.000Z`;
     const date = new Date(iso);
     if (!Number.isFinite(date.getTime()) || date.toISOString() !== iso) problem("INVALID_TIMESTAMP", file, "Data/hora da versão inválida. Gere novamente a migração com Prisma.");
-    if (versions.has(version)) problem("DUPLICATE_VERSION", file, `Versão ${version} repetida em duas pastas. Gere uma versão única; outra pasta: ${versions.get(version)}.`);
+    if (versions.has(version)) {
+      const previous = versions.get(version);
+      const previousFile = `${root}${previous}/migration.sql`;
+      const duplicatedFile = base.has(file) && !base.has(previousFile) ? previousFile : file;
+      const other = duplicatedFile === file ? previous : directory;
+      problem("DUPLICATE_VERSION", duplicatedFile, `Versão ${version} repetida em duas pastas. Gere uma versão única; outra pasta: ${other}.`);
+    }
     versions.set(version, directory);
     if (!base.has(file) && current.has(file)) {
       added.push(file);
@@ -74,5 +80,5 @@ export function readMigrationComparison(reference = process.env.MIGRATION_BASE_R
 const escapeData = value => String(value).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
 export function annotation(kind, { file = "prisma/schema.prisma", code = "MIGRATION_CHECK", message }) {
   const property = escapeData(file).replaceAll(":", "%3A").replaceAll(",", "%2C");
-  return `::${kind} file=${property},title=Histórico Prisma (${code})::${escapeData(message)}`;
+  return `::${kind} file=${property},line=1,title=Histórico Prisma (${code})::${escapeData(message)}`;
 }

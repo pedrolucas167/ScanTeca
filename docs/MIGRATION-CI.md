@@ -82,7 +82,8 @@ em PRs que não alterem schema/migrations.
 
 ## Validação local — 05/11/2026
 
-- 11 testes das regras, anotações e guardas aprovados.
+- 12 testes das regras, anotações e guardas aprovados, incluindo a associação
+  do erro de versão repetida ao arquivo novo do PR.
 - Validação do schema atual contra a base `origin/main` aprovada em PostgreSQL
   descartável, sem migração nova nem alteração no banco do projeto.
 - Quatro testes em PostgreSQL aprovados: schema-base sem mudanças, migration
@@ -92,7 +93,29 @@ em PRs que não alterem schema/migrations.
 - Container e rede Docker próprios removidos ao final; nenhum dado de produção
   foi utilizado. Nenhuma regra de branch foi modificada.
 
-O workflow ainda precisa ser publicado e executado no GitHub; a validação acima
-é local. Não equivale a uma execução do Actions nem a replay integral do legado.
+## Integração real no GitHub — 05/11/2026
+
+A implementação foi publicada em uma PR de rascunho, sem merge. Uma PR
+temporária separada recebeu apenas fixtures fictícias para conferir a integração:
+
+- [Caso válido aprovado](https://github.com/pedrolucas167/ScanTeca/actions/runs/42020585159):
+  os jobs de histórico e SQL passaram; a nova tabela fictícia foi aplicada no
+  PostgreSQL descartável do Actions e o schema final coincidiu com o esperado.
+  Os quatro testes SQL positivos/negativos também passaram no runner Linux.
+- [Versão repetida reprovada](https://github.com/pedrolucas167/ScanTeca/actions/runs/42021112340):
+  o job de histórico falhou e o job SQL foi ignorado. A API de checks confirmou
+  anotação `DUPLICATE_VERSION` ligada ao arquivo SQL, identificando a outra pasta
+  e orientando gerar uma versão única. A anotação agora inclui linha 1 e dá
+  preferência ao arquivo novo quando houver conflito com migration integrada.
+- O teste real revelou um falso positivo do scanner nas credenciais públicas
+  fictícias de migrations. Exceções exatas foram limitadas aos três arquivos de
+  teste que as usam; o scanner passou depois da correção. Um teste adicional
+  confirma que os mesmos valores continuam bloqueados fora desses caminhos.
+
+As fixtures ficam somente na branch temporária de teste, sem entrar no PR de
+implementação ou na `main`. Essa evidência confirma execução e anotações reais
+do Actions, mas continua sem provar replay integral do SQL legado ou migração
+de dados existentes. Nenhum banco de produção foi acessado e nenhuma proteção
+de branch foi alterada.
 
 Referência: [histórico de migrations do Prisma 7](https://www.prisma.io/docs/orm/v7/prisma-migrate/understanding-prisma-migrate/migration-histories).
