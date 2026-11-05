@@ -14,6 +14,11 @@ Não use o banco de produção para testes ou `prisma db push`.
 
 ## Checks de pull request
 
+O workflow de [migrations Prisma](MIGRATION-CI.md) verifica versões repetidas,
+integridade dos arquivos integrados e SQL novo em PostgreSQL descartável, com
+anotações amigáveis nos arquivos do PR. Ele não acessa o histórico de produção
+nem altera as regras de proteção da branch.
+
 `build`, `reading-integration` e `coverage` são os checks centrais. O relatório
 combina as duas suítes e reprova dados ausentes e regressões abaixo dos limites
 versionados. `workflow-policy` verifica títulos Conventional Commits, permissões,
@@ -56,7 +61,7 @@ schema, instala Chromium se necessário, gera o build de produção e executa o
 cenário no mesmo modo da CI. A geração do build leva mais tempo que o servidor de
 desenvolvimento, mas evita interferência de recarregamentos durante o login. Ao terminar, encerra
 somente seu próprio projeto Docker e descarta o banco, mesmo em falha normal.
-Os três cenários autenticados e os limites dos providers estão em
+Os oito cenários autenticados e os limites dos providers estão em
 [AUTHENTICATED-E2E.md](AUTHENTICATED-E2E.md).
 Não exige exportar URLs ou instalar a CLI do Clerk. A porta local 55439 deve estar
 livre; um serviço existente nessa porta não é removido nem reutilizado.
@@ -64,8 +69,9 @@ As chaves locais são lidas sem importar URLs de banco ou integrações do `.env
 O isolamento usa `compose.e2e.yml`, com armazenamento temporário em memória.
 
 Na CI, abra **Actions → Browser tests → Run workflow** na `main`. O cenário
-autenticado vem selecionado por padrão; desmarque-o para rodar somente os dez
-cenários públicos. A preparação do Clerk acontece no mesmo worker do teste, sem
+autenticado vem selecionado por padrão; desmarque-o para rodar somente os 24
+cenários públicos, incluindo 14 casos de interface do Oráculo com APIs simuladas.
+A preparação do Clerk acontece no mesmo worker do teste, sem
 arquivos de sessão compartilhados. O ambiente `e2e` deve permitir somente a branch
 `main`; os dois secrets devem ser cadastrados nesse ambiente, não no código.
 Isso impede que uma execução de branch não revisada receba essas credenciais.

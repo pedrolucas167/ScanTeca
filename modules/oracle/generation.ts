@@ -1,14 +1,14 @@
 import type { LibrarySetting } from "@prisma/client";
 import type { OracleMode } from "@/lib/constants/oracle";
 import type { Source, RetrievalStats } from "@/lib/types/oracle";
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { openRouterChat } from "@/lib/openrouter-chat";
 import { validateOracleResponse } from "@/lib/oracle-quality";
 import { readOracleCompletion } from "./completion";
 import { validateCitations, validateInventoryClaims } from "./evidence";
 import { saveOracleAnswer } from "./history";
 import { updateReaderProfile } from "./profile";
 import type { OraclePipelineContext } from "./pipeline";
-import { OPENROUTER_BASE, CHAT_MODEL, MAX_TOKENS_CHAT } from "./config";
+import { CHAT_MODEL, MAX_TOKENS_CHAT } from "./config";
 
 export interface OracleChatMessage { role: "system" | "user" | "assistant"; content: string }
 export async function generateOracleResponse({ pipeline, userId, sessionId, mode, question: trimmed, apiKey,
@@ -23,23 +23,17 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
   let consumerCancelled = false;
   const generationSignal = AbortSignal.any([signal, cancellation.signal]);
   stage("generation");
-  const llmRes = await metrics.measure("generation", () => fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
+  const llmRes = await metrics.measure("generation", () => openRouterChat({
+    apiKey,
     signal: generationSignal,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "Scanteca Oráculo",
-    },
-    body: JSON.stringify({
+    body: {
       model: CHAT_MODEL,
       messages,
       stream: true,
       temperature,
       max_tokens: MAX_TOKENS_CHAT,
-    }),
-  }, 60_000));
+    },
+  }));
 
   if (!llmRes.ok || !llmRes.body) {
     await llmRes.body?.cancel().catch(() => undefined);

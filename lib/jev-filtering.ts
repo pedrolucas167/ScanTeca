@@ -46,9 +46,9 @@ const GENRE_PATTERNS = [
 ];
 
 const AUTHOR_PATTERNS = [
-  /escrito\s+por\s+([A-Za-z][A-Za-záàâãéèêíïóôõöúçñ\s\.]+)(?:\.|,|\s|$)/i,
-  /por\s+([A-Za-z][A-Za-záàâãéèêíïóôõöúçñ\s\.]+)(?:\.|,|\s|$)/i,
-  /do\s+([A-Za-z][A-Za-záàâãéèêíïóôõöúçñ\s\.]+)(?:\.|,|\s|$)/i,
+  /\bescrito\s+por\s+([A-Za-z][A-Za-záàâãéèêíïóôõöúçñ\s\.]+)(?:\.|,|\s|$)/i,
+  /\bpor\s+([A-Za-z][A-Za-záàâãéèêíïóôõöúçñ\s\.]+)(?:\.|,|\s|$)/i,
+  /\bdo\s+([A-Za-z][A-Za-záàâãéèêíïóôõöúçñ\s\.]+)(?:\.|,|\s|$)/i,
 ];
 
 /**
@@ -56,7 +56,9 @@ const AUTHOR_PATTERNS = [
  */
 export async function jevExtractFilters(query: string): Promise<MetadataFilters> {
   const filters: MetadataFilters = {};
-  const trimmed = query.trim().toLowerCase();
+  // A quoted title is data, not an implicit author, genre, date or status filter.
+  const metadataQuery = query.replace(/"[^"]+"|“[^”]+”/gu, " ");
+  const trimmed = metadataQuery.trim().toLowerCase();
   const minPages = trimmed.match(/(?:mais de\s*|\+\s*)(\d+)\s*p[áa]ginas/i);
   const maxPages = trimmed.match(/(?:menos de|at[ée])\s*(\d+)\s*p[áa]ginas/i);
   if (minPages) filters.pages_min = Number(minPages[1]) + 1;
@@ -69,7 +71,7 @@ export async function jevExtractFilters(query: string): Promise<MetadataFilters>
   }
 
   // Extract author
-  const author = extractAuthor(query);
+  const author = extractAuthor(metadataQuery);
   if (author) {
     filters.author = author;
   }
@@ -94,7 +96,7 @@ export async function jevExtractFilters(query: string): Promise<MetadataFilters>
   }
 
   // Extract title keywords
-  const titleKeywords = extractTitleKeywords(trimmed);
+  const titleKeywords = extractTitleKeywords(query.trim().toLowerCase());
   if (titleKeywords) {
     filters.title_contains = titleKeywords;
   }

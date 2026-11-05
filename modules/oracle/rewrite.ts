@@ -1,6 +1,6 @@
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { openRouterChat } from "@/lib/openrouter-chat";
 import { parseOracleUsage, type OracleUsage } from "@/lib/oracle-usage";
-import { OPENROUTER_BASE, CHAT_MODEL, MAX_TOKENS_REWRITE } from "./config";
+import { CHAT_MODEL, MAX_TOKENS_REWRITE } from "./config";
 
 export async function contextualizeQuestion(
   question: string,
@@ -10,17 +10,10 @@ export async function contextualizeQuestion(
 ): Promise<string> {
   if (history.length === 0) return question;
   try {
-    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
+    const res = await openRouterChat({
+      apiKey, timeoutMs: 8000,
       signal: options.signal,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer":
-          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Scanteca Oráculo",
-      },
-      body: JSON.stringify({
+      body: {
         model: CHAT_MODEL,
         stream: false,
         max_tokens: MAX_TOKENS_REWRITE,
@@ -49,7 +42,7 @@ ${history
 Última pergunta do leitor: ${question}`,
           },
         ],
-      }),
+      },
     });
     if (!res.ok) {
       await res.body?.cancel().catch(() => undefined);
