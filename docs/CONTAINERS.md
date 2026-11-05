@@ -106,9 +106,13 @@ A execução [Application container](https://github.com/pedrolucas167/ScanTeca/a
 aprovou o smoke real no runner Linux; o job publish foi ignorado, como esperado
 para uma PR. A análise ShellCheck/actionlint reprovou duas construções do script
 de publicação (atribuição junto com export e crases literais no printf). Ambas
-foram corrigidas sem desabilitar regras; a repetição da política é necessária. O
-repositório não possui a variável pública de publicação configurada. Nenhum push
-no GHCR foi executado ou comprovado nesta validação local. O primeiro pacote
-depende de integração na main, CI aprovado e configuração explícita da chave
-pública. A primeira publicação do runner hospedado será Linux amd64; builds
+foram corrigidas sem desabilitar regras. A [repetição da política](https://github.com/pedrolucas167/ScanTeca/actions/runs/42036922731)
+passou, assim como a [repetição do container](https://github.com/pedrolucas167/ScanTeca/actions/runs/42036922726)
+e build, integração e cobertura do CI.
+
+A variável pública de publicação foi configurada com a chave Clerk de
+desenvolvimento já usada nos testes; nenhuma chave privada foi enviada ao
+GitHub nem incorporada na imagem. Até este registro, nenhum push no GHCR foi
+executado ou comprovado. O primeiro pacote depende de integração na main e de
+uma nova validação com a chave pública configurada. A primeira publicação do runner hospedado será Linux amd64; builds
 multiplataforma, login autenticado na imagem e deployment Docker não foram validados.
