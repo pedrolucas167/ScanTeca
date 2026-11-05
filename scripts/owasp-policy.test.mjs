@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scannerArguments, owaspImage, nvdDatafeed, reportSummary, dependencyInstallArguments } from "./owasp-policy.mjs";
+import { scannerArguments, owaspImage, nvdDatafeed, reportSummary, dependencyInstallArguments, npmAuditSummary } from "./owasp-policy.mjs";
 
 test("scanner fixa digest e monta somente manifests em leitura, cache e saída separados", () => {
   const args = scannerArguments({ input: "/fixture", output: "/reports", data: "/cache", name: "scanteca-owasp-123", user: "1001:1001" });
@@ -33,6 +33,19 @@ test("identidade do runner aceita somente UID e GID numéricos", () => {
 });
 
 const sarif = { version: "2.1.0", runs: [{ tool: { driver: { name: "OWASP Dependency-Check" } } }] };
+
+test("auditoria npm mantém achados moderados visíveis independentemente do OWASP", () => {
+  const counts = { info: 0, low: 0, moderate: 8, high: 0, critical: 0, total: 8 };
+  assert.deepEqual(npmAuditSummary({ metadata: { vulnerabilities: counts } }), counts);
+});
+
+test("erro, métricas ausentes ou contagens inconsistentes da auditoria npm reprovam", () => {
+  for (const report of [null, {}, { error: { code: "EFAIL" } },
+    { metadata: { vulnerabilities: { info: 0, low: 0, moderate: 8, high: 0, critical: 0, total: 0 } } },
+    { metadata: { vulnerabilities: { info: 0, low: 0, moderate: -1, high: 0, critical: 0, total: -1 } } }]) {
+    assert.throws(() => npmAuditSummary(report));
+  }
+});
 const valid = { scanInfo: { engineVersion: "13.0.0" }, dependencies: [{ vulnerabilities: [{ name: "CVE-fixture", severity: "HIGH" }] }, { vulnerabilities: [{ name: "CVE-fixture", severity: "HIGH" }, { name: "CVE-other", severity: "CRITICAL" }] }] };
 
 test("relatório deduplica achados e mantém severidades visíveis em modo informativo", () => {

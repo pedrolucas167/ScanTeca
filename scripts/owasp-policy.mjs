@@ -5,6 +5,16 @@ export function dependencyInstallArguments(input) {
   return ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--include=dev", "--prefix", input];
 }
 
+export function npmAuditSummary(report) {
+  const counts = report?.metadata?.vulnerabilities;
+  const severities = ["info", "low", "moderate", "high", "critical", "total"];
+  if (report?.error || !counts || !severities.every(key => Number.isInteger(counts[key]) && counts[key] >= 0)
+    || counts.total !== severities.slice(0, -1).reduce((sum, key) => sum + counts[key], 0)) {
+    throw new Error("Auditoria npm ausente ou inválida; não constitui resultado sem achados.");
+  }
+  return Object.fromEntries(severities.map(key => [key, counts[key]]));
+}
+
 export function scannerArguments({ input, output, data, name, user = "1000:1000" }) {
   if (!/^scanteca-owasp-\d+$/u.test(name)) throw new Error("Nome de container de teste inválido.");
   if (!/^\d+:\d+$/u.test(user)) throw new Error("Identidade do runner inválida.");

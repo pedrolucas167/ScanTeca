@@ -53,8 +53,6 @@ isolada com scripts desabilitados e inclui dependências de desenvolvimento.
 Somente uma execução do scanner com exit code zero permite salvar a base em
 cache; isso não substitui a verificação de componentes e relatórios.
 
-## Limites
-
 ## Execução real aprovada e atualização final
 
 A execução [42027368618](https://github.com/pedrolucas167/ScanTeca/actions/runs/42027368618)
@@ -68,6 +66,18 @@ ausência de problemas, nem equivalência com todos os resultados de npm audit.
 A branch recebeu a main com as atualizações de Actions e de dependências de
 produção. Os seis testes locais passaram novamente. Uma nova execução real no
 GitHub e a inspeção dos artifacts do commit atualizado são condições para merge.
+
+A execução [42032758528](https://github.com/pedrolucas167/ScanTeca/actions/runs/42032758528)
+também aprovou o scanner após atualizar com a main. A conferência complementar
+com npm audit no mesmo lockfile mostrou oito pacotes afetados por um advisory
+moderado, GHSA-g3hv-75wg-m249, na cadeia de desenvolvimento do ESLint/minimatch.
+Não há achados altos ou críticos nessa consulta. Não foi determinada equivalência
+entre a cobertura do Node Audit embutido e a do npm CLI; não se atribui causa
+ao desvio sem evidência. O runner agora publica npm-audit.json e contagens
+separadas de npm audit, incluindo desenvolvimento. Falha de consulta ou métricas
+inválidas reprovam; achados seguem informativos. Nenhuma atualização automática
+ou supressão foi aplicada para esconder esse aviso. Dois testes adicionais
+cobrem achados moderados e rejeição de resultados inválidos.
 
 ## Limites de cobertura
 
