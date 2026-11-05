@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import { loadDevelopmentClerkKeys } from "./scripts/e2e-clerk-keys.mjs";
+import { oracleFixtureKey } from "./scripts/e2e-oracle-provider.mjs";
 
 // Carrega somente as chaves Clerk. Nunca importa DATABASE_URL ou integrações de .env.
 const keys = loadDevelopmentClerkKeys();
@@ -12,9 +13,14 @@ const url = new URL(database);
 if (url.hostname !== "127.0.0.1" || url.port !== "55439" || url.pathname !== "/scanteca_reading_test") throw new Error("E2E permite somente o banco descartável documentado.");
 const isolatedEnvironment = {
   DATABASE_URL: database,
+  // Keep provider fixtures deterministic even when local env enables rotation.
+  ORACLE_CHAT_STRATEGY: "fixed", ORACLE_FREE_MODELS: "",
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: "", VAPID_PRIVATE_KEY: "", OPENROUTER_API_KEY: "",
   UPSTASH_REDIS_REST_URL: "", UPSTASH_REDIS_REST_TOKEN: "", KV_REST_API_URL: "", KV_REST_API_TOKEN: "", KV_URL: "",
 };
+if (process.env.E2E_AUTHENTICATED === "1") Object.assign(isolatedEnvironment, {
+  E2E_ORACLE_FIXTURES: "1", OPENROUTER_API_KEY: oracleFixtureKey,
+});
 Object.assign(process.env, isolatedEnvironment);
 const authenticated = process.env.E2E_AUTHENTICATED === "1";
 
@@ -37,7 +43,7 @@ export default defineConfig({
   projects: [
     { name: "guest-desktop", testMatch: ["guest.spec.ts", "oracle.spec.ts"], use: { viewport: { width: 1440, height: 900 } } },
     { name: "guest-mobile", testMatch: ["guest.spec.ts", "oracle.spec.ts"], use: { viewport: { width: 375, height: 900 } } },
-    ...(authenticated ? [{ name: "authenticated", testMatch: "authenticated.spec.ts", use: { screenshot: "off" as const } }] : []),
+    ...(authenticated ? [{ name: "authenticated", testMatch: ["authenticated.spec.ts", "oracle-authenticated.spec.ts"], use: { screenshot: "off" as const, serviceWorkers: "block" as const } }] : []),
   ],
   webServer: {
     command: process.env.CI || process.env.E2E_PRODUCTION === "1" ? "npm run start -- --port 3020" : "npm run dev -- --port 3020",

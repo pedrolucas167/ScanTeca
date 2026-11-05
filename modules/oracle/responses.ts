@@ -1,24 +1,18 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import type { RoutingDecision } from "@/lib/jev-routing";
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { openRouterChat } from "@/lib/openrouter-chat";
 import { readOracleCompletion } from "./completion";
-import { OPENROUTER_BASE, CHAT_MODEL } from "./config";
+import { CHAT_MODEL } from "./config";
 
 export async function directChatResponse(question: string, apiKey: string, requestSignal: AbortSignal) {
   const cancellation = new AbortController();
   let consumerCancelled = false;
   const signal = AbortSignal.any([requestSignal, cancellation.signal]);
   try {
-    const res = await fetchWithTimeout(`${OPENROUTER_BASE}/chat/completions`, {
+    const res = await openRouterChat({
+      apiKey, timeoutMs: 8000,
       signal,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Scanteca Oráculo",
-      },
-      body: JSON.stringify({
+      body: {
         model: CHAT_MODEL,
         stream: true,
         max_tokens: 300,
@@ -32,7 +26,7 @@ export async function directChatResponse(question: string, apiKey: string, reque
             content: question,
           },
         ],
-      }),
+      },
     });
 
     if (!res.ok || !res.body) {
