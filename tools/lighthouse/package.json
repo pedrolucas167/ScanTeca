@@ -1,0 +1,7 @@
+{
+  "name": "scanteca-lighthouse-tools",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": "24.x" },
+  "dependencies": { "@lhci/cli": "0.16.0" }
+}

@@ -1,0 +1,5 @@
+services:
+  app:
+    environment:
+      # Public, signed-out navigation only. Never pass a real private key to PRs.
+      CLERK_SECRET_KEY: sk_test_dummy
