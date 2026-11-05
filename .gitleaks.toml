@@ -26,6 +26,18 @@ description = "Senha publica exclusiva do banco descartavel local"
 regexTarget = "match"
 regexes = ['''^postgresql://scanteca_test:scanteca_test_local@''', '''^postgresql://scanteca_dev:scanteca_dev_local@''']
 [[rules.allowlists]]
+description = "Credencial publica do PostgreSQL descartavel exclusivo do CI de migrations"
+condition = "AND"
+paths = ['''^scripts/run-migration-check\.mjs$''', '''^\.github/workflows/migrations\.yml$''']
+regexTarget = "match"
+regexes = ['''^postgresql://scanteca_test:scanteca_migration_local@$''']
+[[rules.allowlists]]
+description = "Credencial sintetica do teste da guarda de destino de migrations"
+condition = "AND"
+paths = ['''^scripts/migration-history\.test\.mjs$''']
+regexTarget = "match"
+regexes = ['''^postgresql://test:test@$''']
+[[rules.allowlists]]
 description = "Credenciais sinteticas dos testes do seed"
 condition = "AND"
 paths = ['''^prisma/development-fixtures\.test\.ts$''']
