@@ -102,7 +102,11 @@ instalação explícita. Compose passou a receber env-file temporário vazio par
 não carregar implicitamente o .env do usuário. A repetição aprovada usou apenas
 a chave pública fictícia documentada.
 
-A execução real do novo job no GitHub ainda precisa ser conferida na PR. O
+A execução [Application container](https://github.com/pedrolucas167/ScanTeca/actions/runs/42036557601)
+aprovou o smoke real no runner Linux; o job publish foi ignorado, como esperado
+para uma PR. A análise ShellCheck/actionlint reprovou duas construções do script
+de publicação (atribuição junto com export e crases literais no printf). Ambas
+foram corrigidas sem desabilitar regras; a repetição da política é necessária. O
 repositório não possui a variável pública de publicação configurada. Nenhum push
 no GHCR foi executado ou comprovado nesta validação local. O primeiro pacote
 depende de integração na main, CI aprovado e configuração explícita da chave
