@@ -42,7 +42,7 @@ try {
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync("public/favicon-32x32.png"));
   const container = docker([...compose, "ps", "--quiet", "app"], true);
   assert.equal(docker(["inspect", "--format", "{{.Config.User}}", container], true), "node");
-  docker([...compose, "exec", "--no-TTY", "app", "node", "-e", "const fs=require('node:fs');if(fs.existsSync('/app/.env')||fs.existsSync('/app/.git')||process.env.CLERK_SECRET_KEY)process.exit(1)"]);
+  docker([...compose, "exec", "--no-TTY", "app", "node", "-e", "const fs=require('node:fs');if(fs.existsSync('/app/.env')||fs.existsSync('/app/.git')||fs.existsSync('/usr/local/lib/node_modules/npm')||process.env.CLERK_SECRET_KEY)process.exit(1)"]);
   docker([...compose, "exec", "--no-TTY", "database", "psql", "-U", "scanteca_dev", "-d", "scanteca_container_dev", "-c", 'SELECT count(*) FROM "SocialProfile"']);
   docker([...compose, "stop", "database"]);
   await awaitStatus(base, 503);
