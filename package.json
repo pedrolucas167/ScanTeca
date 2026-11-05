@@ -78,7 +78,7 @@
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "5.0.5",
     "dotenv": "17.3.1",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.4.4",
     "istanbul-lib-coverage": "3.2.2",
     "istanbul-lib-report": "3.0.1",
