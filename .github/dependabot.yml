@@ -10,6 +10,11 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: chore(deps)
+    # The current typescript-eslint parser supports TypeScript <6.1.
+    # Review the complete toolchain before widening this range.
+    ignore:
+      - dependency-name: typescript
+        versions: ['>=6.1.0']
     groups:
       vitest:
         patterns: [vitest, '@vitest/*', jsdom]
