@@ -28,13 +28,20 @@ demonstravam uma execução do novo job.
 
 ## Evidências
 
-Quatro testes locais passaram: isolamento dos mounts e digest, limite dos nomes
+Cinco testes locais passaram: isolamento dos mounts e digest, identidade numérica
+do usuário do runner, limite dos nomes
 de containers próprios, deduplicação/severidades e rejeição de relatórios vazios
 ou inválidos. A tentativa original em cópia isolada iniciou a atualização de
 419.455 registros NVD sem API key; isso não comprovou geração do relatório.
 
 A correção ainda exige uma execução real do novo job e conferência do artifact
 no GitHub antes de ser considerada aprovada. Nenhum dado de produção participa.
+
+A primeira execução real da correção falhou ao ler o input no Linux: a pasta
+temporária pertence ao runner, enquanto a imagem usa outro usuário. O contêiner
+agora recebe o UID/GID do runner, preservando a pasta privada e o mount em
+leitura. Falhas também geram um resumo de diagnóstico para o artifact, sem
+transformar um resultado parcial em aprovação. A repetição ainda é necessária.
 
 ## Limites
 
