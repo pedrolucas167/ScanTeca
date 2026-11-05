@@ -44,6 +44,13 @@ test("aceita placeholders e a chave pública fictícia exata do build", () => {
   assert.equal(scan(`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${publicDummy}\nCLERK_SECRET_KEY=<configure-no-secret>`).status, 0);
 });
 
+test("exceções de migrations não liberam credenciais fora dos arquivos de teste", () => {
+  const migrationUrl = ["postgresql://scanteca_test:", "scanteca_migration_local", "@127.0.0.1:55440/scanteca_migration_test"].join("");
+  const guardUrl = ["postgresql://test:", "test", "@127.0.0.1:55440/scanteca_migration_test"].join("");
+  assert.equal(scan(`DATABASE_URL=${migrationUrl}`).status, 1);
+  assert.equal(scan(`DATABASE_URL=${guardUrl}`).status, 1);
+});
+
 test("reprova quando o scanner não pode ser executado", () => {
   const result = spawnSync(process.execPath, ["scripts/secret-scan.mjs"], { env: { ...process.env, GITLEAKS_BIN: path.resolve("scanner-inexistente") }, encoding: "utf8" });
   assert.equal(result.status, 1);
