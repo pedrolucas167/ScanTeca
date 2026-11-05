@@ -91,10 +91,76 @@ Registre o digest retornado pelo registry para execução imutável. Não há `l
 nem substituição automática do deployment Vercel. A visibilidade inicial do pacote
 é privada; sua alteração é uma decisão explícita do proprietário.
 
-Primeira entrega: tags por commit. Aliases de release, SBOM, attestations,
-scanner de imagem e política de exclusão de versões do registry ficam para a
-próxima etapa; o scanner OWASP atual cobre manifests, não a imagem base do sistema.
-Não há garantia de retenção limitada de imagens GHCR nesta primeira versão.
+Tags por commit permanecem. Aliases de release, attestations e política de
+exclusão de versões do registry ficam para etapa posterior. Não há garantia
+de retenção limitada de imagens GHCR nesta versão.
+
+### Inventário e vulnerabilidades da imagem
+
+Após o smoke, o mesmo job instala Syft 1.56.0 e Grype 0.121.1 por arquivos
+oficiais com SHA-256 fixado no código. Não usa instalador remoto executado via
+pipe, versões flutuantes nem tokens do registry para analisar a imagem local.
+Linux/Windows x64 são suportados pelo instalador; nenhuma ferramenta é instalada
+globalmente no computador. Os executáveis ficam na pasta reports ignorada.
+
+O scan parte do ID imutável da imagem runtime local, em modo de filesystem final,
+e gera SBOM Syft JSON e CycloneDX JSON. Grype analisa esse SBOM e produz JSON e
+SARIF. Exige inventário não vazio com pacotes Debian e npm, versões esperadas,
+formatos válidos e correspondência dos achados com os componentes inventariados.
+Erros operacionais, checksums inválidos ou relatórios parciais reprovam o job.
+Atualização explícita da base é obrigatória; a base deve ter no máximo 120 horas.
+
+Política inicial: bloquear publicação por achados **High/Critical com correção
+disponível**. Achados sem correção e de outras severidades permanecem nos
+relatórios e no resumo; não são suprimidos. Ausência de bloqueios não comprova
+imagem livre de vulnerabilidades. Não há allowlist nem supressões nesta entrega.
+
+Os relatórios e a identidade da imagem ficam no artifact container-security por
+14 dias, inclusive em reprovação. Somente depois da aprovação a imagem é salva
+para o job publish. Esse job compara as camadas de conteúdo, configuração,
+arquitetura e sistema da imagem carregada com o registro do scan antes de enviar
+a mesma imagem ao GHCR. Isso evita confundir IDs de índices OCI e de configurações
+após exportar/carregar a imagem. A retenção de relatórios é distinta da retenção
+de imagens e não representa uma assinatura criptográfica de procedência.
+
+```sh
+node scripts/install-container-scanners.mjs
+node --test scripts/container-security-policy.test.mjs
+node scripts/test-container.mjs
+node scripts/scan-container.mjs
+```
+
+O scanner OWASP existente cobre manifests; esta etapa acrescenta o conteúdo da
+imagem runtime. Não analisa os hosts de produção, o banco ou dados de usuários.
+Não inclui pentest, testes de carga nem reanálise agendada de imagens antigas.
+Novos advisories exigem nova execução, mesmo sem alteração do código.
+
+Validação desta etapa: seis testes de política passaram localmente. A primeira
+tentativa operacional reprovou por ausência da imagem local. Após reconstrução e
+smoke aprovados, o primeiro scan inventariou 354 componentes e bloqueou oito
+achados corrigíveis. Seis pertenciam ao npm global da imagem base, desnecessário
+para executar server.js. Npm, npx, Corepack e Yarn foram removidos somente do
+runtime; builder/tools continuam com as ferramentas necessárias. O smoke real
+foi repetido e aprovou inclusive ausência do npm no runtime.
+
+No Windows, o inventário remanescente tinha 208 componentes e duas correspondências
+CPE de binários duplicados dos pacotes Debian. Para conferir a classificação na
+plataforma do CI, exportamos a mesma imagem e executamos os binários oficiais Linux
+em WSL, com hashes verificados e a mesma base Grype. Essa execução inventariou
+203 componentes, com pacotes Debian e npm, e retornou 210 pares componente/advisory,
+48 High, dois Critical e **zero bloqueios com correção disponível**. O caso
+util-linux continua visível como not-fixed nos pacotes Debian. A diferença entre
+Windows e Linux foi observada, sem desabilitar catalogers ou adicionar supressões.
+O runner Linux é a referência para a decisão de publicação; o resultado nativo
+Windows é diagnóstico e pode exigir triagem dessas correspondências.
+
+O [aviso Debian OpenSSL](https://lists.debian.org/debian-lts-announce/2026/10/msg00053.html)
+confirma a correção de CVE-2026-84782 em 3.0.22-1~deb12u2, versão inventariada.
+O [tracker util-linux](https://security-tracker.debian.org/tracker/CVE-2026-53615)
+registra Bookworm vulnerável e Trixie corrigido. Não se considera uma versão
+upstream corrigida equivalente a uma correção disponível no repositório Bookworm.
+Os achados sem correção permanecem como risco conhecido; não há declaração de
+imagem livre de CVEs. A execução real no GitHub ainda deve ser conferida na PR.
 
 ## Disco e limpeza
 
