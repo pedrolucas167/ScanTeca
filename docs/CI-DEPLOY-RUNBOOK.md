@@ -30,6 +30,15 @@ de segurança do GitHub. Sua ativação e os alertas foram confirmados durante a
 implantação destes workflows. Não use `continue-on-error` para ocultar uma falha
 de configuração. O workflow manual de auditoria publica achados existentes em
 modo informativo; isso não significa ausência de vulnerabilidades.
+O workflow semanal **OWASP Dependency-Check (informational)** também executa em
+PRs que alterem seu código/configuração ou os manifests npm, e pode ser iniciado
+manualmente. Publica HTML, JSON, SARIF e resumo como artifact, com base NVD em
+cache e scanner fixado por digest; veja [escopo e evidências](OWASP-VALIDATION.md).
+Ele usa o arquivo versionado
+`.github/dependency-check-suppressions.xml`; o limiar `--failOnCVSS 11` mantém
+essa primeira integração informativa, sem transformar achados em falsos
+sucessos nem bloquear o merge. Não habilite uma supressão sem confirmar a
+aplicabilidade do CVE e registrar sua justificativa e data de revisão.
 
 ## Navegador isolado
 
