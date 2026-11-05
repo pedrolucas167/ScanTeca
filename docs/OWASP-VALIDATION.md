@@ -16,8 +16,10 @@ demonstravam uma execução do novo job.
 - Sonatype OSS Index, que exige credencial própria, está explicitamente fora
   desta configuração. Isso é uma limitação de cobertura, não uma aprovação dele.
 - O contêiner recebe apenas package.json, package-lock.json e suppressions em
-  leitura; saída e cache usam mounts separados. Não monta .env, .git, banco ou
-  o workspace completo.
+  uma área temporária com node_modules instalado pelo lockfile, sem scripts de
+  dependências (`npm ci --ignore-scripts`). A análise parte do lockfile, e a
+  área é montada somente em leitura. Saída e cache usam mounts separados.
+  Não monta .env, .git, banco ou o workspace completo.
 - Só registra sucesso depois de verificar HTML, JSON e SARIF não vazios, engine
   esperada, componentes analisados e estrutura SARIF. Relatório parcial não aprova
   uma falha do scanner. Erros operacionais reprovam o job.
@@ -28,7 +30,8 @@ demonstravam uma execução do novo job.
 
 ## Evidências
 
-Cinco testes locais passaram: isolamento dos mounts e digest, identidade numérica
+Seis testes locais passaram: instalação isolada sem scripts, isolamento dos mounts
+e digest, identidade numérica
 do usuário do runner, limite dos nomes
 de containers próprios, deduplicação/severidades e rejeição de relatórios vazios
 ou inválidos. A tentativa original em cópia isolada iniciou a atualização de
@@ -42,6 +45,13 @@ temporária pertence ao runner, enquanto a imagem usa outro usuário. O contêin
 agora recebe o UID/GID do runner, preservando a pasta privada e o mount em
 leitura. Falhas também geram um resumo de diagnóstico para o artifact, sem
 transformar um resultado parcial em aprovação. A repetição ainda é necessária.
+
+A segunda execução atualizou a base NVD e gerou os três formatos, mas foi
+corretamente reprovada porque não havia componentes no relatório. O Node Package
+Analyzer exige node_modules. A preparação agora instala o lockfile na área
+isolada com scripts desabilitados e inclui dependências de desenvolvimento.
+Somente uma execução do scanner com exit code zero permite salvar a base em
+cache; isso não substitui a verificação de componentes e relatórios.
 
 ## Limites
 

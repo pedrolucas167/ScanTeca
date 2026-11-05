@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { scannerArguments, reportSummary } from "./owasp-policy.mjs";
+import { scannerArguments, reportSummary, dependencyInstallArguments } from "./owasp-policy.mjs";
 
 const reports = path.resolve("reports");
 const output = path.join(reports, "security", "owasp");
@@ -19,11 +19,19 @@ try {
     if (!fs.lstatSync(source).isFile()) throw new Error("O scanner exige manifests e suppressions como arquivos regulares.");
     fs.copyFileSync(source, path.join(input, destination));
   }
+  const nodeDirectory = path.dirname(process.execPath);
+  const npmCli = [path.join(nodeDirectory, "node_modules/npm/bin/npm-cli.js"), path.resolve(nodeDirectory, "../lib/node_modules/npm/bin/npm-cli.js")].find(file => fs.existsSync(file));
+  if (!npmCli) throw new Error("Npm CLI não encontrada junto ao Node. Confira actions/setup-node.");
+  // Node Package Analyzer requires node_modules. Never execute dependency lifecycle scripts.
+  const installation = spawnSync(process.execPath, [npmCli, ...dependencyInstallArguments(input)], { stdio: "inherit", windowsHide: true, timeout: 10 * 60 * 1000 });
+  if (installation.error || installation.status !== 0) throw new Error("Instalação isolada do lockfile falhou; nenhum script de dependência foi executado.");
   invoked = true;
   // mkdtemp is owner-only on Linux; use that same owner inside the non-privileged container.
   const user = `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`;
   const result = spawnSync("docker", scannerArguments({ input, output, data, name, user }), { stdio: "inherit", windowsHide: true, timeout: 35 * 60 * 1000 });
   if (result.error || result.status !== 0) throw new Error("O scanner OWASP falhou. Confira atualização NVD, conectividade e logs. Relatórios parciais não são aprovação.");
+  // Preserve a successfully updated DB even if later report validation rejects the result.
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, "database-ready=true\n");
   for (const extension of ["html", "json", "sarif"]) {
     const file = path.join(output, `dependency-check-report.${extension}`);
     if (!fs.existsSync(file) || fs.statSync(file).size === 0) throw new Error(`Relatório ${extension.toUpperCase()} não foi gerado.`);

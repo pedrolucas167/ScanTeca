@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scannerArguments, owaspImage, nvdDatafeed, reportSummary } from "./owasp-policy.mjs";
+import { scannerArguments, owaspImage, nvdDatafeed, reportSummary, dependencyInstallArguments } from "./owasp-policy.mjs";
 
 test("scanner fixa digest e monta somente manifests em leitura, cache e saída separados", () => {
   const args = scannerArguments({ input: "/fixture", output: "/reports", data: "/cache", name: "scanteca-owasp-123", user: "1001:1001" });
@@ -13,6 +13,15 @@ test("scanner fixa digest e monta somente manifests em leitura, cache e saída s
   assert.equal(args.includes("--disableNodeAudit"), false);
   assert.equal(args.some(value => value.includes(".env")), false);
   assert.equal(args[args.indexOf("--user") + 1], "1001:1001");
+  assert.equal(args[args.indexOf("--scan") + 1], "/input/package-lock.json");
+});
+
+test("instalação isolada usa lockfile, inclui dev e nunca executa scripts de dependências", () => {
+  const args = dependencyInstallArguments("/fixture");
+  assert.equal(args[0], "ci");
+  assert.ok(args.includes("--ignore-scripts"));
+  assert.ok(args.includes("--include=dev"));
+  assert.equal(args[args.indexOf("--prefix") + 1], "/fixture");
 });
 
 test("nomes de containers externos não podem ser usados na limpeza", () => {
