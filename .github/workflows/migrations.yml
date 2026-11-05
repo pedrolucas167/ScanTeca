@@ -1,0 +1,65 @@
+name: Prisma migrations
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prisma-migrations-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      needs-replay: ${{ steps.history.outputs.needs-replay }}
+    env:
+      # Pass event data as environment data, never interpolate it into shell commands.
+      MIGRATION_BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - run: npm run test:migrations-tools
+      - id: history
+        run: npm run migrations:check
+
+  migration-sql:
+    needs: migration-history
+    if: needs.migration-history.outputs.needs-replay == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: scanteca_test
+          POSTGRES_PASSWORD: scanteca_migration_local
+          POSTGRES_DB: scanteca_migration_test
+        ports: ['55440:5432']
+        options: >-
+          --health-cmd "pg_isready -U scanteca_test"
+          --health-interval 3s --health-timeout 3s --health-retries 15
+    env:
+      MIGRATION_BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+      SCANTECA_MIGRATION_DATABASE_URL: postgresql://scanteca_test:scanteca_migration_local@127.0.0.1:55440/scanteca_migration_test
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run migrations:test-sql
+      - run: npm run test:migrations:integration
