@@ -14,6 +14,11 @@ Não use o banco de produção para testes ou `prisma db push`.
 
 ## Checks de pull request
 
+O workflow de [migrations Prisma](MIGRATION-CI.md) verifica versões repetidas,
+integridade dos arquivos integrados e SQL novo em PostgreSQL descartável, com
+anotações amigáveis nos arquivos do PR. Ele não acessa o histórico de produção
+nem altera as regras de proteção da branch.
+
 `build`, `reading-integration` e `coverage` são os checks centrais. O relatório
 combina as duas suítes e reprova dados ausentes e regressões abaixo dos limites
 versionados. `workflow-policy` verifica títulos Conventional Commits, permissões,
