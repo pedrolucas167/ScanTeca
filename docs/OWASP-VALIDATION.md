@@ -55,6 +55,22 @@ cache; isso não substitui a verificação de componentes e relatórios.
 
 ## Limites
 
+## Execução real aprovada e atualização final
+
+A execução [42027368618](https://github.com/pedrolucas167/ScanTeca/actions/runs/42027368618)
+terminou com sucesso. O artifact foi baixado e inspecionado: 676 componentes,
+engine 13.0.0, HTML, JSON e SARIF 2.1.0 válidos. O log registra conclusão dos
+analisadores Node Package, NVD CVE e Node Audit. Pacotes opcionais de outras
+plataformas não instalados no runner Linux são ignorados, com aviso no log.
+O relatório dessa execução não listou vulnerabilidades; isso não comprova
+ausência de problemas, nem equivalência com todos os resultados de npm audit.
+
+A branch recebeu a main com as atualizações de Actions e de dependências de
+produção. Os seis testes locais passaram novamente. Uma nova execução real no
+GitHub e a inspeção dos artifacts do commit atualizado são condições para merge.
+
+## Limites de cobertura
+
 NVD, npm e Docker Hub são serviços externos: indisponibilidade pode reprovar a
 execução. O cache reduz downloads, sem transformar uma base ausente em aprovação.
 A análise foca os manifests npm; não é pentest, análise de infraestrutura nem
