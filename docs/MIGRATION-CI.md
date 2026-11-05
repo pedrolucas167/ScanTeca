@@ -112,7 +112,12 @@ temporária separada recebeu apenas fixtures fictícias para conferir a integra�
   teste que as usam; o scanner passou depois da correção. Um teste adicional
   confirma que os mesmos valores continuam bloqueados fora desses caminhos.
 
-As fixtures ficam somente na branch temporária de teste, sem entrar no PR de
+Uma [repetição final do caso negativo](https://github.com/pedrolucas167/ScanTeca/actions/runs/42021469382)
+confirmou pela API a anotação ligada à linha 1 do SQL. A PR temporária foi
+encerrada sem merge e a branch de teste foi removida. O diff da PR definitiva
+foi conferido: não contém schema ou migrations fictícios.
+
+As fixtures foram usadas somente na branch temporária, sem entrar no PR de
 implementação ou na `main`. Essa evidência confirma execução e anotações reais
 do Actions, mas continua sem provar replay integral do SQL legado ou migração
 de dados existentes. Nenhum banco de produção foi acessado e nenhuma proteção
