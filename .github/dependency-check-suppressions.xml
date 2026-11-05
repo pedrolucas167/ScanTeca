@@ -10,21 +10,6 @@
       - Review suppressions quarterly or on each dependency upgrade
   -->
 
-  <!--
-    Testcontainers pulls older Bouncy Castle versions for test scope only.
-    Keep this candidate disabled until Testcontainers is introduced and the
-    affected CVE is confirmed to be irrelevant to the test runner.
-  -->
-  <!--
-  <suppress>
-    <notes>
-      Bouncy Castle CVE in test scope only - Testcontainers dependency. Not
-      exploitable in CI test runners. Review by 2027-02-03 or on a
-      Testcontainers upgrade.
-    </notes>
-    <packageUrl regex="true">pkg:maven/org\.bouncycastle/.*@.*</packageUrl>
-    <cvssBelow>9</cvssBelow>
-  </suppress>
-  -->
+  <!-- No active suppressions. Java/Testcontainers examples do not apply here. -->
 
 </suppressions>

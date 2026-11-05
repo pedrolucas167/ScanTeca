@@ -1,6 +1,14 @@
 name: OWASP Dependency-Check (informational)
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/owasp.yml'
+      - '.github/dependency-check-suppressions.xml'
+      - 'scripts/owasp-*.mjs'
+      - 'scripts/run-owasp.mjs'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
   schedule:
     - cron: "23 3 * * 1"
@@ -8,27 +16,31 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: owasp-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   dependency-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Run OWASP Dependency-Check
-        run: |
-          mkdir -p reports/security/owasp
-          docker run --rm \
-            -v "${{ github.workspace }}:/src" \
-            owasp/dependency-check:12.1.0 \
-            --project "ScanTeca" \
-            --scan /src \
-            --out /src/reports/security/owasp \
-            --suppression /src/.github/dependency-check-suppressions.xml \
-            --format ALL \
-            --failOnCVSS 11
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - run: node --test scripts/owasp-policy.test.mjs
+      - name: Restore vulnerability database
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/security/owasp-data-v13
+          key: ${{ runner.os }}-owasp-v13-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-owasp-v13-
+      - name: Run scanner and verify reports
+        run: node scripts/run-owasp.mjs
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
