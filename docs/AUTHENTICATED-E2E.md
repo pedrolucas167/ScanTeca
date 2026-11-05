@@ -1,6 +1,6 @@
 # Cenários autenticados automatizados
 
-O projeto `authenticated` do Playwright cobre oito cenários:
+O projeto `authenticated` do Playwright cobre dez cenários:
 
 1. Publicar no feed, confirmar sucesso e remover somente a publicação criada.
 2. Cadastrar um livro pelo formulário manual, abrir seu detalhe, iniciar uma sessão,
@@ -21,11 +21,18 @@ O projeto `authenticated` do Playwright cobre oito cenários:
    conflito real de versão e preservar o rascunho antes de carregar/salvar de novo.
 8. Oráculo: outra conta não lê/altera/apaga a conversa, não injeta artefato nela
    e não recebe memória/fontes/artefatos do dono pelas APIs. Limpar o histórico e
-   editar a própria memória não afeta os dados do proprietário.
+   editar a própria memória não afeta os dados do proprietário. Regenerar por API
+   com ID de sessão alheia e `userId` forjado também recebe 404. Livros de mesmo
+   título nas duas estantes produzem fontes somente da conta autenticada.
+9. Oráculo: cancelar uma regeneração restaura a resposta anterior na interface;
+   mensagens e fontes persistidas permanecem idênticas, inclusive depois do prazo
+   do provedor e ao reabrir a conversa após reload.
+10. Sem sessão Clerk: doze combinações de método/rota de conversa, histórico,
+    artefatos e memória retornam 401, inclusive mutações diretas.
 
 Somados aos dez cenários públicos gerais e aos 14 de interface do Oráculo com
-APIs simuladas, são **32 cenários configurados**. Use
-`npm run test:e2e:auth` para os oito autenticados localmente. O comando prepara o
+APIs simuladas, são **34 cenários configurados**. Use
+`npm run test:e2e:auth` para os dez cenários do projeto autenticado localmente. O comando prepara o
 build de produção, banco descartável e Chromium. No GitHub, execute Browser tests
 na `main` com a opção autenticada habilitada.
 
@@ -54,6 +61,21 @@ o formato de moderação do simulador e remover uma espera de conclusão de SSE 
 teste de falhas. Não se atribuem essas duas falhas iniciais ao produto. Avaliação
 real dos modelos gratuitos é uma rodada separada, documentada em
 [ORACLE-FREE-MODELS.md](ORACLE-FREE-MODELS.md).
+
+Execução local de 05/11/2026: **7/7 cenários do Oráculo aprovados**, incluindo
+cancelamento de regeneração, fontes isoladas com títulos iguais e doze chamadas
+sem sessão retornando 401. O projeto completo terminou em **9/10**: o feed
+recebeu 201, mas o texto não apareceu na interface em 15 s. Na primeira rodada,
+o feed passou e a suíte também ficou em 9/10 por uma expectativa incorreta no
+teste novo de isolamento, corrigida para verificar mensagens apagadas e sessão
+preservada. Builds, TypeScript, lint e testes dos fixtures passaram; a análise
+de segredos ficou indisponível por ausência de Gitleaks. As duas rodadas
+removeram contas e banco temporários. Evidências e limites completos estão em
+[ORACLE-VALIDATION.md](ORACLE-VALIDATION.md). Para repetir só o Oráculo, use
+`npm run test:e2e:auth -- oracle-authenticated.spec.ts`.
+Esse comando também passou isoladamente antes do PR, na branch baseada na
+`main`: **7/7 em 1,5 min**, sem retries, com novo banco descartável e teardown
+aprovado. A configuração E2E desabilita rotação local de modelos.
 
 Esses cenários não validam câmera física, qualidade dos providers de metadados,
 OAuth/MFA, voz/IA paga ou leitor de tela real. Testes de transação e concorrência
