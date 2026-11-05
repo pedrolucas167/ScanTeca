@@ -29,6 +29,10 @@ Os relatórios brutos e os logs ficam no diretório ignorado
 esses arquivos brutos: podem incluir dados de navegação. Nenhuma etapa envia
 relatórios ao serviço de upload do Lighthouse.
 
+O lockfile da ferramenta fixa `basic-ftp` em uma versão corrigida para o
+[GHSA-c475-qrg2-pj4r](https://github.com/advisories/GHSA-c475-qrg2-pj4r).
+Remova o override quando a cadeia de dependências aceitar a versão corrigida.
+
 Essa medição não representa a latência da Vercel, o catálogo autenticado nem o
 comportamento sob carga. Compare execuções do mesmo ambiente antes de propor
 limites e repita medições fora da faixa esperada.
