@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 // Next.js configuration for image optimization and redirects
 const nextConfig: NextConfig = {
+  ...(process.env.SCANTECA_STANDALONE === "1" ? { output: "standalone" as const } : {}),
   images: {
     remotePatterns: [
       {

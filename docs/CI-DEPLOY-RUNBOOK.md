@@ -177,6 +177,11 @@ outro PR. Nenhum desses modos mescla PRs automaticamente ou substitui a Vercel.
 
 ## Pendências que precisam de configuração
 
+O workflow Application container valida imagem e banco descartável em PRs.
+Após CI aprovado na main, pode publicar a imagem testada no GHCR quando a variável
+pública `CONTAINER_CLERK_PUBLISHABLE_KEY` estiver configurada. Sem ela, valida com
+fixture e não publica. Detalhes, limites e comandos em [Containers](CONTAINERS.md).
+
 As chaves Clerk não são cadastradas por commit. A execução autenticada na CI exige
 os dois secrets de desenvolvimento; a conta é criada automaticamente. Os modos de escrita de release exigem
 o token e o ambiente. Mantenha novos checks opcionais até validar seu fluxo real.

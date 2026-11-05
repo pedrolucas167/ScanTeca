@@ -1,0 +1,85 @@
+name: Application container
+on:
+  pull_request:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.event.pull_request.number || github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  container-test:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CONTAINER_CLERK_PUBLISHABLE_KEY || 'pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Build and test isolated container
+        run: node scripts/test-container.mjs
+      - name: Save the exact tested image for publication
+        if: github.event_name != 'pull_request' && vars.CONTAINER_CLERK_PUBLISHABLE_KEY != ''
+        run: docker save scanteca-container:test --output image.tar
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: github.event_name != 'pull_request' && vars.CONTAINER_CLERK_PUBLISHABLE_KEY != ''
+        with:
+          name: tested-container
+          path: image.tar
+          retention-days: 1
+          compression-level: 1
+          if-no-files-found: error
+      - name: Explain publication configuration
+        if: github.event_name != 'pull_request' && vars.CONTAINER_CLERK_PUBLISHABLE_KEY == ''
+        run: echo 'Imagem validada com chave pública fictícia. Configure CONTAINER_CLERK_PUBLISHABLE_KEY para publicar uma imagem utilizável; nenhum pacote foi publicado.' >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    needs: container-test
+    if: github.event_name != 'pull_request' && vars.CONTAINER_CLERK_PUBLISHABLE_KEY != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: tested-container
+      - name: Publish tested image by source commit
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          image="ghcr.io/${REPOSITORY,,}:sha-${SOURCE_SHA}"
+          export DOCKER_CONFIG="$(mktemp -d)"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          docker load --input image.tar
+          docker tag scanteca-container:test "$image"
+          docker push "$image"
+          docker buildx imagetools inspect "$image"
+          printf 'Imagem testada publicada: `%s`\n' "$image" >> "$GITHUB_STEP_SUMMARY"
