@@ -52,6 +52,26 @@ Não cobre saúde de Clerk, Redis, S3 ou IA. HEALTHCHECK usa esse endpoint.
 
 ## CI e GitHub Packages
 
+### Atualizações da imagem base
+
+O Dependabot também acompanha o Dockerfile da raiz, semanalmente às segundas
+às 10h no fuso America/Sao_Paulo, com no máximo uma PR Docker aberta. A imagem
+Node continua fixada por digest nas duas etapas que a utilizam. Atualizações
+devem passar pelo build e smoke reais de containers já existentes e pela revisão
+da PR. Não há merge automático nem alteração da imagem em execução por essa agenda.
+
+Atualizações major de Node ficam fora dessa rotina: o projeto declara Node 24,
+e uma mudança de major exige revisão explícita. Atualizações npm e Actions
+mantêm seus grupos e agendas anteriores. Esta configuração cobre o Dockerfile;
+imagens dos arquivos Compose e o scanner OWASP referenciado em JavaScript não
+estão incluídos nesse bloco. Dependabot Docker não substitui análise de CVEs da
+imagem ou inventário de componentes; Syft/Grype são a próxima etapa proposta.
+
+A configuração YAML e a preservação das entradas existentes foram verificadas
+localmente. A execução gerenciada pelo Dependabot só pode ser confirmada após
+integração na branch padrão e uma verificação real do serviço. A existência
+desta configuração não comprova que uma PR de atualização já foi gerada.
+
 PRs constroem e testam, com token somente de leitura, sem publicar imagens.
 Depois de CI aprovado em push na main, um workflow separado valida a imagem
 daquele commit. O gatilho rejeita execuções de PR e repositórios externos.
