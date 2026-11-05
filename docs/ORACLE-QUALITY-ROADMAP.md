@@ -14,15 +14,19 @@ cenários autenticados e a avaliação representativa definidos abaixo.
 | 1. Busca híbrida | Combinar candidatos semânticos, título/autor e filtros; aceitar livros sem embedding; manter isolamento de conta | Implementada, testada e publicada em 31/10/2026; relevância em acervo representativo ainda em avaliação |
 | 2. Evidências | Uma numeração compartilhada entre contexto e fontes; rejeitar referências inexistentes; distinguir inferências no prompt | Implementadas, testadas e publicadas em 31/10/2026; checagens heurísticas não demonstram apoio semântico de toda afirmação |
 | 3. Avaliação | Perguntas de referência para busca e citações; depois avaliar relevância e fidelidade com acervo representativo e modelo real | Última rodada sintética real: 10/10; caso externo repetido mais três vezes com o mesmo prompt: 3/3; falhas anteriores preservadas no histórico; acervo representativo e revisão humana independente pendentes |
-| 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Migração aplicada em produção em 30/10/2026 e aplicação publicada em 31/10/2026; aceite autenticado específico do Oráculo é a próxima etapa |
+| 4. Personalização | Leitor consulta, corrige e apaga o perfil; recomendações explicam relação com preferências | Migração aplicada em produção em 30/10/2026 e aplicação publicada em 31/10/2026; controles de memória aprovados no aceite autenticado local em 05/11/2026 com IA simulada; aprendizado e qualidade da personalização exigem avaliação própria |
 | 5. Desempenho e experiência | Medir latência e tokens por etapa; mostrar andamento da consulta; avaliar custos com dados reais | Instrumentação opcional e progresso SSE publicados; cenário sintético com streaming e custo real validado; coleta de métricas em produção pendente |
 | 6. Modularização | Separar contexto, geração, sessões e artefatos e validar suas falhas | Concluída no fluxo fundamentado e nos recursos de sessões/artefatos: contexto textual, reescrita, geração, orquestração e operações extraídas; 431 testes unitários, 100 de integração e 14 de navegador aprovados; voz segue fora do escopo funcional completo |
 
 ## Próxima etapa — aceite autenticado e avaliação representativa
 
 **Prioridade atual:** validar o fluxo completo do Oráculo e a qualidade das
-respostas antes de considerar encerrado o roadmap. Em 04/11/2026, o aceite local
-autenticado passou em oito cenários (cinco específicos do Oráculo). A avaliação
+respostas antes de considerar encerrado o roadmap. Em 05/11/2026, passaram os
+sete cenários do Oráculo (seis autenticados e um sem sessão) com PostgreSQL
+descartável e duas contas Clerk de desenvolvimento no cenário de isolamento.
+O projeto completo terminou em 9/10 por falha de exibição do feed, fora do
+Oráculo; veja [execuções, correção de teste e limites](ORACLE-VALIDATION.md).
+O resultado anterior de 04/11/2026 foi 8/8 (cinco do Oráculo). A avaliação
 gratuita real começou, mas continua aberta por qualidade e esgotamento de cota;
 veja [resultados e decisão de custo](ORACLE-FREE-MODELS.md). Produção não mudou.
 

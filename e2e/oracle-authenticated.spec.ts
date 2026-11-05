@@ -111,6 +111,28 @@ test("cancelamento autenticado não persiste resposta parcial", async ({ page, i
   expect((await currentSession(page)).messages.map(message => message.role)).toEqual(["user"]);
 });
 
+test("cancelar regeneração restaura resposta e fontes na tela e no histórico", async ({ page, identity }) => {
+  await signInAs(page, identity);
+  await seedBook(page);
+  await page.goto("/oracle");
+  await send(page, `Compare "Memórias da cidade" [cancelar-regeneracao] ${crypto.randomUUID()}`);
+  const regenerate = page.getByRole("button", { name: "Regenerar", exact: true });
+  await expect(regenerate).toBeVisible();
+  const original = await currentSession(page);
+  await regenerate.click();
+  await expect(page.getByRole("status", { name: "Andamento da consulta" })).toContainText("Preparando a resposta");
+  await page.getByRole("button", { name: "Parar geração" }).click();
+  await expect(page.getByRole("main").getByText(/Resposta de teste 1\./)).toBeVisible();
+  await expect(regenerate).toBeEnabled();
+  expect((await currentSession(page)).messages).toEqual(original.messages);
+  await page.waitForTimeout(11000);
+  expect((await currentSession(page)).messages).toEqual(original.messages);
+  await page.reload();
+  await page.getByRole("button", { name: "Conversas salvas" }).click();
+  await page.getByRole("button", { name: original.title, exact: true }).click();
+  await expect(page.getByRole("main").getByText(/Resposta de teste 1\./)).toBeVisible();
+});
+
 test("memória autenticada preserva rascunho em conflito e persiste edição, pausa e exclusão", async ({ page, identity }) => {
   await signInAs(page, identity);
   await page.goto("/oracle");
@@ -146,7 +168,7 @@ test("memória autenticada preserva rascunho em conflito e persiste edição, pa
 test("segunda conta não acessa conversas, memória ou artefatos do dono", async ({ page, browser, baseURL, identity, identityFactory }) => {
   test.setTimeout(120000);
   await signInAs(page, identity);
-  await seedBook(page);
+  const bookId = await seedBook(page);
   await page.goto("/oracle");
   await send(page, `Compare os temas de "Memórias da cidade" ${crypto.randomUUID()}`);
   await expect(page.getByRole("button", { name: "Regenerar", exact: true })).toBeVisible();
@@ -164,19 +186,49 @@ test("segunda conta não acessa conversas, memória ou artefatos do dono", async
     expect((await other.request.patch(`/api/oracle/sessions/${session.id}`, { data: { title: "Invasão" } })).status()).toBe(404);
     expect((await other.request.delete(`/api/oracle/sessions/${session.id}`)).status()).toBe(404);
     expect((await other.request.post("/api/oracle", { data: { sessionId: session.id, question: "Compare os livros privados" } })).status()).toBe(404);
+    expect((await other.request.post("/api/oracle", { data: {
+      sessionId: session.id, question: "Compare os livros privados", regenerate: true, userId: identity.userId,
+    } })).status()).toBe(404);
     expect((await other.request.post("/api/oracle/artifacts", { data: { sessionId: session.id, type: "NOTE", title: "Invasão", content: "Não deve ser salvo." } })).status()).toBe(404);
     for (const path of ["/api/oracle", "/api/oracle/sessions", "/api/oracle/artifacts", "/api/library-settings"]) {
       const response = await other.request.get(path);
       expect(response.status()).toBe(200);
       const text = await response.text();
       expect(text).not.toContain(session.id);
+      expect(text).not.toContain(bookId);
       expect(text).not.toContain(privateMemory);
       expect(text).not.toContain("Conteúdo privado do dono.");
     }
+    // Mesmo título nas duas estantes: a recuperação deve citar só o livro da conta ativa.
+    const otherBookId = await seedBook(other);
+    await other.goto("/oracle");
+    await send(other, `Compare "Memórias da cidade" ${crypto.randomUUID()}`);
+    await expect(other.getByRole("button", { name: "Regenerar", exact: true })).toBeVisible();
+    const otherSession = await currentSession(other);
+    expect(otherSession.messages[1]?.sources.map(source => source.id)).toContain(otherBookId);
+    expect(otherSession.messages[1]?.sources.map(source => source.id)).not.toContain(bookId);
     expect((await other.request.post("/api/library-settings", { data: { oracleProfile: "Preferência da segunda conta", oracleProfileVersion: 0 } })).status()).toBe(200);
     expect((await other.request.delete("/api/oracle")).status()).toBe(200);
+    // Limpar histórico remove mensagens; a sessão vazia continua disponível.
+    expect((await currentSession(other)).messages).toEqual([]);
     expect((await currentSession(page)).messages).toEqual(session.messages);
     expect((await (await page.request.get("/api/library-settings")).json()).setting.oracleProfile).toBe(privateMemory);
     expect((await (await page.request.get("/api/oracle/artifacts")).json()).artifacts).toHaveLength(1);
   } finally { await otherContext.close(); }
+});
+
+test("APIs do Oráculo recusam acesso direto sem sessão Clerk", async ({ request }) => {
+  const sessionId = "cm00000000000000000000000";
+  const endpoints = [
+    ["GET", "/api/oracle"], ["POST", "/api/oracle"], ["DELETE", "/api/oracle"],
+    ["GET", "/api/oracle/sessions"], ["POST", "/api/oracle/sessions"],
+    ["GET", `/api/oracle/sessions/${sessionId}`], ["PATCH", `/api/oracle/sessions/${sessionId}`],
+    ["DELETE", `/api/oracle/sessions/${sessionId}`],
+    ["GET", "/api/oracle/artifacts"], ["POST", "/api/oracle/artifacts"],
+    ["GET", "/api/library-settings"], ["POST", "/api/library-settings"],
+  ] as const;
+  for (const [method, path] of endpoints) {
+    const response = await request.fetch(path, { method, data: method === "POST" || method === "PATCH" ? {} : undefined });
+    expect(response.status(), `${method} ${path}`).toBe(401);
+  }
 });

@@ -49,7 +49,7 @@ export function createOracleProviderFixture(environment) {
         };
         if (init?.signal?.aborted) return abort();
         init?.signal?.addEventListener("abort", abort, { once: true });
-        if (question.includes("[cancelar]")) timer = setTimeout(finish, 10_000);
+        if (question.includes("[cancelar]") || (question.includes("[cancelar-regeneracao]") && attempt > 1)) timer = setTimeout(finish, 10_000);
         else finish();
       },
       cancel() {

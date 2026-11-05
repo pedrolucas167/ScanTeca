@@ -2,9 +2,11 @@
 
 Continuação do Oráculo em 30/10/2026: [roadmap de qualidade](./ORACLE-QUALITY-ROADMAP.md).
 A modularização do fluxo fundamentado foi concluída, integrada e publicada.
-A próxima etapa é o aceite autenticado do Oráculo e a avaliação representativa,
-com critérios registrados no roadmap específico; essas validações ainda não
-estão concluídas.
+O aceite local do Oráculo foi ampliado em 05/11/2026: sete cenários aprovados,
+com duas contas Clerk de desenvolvimento, banco descartável e IA simulada.
+A suíte geral ficou em 9/10 por falha no feed. Evidências e limitações estão em
+[ORACLE-VALIDATION.md](./ORACLE-VALIDATION.md). Avaliação representativa,
+revisão humana e aceite de produção continuam pendentes no roadmap específico.
 
 Registro histórico iniciado em 13/10/2026. Estratégia: migração incremental no mesmo Next.js,
 PostgreSQL e deploy. Estimativas em dias de engenharia focada de uma pessoa,
@@ -22,7 +24,7 @@ O smoke público não comprova o aceite autenticado nem a qualidade representati
 
 | Ordem sugerida | Frente | O que ainda precisa de aceite |
 | --- | --- | --- |
-| Próxima etapa marcada | Oráculo | Aceite autenticado com persistência e isolamento entre contas; avaliação com acervo fictício representativo e revisão humana explícita. Voz e métricas de produção continuam separadas |
+| Próxima etapa marcada | Oráculo | Aceite local de persistência e isolamento aprovado em 05/11/2026 com IA simulada; faltam avaliação com acervo fictício representativo, revisão humana explícita e aceite de produção. Voz e métricas de produção continuam separadas |
 | Próximo pacote de código | Comunidade e privacidade | Consolidar regras de visibilidade, bloqueio e moderação entre feed, perfis, clubes e discussões, com cenários autenticados entre duas contas |
 | Seguinte | Jobs e notificações | Verificar execução real dos crons e recuperação em produção; tratar vazão do backlog e idempotência dos lembretes |
 | Operação e interface | Providers e experiência | Exercitar câmera/scanner, metadados reais, uploads, push em dispositivo e voz; separar melhor responsabilidades da interface do Oráculo |
