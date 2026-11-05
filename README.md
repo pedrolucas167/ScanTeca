@@ -10,6 +10,8 @@ O projeto é uma **PWA** em português do Brasil. O manifesto define instalaçã
 
 Para testar Biblioteca e Leitura com sua conta de desenvolvimento, veja [Dados fictícios e PostgreSQL local](docs/DEVELOPMENT-DATA.md).
 
+Para executar a aplicação e PostgreSQL juntos em Docker, veja [Containers e publicação de imagens](docs/CONTAINERS.md).
+
 ## Funcionalidades
 
 - Catálogo pessoal com coleções, status de leitura, notas, avaliações e progresso.

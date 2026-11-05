@@ -34,6 +34,7 @@
     "migrations:test-sql": "node scripts/check-migration-sql.mjs",
     "migrations:verify": "node scripts/run-migration-check.mjs",
     "test:migrations:integration": "node --test scripts/migration-sql.integration.test.mjs",
+    "test:container": "node scripts/test-container.mjs",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

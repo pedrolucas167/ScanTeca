@@ -1,0 +1,38 @@
+services:
+  database:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: scanteca_dev
+      POSTGRES_PASSWORD: scanteca_dev_local
+      POSTGRES_DB: scanteca_container_dev
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U scanteca_dev -d scanteca_container_dev]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  prepare:
+    image: scanteca-container-tools:test
+    build:
+      context: .
+      target: tools
+    environment:
+      DATABASE_URL: postgresql://scanteca_dev:scanteca_dev_local@database:5432/scanteca_container_dev
+    depends_on:
+      database:
+        condition: service_healthy
+  app:
+    image: scanteca-container:test
+    build:
+      context: .
+      target: runtime
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA}
+    environment:
+      DATABASE_URL: postgresql://scanteca_dev:scanteca_dev_local@database:5432/scanteca_container_dev
+    ports:
+      - 127.0.0.1::3000
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
