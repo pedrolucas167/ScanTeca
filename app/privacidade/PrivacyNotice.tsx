@@ -15,7 +15,7 @@ export default function PrivacyNotice() {
         <ul className="mt-2 list-disc space-y-2 pl-5">
           <li><strong>Conta e segurança.</strong> Usamos os dados de cadastro e a sessão do Clerk para identificar a conta e proteger o acesso. A ScanTeca registra a versão e a data do aceite dos termos.</li>
           <li><strong>Biblioteca e comunidade.</strong> Guardamos registros de leitura, anotações, preferências e conteúdo que você publica para oferecer esses recursos. Perfis, publicações e links podem disponibilizar conteúdo a outras pessoas conforme a visibilidade do recurso. Consultas por título, autor ou ISBN podem usar Google Books e Open Library.</li>
-          <li><strong>Oráculo.</strong> Perguntas, áudio quando você usa voz e o contexto usado para responder podem ser enviados ao OpenRouter e ao provedor do modelo selecionado. O app também usa serviços de IA em recursos como recomendações e moderação. Você pode gerenciar a memória do Oráculo na interface.</li>
+          <li><strong>Oráculo e outros recursos de IA.</strong> A ScanTeca envia suas solicitações de IA ao OpenRouter. Quando você usa o Oráculo, isso pode incluir a pergunta, o áudio dos recursos de voz e o contexto necessário à resposta. O OpenRouter encaminha a solicitação ao provedor que executa o modelo. Recomendações e moderação também usam o OpenRouter. Você pode gerenciar a memória do Oráculo na interface.</li>
           <li><strong>Notificações.</strong> Se você habilitar notificações, usamos a inscrição do navegador para entregá-las.</li>
         </ul>
       </section>
