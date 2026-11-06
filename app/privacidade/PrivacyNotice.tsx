@@ -3,7 +3,6 @@ import Link from "next/link";
 export default function PrivacyNotice() {
   return (
     <div className="mt-4 space-y-5">
-      <p className="text-sm font-medium">Minuta para revisão. A confirmação dos prazos de retenção e do tratamento pelos fornecedores está pendente.</p>
       <section>
         <h2 className="font-semibold">Responsável e contato</h2>
         <p>Pedro Lucas Marques é o responsável pela ScanTeca. Para assuntos de privacidade, escreva para{" "}
