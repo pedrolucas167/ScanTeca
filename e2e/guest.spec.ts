@@ -1,6 +1,30 @@
 import { clerk } from "@clerk/testing/playwright";
 import { expect, test } from "@playwright/test";
 
+test("métricas dependem de aceite e param após revogação", async ({ page }) => {
+  const events: unknown[] = [];
+  await page.route("**/api/vitals", async route => {
+    events.push(route.request().postDataJSON());
+    expect(route.request().headers().referer).toBeUndefined();
+    await route.fulfill({ status: 204 });
+  });
+  await page.goto("/manifesto");
+  await page.getByRole("button", { name: "Recusar métricas" }).click();
+  await page.reload();
+  const preferences = page.getByRole("button", { name: "Preferências de métricas" });
+  await expect(preferences).toHaveAttribute("aria-expanded", "false");
+  expect(events).toEqual([]);
+
+  await preferences.click();
+  await page.getByRole("button", { name: "Permitir métricas" }).click();
+  await expect.poll(() => events).toContainEqual({ page: "manifesto", name: "page_view" });
+  await preferences.click();
+  await page.getByRole("button", { name: "Recusar métricas" }).click();
+  await page.goto("/feed");
+  await expect(preferences).toHaveAttribute("aria-expanded", "false");
+  expect(events).toEqual([{ page: "manifesto", name: "page_view" }]);
+});
+
 test("apresentação responde e o teclado pula para o conteúdo", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Sua estante de livros físicos");
