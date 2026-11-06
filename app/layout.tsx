@@ -29,6 +29,7 @@ import AnalyticsConsent from "@/components/ui/AnalyticsConsent";
 import { analyticsCookie, parseAnalyticsPreference } from "@/lib/analytics-preference";
 import { measureServerTask } from "@/lib/server-timing";
 import TermsDocument from "./termos/TermsDocument";
+import PrivacyNotice from "./privacidade/PrivacyNotice";
 import TermsAgreement from "./termos/TermsAgreement";
 import { termsVersion } from "./termos/version";
 import "./globals.css";
@@ -243,6 +244,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             {termsState ? (
               <main className="mx-auto w-full max-w-3xl px-4 py-10">
                 <TermsDocument />
+                <details className="mt-6 rounded-lg border border-outline-variant p-4">
+                  <summary className="cursor-pointer font-semibold">Aviso de Privacidade da ScanTeca</summary>
+                  <PrivacyNotice />
+                </details>
                 {termsState === "unavailable" && (
                   <p role="status" className="mt-4">Não foi possível consultar o aceite da sua conta. Você pode tentar registrar o aceite novamente.</p>
                 )}
@@ -271,6 +276,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   Oráculo
                 </Link>
                 <AnalyticsConsent initialPreference={analyticsPreference} />
+                <Link href="/privacidade" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
+                  Aviso de Privacidade
+                </Link>
                 <Link href="/termos" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
                   Termos de uso
                 </Link>

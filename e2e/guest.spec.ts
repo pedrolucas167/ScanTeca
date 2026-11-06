@@ -75,6 +75,15 @@ test("cadastro mantém campos legíveis e área de toque", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test("aviso de privacidade pode ser lido antes do cadastro", async ({ page }) => {
+  await page.goto("/sign-up");
+  await page.getByRole("link", { name: "Aviso de Privacidade", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/privacidade$/);
+  await expect(page.getByRole("heading", { name: "Aviso de Privacidade da ScanTeca" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "pedro_marques_dev@hotmail.com" }))
+    .toHaveAttribute("href", "mailto:pedro_marques_dev@hotmail.com");
+});
+
 test("preferência por movimento reduzido limita a animação", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");

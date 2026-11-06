@@ -54,6 +54,8 @@ test("aceite dos termos persiste por conta e libera a interface", async ({ page,
   await signInAs(page, identity, { acceptTerms: false });
   await page.goto("/manual-add");
   await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toBeVisible();
+  await page.getByText("Aviso de Privacidade da ScanTeca", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Seus direitos" })).toBeVisible();
   await acceptCurrentTerms(page);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toHaveCount(0);
