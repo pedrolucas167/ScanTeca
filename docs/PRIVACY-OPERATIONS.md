@@ -22,13 +22,30 @@ Referências técnicas no repositório: `prisma/schema.prisma`, `lib/s3.ts`,
 não comprovam as regiões, os serviços ativos nem as garantias contratuais.
 
 A consulta de metadados do projeto vinculado no Neon indicou a região
-`aws-sa-east-1` (São Paulo). Isso identifica a região do projeto consultado.
-A retenção de backups e o tratamento por outros serviços seguem em revisão.
+`aws-sa-east-1` (São Paulo) e uma janela de restauração de 21.600 segundos
+(6 horas). A janela de restauração não comprova a retenção de snapshots,
+exportações ou cópias mantidas separadamente.
+
+O responsável indicou [seu perfil público](https://github.com/pedrolucas167)
+como referência e um limite de seis meses para logs e backups, com uso dos
+padrões dos fornecedores quando compatíveis. Este limite é uma decisão
+operacional, não uma obrigação geral do Marco Civil. Use a janela menor
+sempre que atender à finalidade, sem estender padrões mais curtos.
+Documente separadamente eventual preservação legal específica.
+
+A Vercel documenta retenção dos logs de execução conforme o plano e o
+adicional de observabilidade. Confirme o plano, exportadores e destinos de
+logs ativos antes de afirmar um prazo no aviso. Logs de build são uma
+categoria separada e não devem conter dados pessoais de usuários.
+[Documentação de logs da Vercel](https://vercel.com/docs/logs/runtime).
 
 O OpenRouter informa que as práticas de retenção e uso das entradas variam
 conforme o provedor do modelo. Confira as rotas permitidas e as configurações
 da conta da ScanTeca antes de descrever retenção ou uso para treinamento no
-aviso. Consulte a [política do OpenRouter](https://openrouter.ai/privacy).
+aviso. O cliente em `lib/openrouter-chat.ts` não fixa um requisito de
+retenção zero e permite fallback na rota de modelos gratuitos. O padrão do
+serviço, por si só, não confirma os destinatários ou a retenção das rotas
+ativas. Consulte a [política do OpenRouter](https://openrouter.ai/privacy).
 
 Para fechar o inventário, registre por finalidade a base legal, a retenção e
 o critério de descarte. Para cada fornecedor ativo, registre seu papel, dados
