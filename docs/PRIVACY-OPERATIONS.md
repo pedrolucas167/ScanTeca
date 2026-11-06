@@ -39,6 +39,29 @@ internacional, registre o mecanismo aplicável e as informações que devem
 constar no aviso. Use referências ao painel ou contrato em local restrito,
 sem copiar credenciais ou dados de titulares para o Git.
 
+## Bases legais e limites de retenção
+
+Esta é a proposta para revisão do responsável. A base legal é vinculada à
+finalidade de cada operação. O aceite dos termos, por si só, não vale como
+consentimento para todas as operações.
+
+| Operação | Base legal aplicável ou a validar | Limite e descarte |
+| --- | --- | --- |
+| Conta, autenticação e recursos solicitados, incluindo biblioteca, publicações, notificações solicitadas e execução de uma consulta ao Oráculo | Execução do contrato ou procedimentos a pedido do titular, art. 7º, V, apenas para dados necessários à função solicitada. | Enquanto a conta ou o recurso exigir os dados. Ao excluir o conteúdo, retirar a preferência ou encerrar a conta, avaliar o término da finalidade e excluir o que não tiver fundamento específico para conservação. |
+| Aceite dos termos | Art. 7º, V, para administrar o vínculo. Após o encerramento, avaliar conservação estritamente necessária para exercício regular de direitos, art. 7º, VI, quando aplicável. | Enquanto necessário ao vínculo. Se houver fundamento para conservação posterior, guardar apenas a evidência mínima pelo prazo aplicável ao caso e registrar a data de descarte. |
+| Cidade opcional e métricas opcionais | Consentimento específico, art. 7º, I e art. 8º. Salvar a cidade de forma voluntária e permitir métricas são escolhas distintas. Validar o registro que demonstra cada escolha. | Remover a cidade quando a pessoa retirar a preferência ou quando a finalidade terminar. Revogar métricas interrompe novas coletas. Os limites atuais de até 30 dias para contagens e 180 dias para a escolha no navegador são configurações do produto. Confirmar a necessidade desses limites antes de publicar. |
+| Memória, personalização, moderação e segurança operacional | Validar separadamente necessidade e base legal. Legítimo interesse, art. 7º, IX e art. 10, só se sustenta quando o teste de balanceamento documentado justificar a operação. Se houver dados sensíveis, analisar o art. 11 antes de tratar. | Reter somente o necessário para cada finalidade comprovada. Confirmar exclusão de memória, expiração de caches, retenção de logs e ciclo de backups com os fornecedores. |
+| Solicitações dos titulares e ordens de autoridade | Obrigação legal ou regulatória, art. 7º, II, quando aplicável. Exercício regular de direitos, art. 7º, VI, conforme o caso. | Guardar a evidência mínima necessária para concluir o atendimento ou cumprir a obrigação específica. O prazo de resposta do art. 19 não é prazo de guarda. |
+| Registros de acesso à aplicação | Obrigação legal somente quando aplicável. O art. 15 do Marco Civil prevê guarda de seis meses para provedor constituído como pessoa jurídica com atividade organizada, profissional e com fins econômicos. Confirmar o enquadramento da ScanTeca e eventuais ordens de preservação. | Se o art. 15 se aplicar, guardar sob sigilo apenas os registros de acesso definidos no art. 5º, VIII, por seis meses, observadas ordens ou hipóteses específicas de preservação. Esse prazo não abrange conversas, biblioteca, cidade, arquivos ou telemetria em geral. |
+
+Os arts. 15 e 16 da LGPD estabelecem o término do tratamento e a eliminação,
+ressalvadas as hipóteses legais de conservação. Quando não houver um prazo
+numérico aplicável, documente o evento que encerra a necessidade, o menor
+período operacional de descarte e quem confere a execução. Uma exceção de
+guarda deve identificar o fundamento, os dados mínimos, o acesso permitido
+e quando será reavaliada ou encerrada. Essa política ainda exige validação
+dos fluxos de exclusão e dos prazos dos fornecedores e backups.
+
 ## Atendimento de solicitações
 
 1. Registre protocolo, data de recebimento, direito solicitado, responsável,
@@ -76,3 +99,8 @@ Fontes oficiais: [LGPD, arts. 6º–9º, 18–19, 33, 37 e 46](https://www.gov.b
 [direitos dos titulares](https://www.gov.br/anpd/pt-br/assuntos/titular-de-dados-1/direito-dos-titulares),
 [guia de cookies da ANPD](https://www.gov.br/anpd/pt-br/centrais-de-conteudo/materiais-educativos-e-publicacoes/guia_orientativo_cookies_e_protecao_de_dados_pessoais)
 e [Regulamento de Transferência Internacional](https://www.gov.br/anpd/pt-br/acesso-a-informacao/institucional/atos-normativos/regulamentacoes_anpd/resolucao-cd-anpd-no-19-de-23-de-agosto-de-2024).
+
+Referências sobre retenção e bases legais:
+[Marco Civil da Internet, arts. 5º e 15](https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2014/lei/l12965.htm),
+[Decreto nº 8.771/2016, art. 13](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2016/decreto/d8771.htm)
+e [Guia de legítimo interesse da ANPD](https://www.gov.br/anpd/pt-br/assuntos/noticias/anpd-lanca-guia-orientativo-sobre-legitimo-interesse).

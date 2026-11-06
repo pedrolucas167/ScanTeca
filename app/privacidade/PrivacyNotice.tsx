@@ -24,6 +24,11 @@ export default function PrivacyNotice() {
         <p>O navegador pode guardar escolhas como tema e preferência de métricas. Se você permitir as métricas opcionais, contamos visitas e faixas de desempenho na inicial, no Manifesto e no Feed. A ScanTeca guarda esses totais diários por até 30 dias e sua escolha por até 180 dias no navegador. Você pode recusar ou revogar pelo botão Preferências de métricas no rodapé.</p>
       </section>
       <section>
+        <h2 className="font-semibold">Bases legais e retenção</h2>
+        <p>Os dados necessários para prestar os recursos que você solicita são tratados para executar o serviço. A cidade opcional e as métricas dependem de escolhas específicas, que você pode retirar. O cumprimento de uma obrigação legal ou o exercício regular de direitos pode exigir o tratamento de dados específicos.</p>
+        <p className="mt-2">A regra de retenção é guardar cada dado somente enquanto ele for necessário à finalidade informada. Depois, ele deve ser eliminado, salvo se houver fundamento legal para conservar uma parte por mais tempo. Um prazo previsto em lei para registros de acesso só se aplica quando a obrigação incide sobre a ScanTeca e apenas àqueles registros.</p>
+      </section>
+      <section>
         <h2 className="font-semibold">Hospedagem e compartilhamento</h2>
         <p>A operação usa Vercel para hospedagem, PostgreSQL no Neon, Redis para funções como limites de requisições e métricas, e AWS para armazenar e entregar imagens de publicações. O navegador também pode carregar fontes do Google. Os prazos de retenção, regiões de processamento e condições de transferência dos fornecedores estão em verificação nesta minuta.</p>
       </section>
