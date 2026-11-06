@@ -22,6 +22,15 @@ export default function TermsDocument() {
           <h2 className="font-semibold">Aceite e preferências</h2>
           <p>Ao aceitar, sua conta registra a versão deste texto e a data e hora do aceite. Se os termos forem atualizados, a ScanTeca poderá pedir um novo aceite. Você controla a coleta de métricas opcionais em Preferências de métricas, no rodapé.</p>
         </section>
+        <section>
+          <h2 className="font-semibold">Contato do responsável</h2>
+          <p>
+            Para dúvidas sobre estes termos ou solicitações de privacidade, escreva para{" "}
+            <a href="mailto:pedro_marques_dev@hotmail.com" className="underline underline-offset-4">
+              pedro_marques_dev@hotmail.com
+            </a>.
+          </p>
+        </section>
       </div>
     </>
   );
