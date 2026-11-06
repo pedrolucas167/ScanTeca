@@ -74,5 +74,4 @@ dist/
 # database dumps
 *.sql
 !prisma/migrations/*.sql
-!prisma/migrations/*/migration.sql
 !prisma/local-extensions.sql
