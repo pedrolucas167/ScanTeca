@@ -63,7 +63,7 @@ export async function exportAccountData(userId: string) {
     prisma.bookDiscussionReply.findMany({ where, select: { id: true, content: true, quote: true, createdAt: true } }),
     prisma.notificationPreference.findUnique({ where, select: { reviews: true, updates: true, progress: true, createdAt: true, updatedAt: true } }),
     prisma.pushSubscription.findMany({ where, select: { createdAt: true, updatedAt: true } }),
-    prisma.socialReport.findMany({ where, select: { reason: true, details: true, status: true, createdAt: true, updatedAt: true } }),
+    prisma.socialReport.findMany({ where: { reporterId: userId }, select: { reason: true, details: true, status: true, createdAt: true, updatedAt: true } }),
     prisma.socialNotification.findMany({ where: { recipientId: userId }, select: { type: true, readAt: true, createdAt: true } }),
     prisma.socialFollow.findMany({ where: { followerId: userId }, select: { createdAt: true } }),
     prisma.socialFollow.findMany({ where: { followingId: userId }, select: { createdAt: true } }),
