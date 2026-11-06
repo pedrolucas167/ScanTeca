@@ -48,6 +48,26 @@ retenção zero e permite fallback na rota de modelos gratuitos. O padrão do
 serviço, por si só, não confirma os destinatários ou a retenção das rotas
 ativas. Consulte a [política do OpenRouter](https://openrouter.ai/privacy).
 
+### Rotas de IA identificadas em 06/11/2026
+
+A listagem de nomes de variáveis na Vercel indicou a configuração do
+OpenRouter. A tabela abaixo cruza os modelos padrão no código com o catálogo
+público de endpoints. Ela identifica rotas possíveis na data da consulta,
+sem comprovar o operador usado por uma solicitação real ou a política da conta.
+
+| Recurso | Modelo padrão no código | Operadores listados no catálogo |
+| --- | --- | --- |
+| Conversa e moderação | `google/gemini-2.5-flash` | Google AI Studio |
+| Recomendações | `meta-llama/llama-3.1-8b-instruct` | DeepInfra, Groq, Cloudflare e CoreWeave |
+| Embeddings | `openai/text-embedding-3-small` | Azure e OpenAI |
+| Transcrição | `openai/whisper-1` | OpenAI |
+| Voz | `openai/gpt-audio-mini` | OpenAI |
+| Síntese de voz | `hexgrad/kokoro-82m` e `mistralai/voxtral-mini-tts-2603` | DeepInfra, Together e Mistral |
+
+Consulta somente leitura, sem enviar conteúdo ao OpenRouter. Antes de
+publicar, confira as restrições de roteamento na conta e identifique o
+instrumento aplicável à transferência de dados. A lista pública é dinâmica.
+
 Para fechar o inventário, registre por finalidade a base legal, a retenção e
 o critério de descarte. Para cada fornecedor ativo, registre seu papel, dados
 enviados, país de processamento, subprocessadores relevantes, termos de
