@@ -1,6 +1,52 @@
 import { clerk, clerkSetup } from "@clerk/testing/playwright";
 import { acceptCurrentTerms, expect, signInAs, test } from "./fixtures";
 
+test("cidade privada e exportação isolada entre contas", async ({ page, context, identity, identityFactory }) => {
+  test.setTimeout(120_000);
+  expect((await page.request.get("/api/privacy/export")).status()).toBe(401);
+  await signInAs(page, identity);
+  await page.goto("/configuracoes");
+  const city = page.getByLabel("Cidade (opcional)");
+  await city.fill("São Luís");
+  await page.getByRole("button", { name: "Salvar cidade" }).click();
+  await expect(page.getByText("Cidade salva.")).toBeVisible();
+  await page.reload();
+  await expect(city).toHaveValue("São Luís");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Baixar meus dados" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("scanteca-meus-dados.json");
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const exported = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  expect(exported.conta.id).toBe(identity.userId);
+  expect(exported.dados.cidade.city).toBe("São Luís");
+  await download.delete();
+
+  const otherIdentity = await identityFactory();
+  const otherContext = await context.browser()!.newContext({ baseURL: new URL(page.url()).origin, serviceWorkers: "block" });
+  try {
+    const other = await otherContext.newPage();
+    await signInAs(other, otherIdentity);
+    const spoof = await other.request.get(`/api/privacy/export?userId=${encodeURIComponent(identity.userId)}`);
+    expect(spoof.status()).toBe(400);
+    const own = await other.request.get("/api/privacy/export");
+    expect(own.ok()).toBe(true);
+    expect(own.headers()["cache-control"]).toBe("private, no-store");
+    expect(await own.json()).toMatchObject({ conta: { id: otherIdentity.userId }, dados: { cidade: null } });
+  } finally {
+    await otherContext.close();
+  }
+  await city.clear();
+  await page.getByRole("button", { name: "Salvar cidade" }).click();
+  await expect(page.getByText("Cidade removida.")).toBeVisible();
+  const updated = await page.request.get("/api/privacy/export");
+  expect(await updated.json()).toMatchObject({ dados: { cidade: null } });
+});
+
 test("aceite dos termos persiste por conta e libera a interface", async ({ page, identity }) => {
   await signInAs(page, identity, { acceptTerms: false });
   await page.goto("/manual-add");
