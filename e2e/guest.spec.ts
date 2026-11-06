@@ -77,7 +77,10 @@ test("cadastro mantém campos legíveis e área de toque", async ({ page }) => {
 
 test("aviso de privacidade pode ser lido antes do cadastro", async ({ page }) => {
   await page.goto("/sign-up");
-  await page.getByRole("link", { name: "Aviso de Privacidade", exact: true }).first().click();
+  await clerk.loaded({ page });
+  const noticeLink = page.locator("#main-content").getByRole("link", { name: "Aviso de Privacidade", exact: true });
+  await expect(noticeLink).toHaveAttribute("href", "/privacidade");
+  await noticeLink.click();
   await expect(page).toHaveURL(/\/privacidade$/);
   await expect(page.getByRole("heading", { name: "Aviso de Privacidade da ScanTeca" })).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "pedro_marques_dev@hotmail.com" }))
