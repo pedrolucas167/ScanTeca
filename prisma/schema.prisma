@@ -6,6 +6,14 @@ datasource db {
   provider   = "postgresql"
 }
 
+model TermsAcceptance {
+  userId     String
+  version    String
+  acceptedAt DateTime @default(now())
+
+  @@id([userId, version])
+}
+
 enum BookStatus {
   READ
   READING

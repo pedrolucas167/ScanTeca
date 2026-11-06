@@ -1,5 +1,15 @@
 import { clerk, clerkSetup } from "@clerk/testing/playwright";
-import { expect, signInAs, test } from "./fixtures";
+import { acceptCurrentTerms, expect, signInAs, test } from "./fixtures";
+
+test("aceite dos termos persiste por conta e libera a interface", async ({ page, identity }) => {
+  await signInAs(page, identity, { acceptTerms: false });
+  await page.goto("/manual-add");
+  await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toBeVisible();
+  await acceptCurrentTerms(page);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Preferências de métricas" })).toHaveAttribute("aria-expanded", "true");
+});
 
 // Mesmo worker: o token fica disponível sem arquivo de sessão ou projeto auxiliar.
 test.beforeAll(async () => { await clerkSetup(); });
