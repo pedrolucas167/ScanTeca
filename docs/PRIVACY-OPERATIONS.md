@@ -68,6 +68,23 @@ Consulta somente leitura, sem enviar conteúdo ao OpenRouter. Antes de
 publicar, confira as restrições de roteamento na conta e identifique o
 instrumento aplicável à transferência de dados. A lista pública é dinâmica.
 
+Na revisão de 06/11/2026, o [catálogo público de endpoints ZDR](https://openrouter.ai/api/v1/endpoints/zdr)
+listava rotas para os modelos padrão de recomendações, embeddings e síntese
+de voz. A consulta não encontrou rotas ZDR para `google/gemini-2.5-flash`,
+`openai/whisper-1` ou `openai/gpt-audio-mini`. Antes de exigir ZDR em toda
+a conta, valide alternativas para conversa, moderação, transcrição e voz.
+O catálogo não demonstra as restrições aplicadas à chave da ScanTeca.
+
+O [DPA público do OpenRouter](https://openrouter.ai/data-processing-agreement)
+descreve cláusulas europeias e britânicas para transferências. A seção 10.2
+dos [termos públicos](https://openrouter.ai/terms) menciona o DPA no contexto
+de organizações ou uso comercial. Esses documentos não confirmam, por si,
+o acordo aplicável à conta pessoal da ScanTeca ou o mecanismo da ANPD para
+transferências a partir do Brasil. A revisão precisa da evidência do acordo
+aplicável e das regras efetivas em **Settings → Privacy**, incluindo
+restrições de provedores, coleta para treinamento e exigência de ZDR.
+Não copie chaves, dados de conta ou conteúdo de solicitações para o Git.
+
 Para fechar o inventário, registre por finalidade a base legal, a retenção e
 o critério de descarte. Para cada fornecedor ativo, registre seu papel, dados
 enviados, país de processamento, subprocessadores relevantes, termos de
