@@ -845,7 +845,7 @@ export default function Catalog({
     .slice(0, 6);
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-surface pb-24 text-on-surface">
+    <div className="relative flex min-h-screen flex-col bg-surface pb-6 text-on-surface">
       <header className="sticky top-0 z-40 border-b border-outline-variant/20 bg-surface/80 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-space-xs">
@@ -1647,7 +1647,7 @@ export default function Catalog({
         </div>
       )}
 
-      <aside className="fixed bottom-6 right-4 z-40">
+      <aside className="sticky bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-30 mt-6 mr-4 self-end">
         <Link
           href="/scanner"
           className="flex items-center gap-2 rounded-full border border-white/20 bg-primary-container px-space-lg py-space-sm font-label-md text-label-md font-semibold text-on-primary-container shadow-[0_12px_32px_-8px_rgba(91,80,230,0.6)] transition-colors hover:bg-[#6366f1] active:scale-95"
