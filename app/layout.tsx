@@ -24,8 +24,11 @@ import AdminLink from "@/components/ui/AdminLink";
 import MobileNav from "@/components/ui/MobileNav";
 import NavigationDropdown from "@/components/ui/NavigationDropdown";
 import RoutePrefetch from "@/components/ui/RoutePrefetch";
-import WebVitals from "@/components/ui/WebVitals";
 import { measureServerTask } from "@/lib/server-timing";
+import TermsDocument from "./termos/TermsDocument";
+import PrivacyNotice from "./privacidade/PrivacyNotice";
+import TermsAgreement from "./termos/TermsAgreement";
+import { termsVersion } from "./termos/version";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -93,10 +96,20 @@ const getAccentTheme = (userId: string) =>
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   let accent: string | null = null;
+  let termsState: "pending" | "unavailable" | null = null;
   try {
     const { userId } = await measureServerTask("layout.auth", () => auth());
     if (userId) {
-      accent = await measureServerTask("layout.accent", () => getAccentTheme(userId));
+      const [acceptance, accentTheme] = await Promise.allSettled([
+        prisma.termsAcceptance.findUnique({
+          where: { userId_version: { userId, version: termsVersion } },
+          select: { version: true },
+        }),
+        measureServerTask("layout.accent", () => getAccentTheme(userId)),
+      ]);
+      if (acceptance.status === "rejected") termsState = "unavailable";
+      else if (!acceptance.value) termsState = "pending";
+      if (accentTheme.status === "fulfilled") accent = accentTheme.value;
     }
   } catch {}
 
@@ -224,7 +237,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             </nav>
           </header>
           <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col focus:outline-none">
-            {children}
+            {termsState ? (
+              <main className="mx-auto w-full max-w-3xl px-4 py-10">
+                <TermsDocument />
+                <details className="mt-6 rounded-lg border border-outline-variant p-4">
+                  <summary className="cursor-pointer font-semibold">Aviso de Privacidade da ScanTeca</summary>
+                  <PrivacyNotice />
+                </details>
+                {termsState === "unavailable" && (
+                  <p role="status" className="mt-4">Não foi possível consultar o aceite da sua conta. Você pode tentar registrar o aceite novamente.</p>
+                )}
+                <TermsAgreement />
+              </main>
+            ) : children}
           </div>
           <footer className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 md:flex-row md:justify-between">
@@ -245,6 +270,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </Link>
                 <Link href="/oracle" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
                   Oráculo
+                </Link>
+                <Link href="/privacidade" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
+                  Aviso de Privacidade
+                </Link>
+                <Link href="/termos" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
+                  Termos de uso
                 </Link>
                 <a
                   href="https://www.linkedin.com/in/pedromarquesdev/"
@@ -278,7 +309,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </ClerkProvider>
         <PwaRegister />
         <RoutePrefetch />
-        <WebVitals />
       </body>
     </html>
   );

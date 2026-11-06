@@ -12,7 +12,6 @@ const sources = [{ id: "oracle-ui-fixture", title: "Livro de demonstração", au
 const stream = `data: ${JSON.stringify({ sources })}\n\ndata: ${JSON.stringify({ text: answer })}\n\ndata: [DONE]\n\n`;
 
 async function bootstrap(page: Page, messages: { role: string; content: string; sources?: Source[] }[] = []) {
-  await page.route("**/api/vitals", route => route.fulfill({ status: 204 }));
   await page.route("**/api/oracle", async route => {
     if (route.request().method() === "GET") {
       await route.fulfill({ json: { messages, stats: { total: 5, indexed: 5 }, suggestions: ["Compare dois livros"] } });

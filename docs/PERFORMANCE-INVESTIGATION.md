@@ -71,7 +71,7 @@ Prioridade: usar cache-first para assets imutáveis e avaliar prefetch por inten
 
 1. Capturar uma navegação autenticada nas telas afetadas, incluindo primeira visita e retorno, em desktop e celular.
 2. Separar tempo de resposta do documento/RSC, carregamento das APIs, hidratação e imagens no waterfall.
-3. Correlacionar traces do `@vercel/otel` já registrado com duração de Prisma, Clerk, Redis e integrações externas; os Web Vitals existentes são enviados a `/api/vitals` e registrados em log.
+3. Correlacionar traces do `@vercel/otel` com duração de Prisma, Clerk, Redis e integrações externas. Para métricas do navegador, use a execução controlada do Lighthouse em ambiente descartável.
 4. Conferir regiões de execução, Neon e Redis no ambiente publicado, além de eventuais cold starts e espera por conexões.
 5. Após correções, comparar as mesmas navegações e condições; não usar o tempo da landing sem login como medida do catálogo autenticado.
 

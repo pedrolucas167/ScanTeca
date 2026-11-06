@@ -39,8 +39,6 @@ export const rateLimits: Record<string, RateLimitConfig> = {
   recommendations: { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
   rota: { userLimit: 30, ipLimit: 60, windowMs: 60_000 },
   "rag-audit": { userLimit: 10, ipLimit: 30, windowMs: 60_000 },
-  // Anônimo (web-vitals): só o ipLimit é aplicado.
-  vitals: { userLimit: 120, ipLimit: 120, windowMs: 60_000 },
 };
 
 interface RateLimitOutcome {

@@ -37,7 +37,7 @@ export const test = base.extend<{ identity: TestIdentity; identityFactory: Ident
   identity: async ({ identityFactory }, provideIdentity) => { await provideIdentity(await identityFactory()); },
 });
 
-export async function signInAs(page: Page, identity: TestIdentity) {
+export async function signInAs(page: Page, identity: TestIdentity, { acceptTerms = true } = {}) {
   await setupClerkTestingToken({ page });
   await page.goto("/sign-in");
   await expect(page.locator('input[name="identifier"]')).toBeVisible();
@@ -50,6 +50,17 @@ export async function signInAs(page: Page, identity: TestIdentity) {
     const clerk = (window as unknown as { Clerk?: { user?: { id: string } } }).Clerk;
     return clerk?.user?.id === userId;
   }, identity.userId);
+  if (acceptTerms) {
+    await page.goto("/");
+    await acceptCurrentTerms(page);
+  }
+}
+
+export async function acceptCurrentTerms(page: Page) {
+  const agreement = page.getByRole("checkbox", { name: "Li e aceito os termos de uso desta versão." });
+  await agreement.check();
+  await page.getByRole("button", { name: "Aceitar termos e continuar" }).click();
+  await expect(agreement).toHaveCount(0);
 }
 
 export { expect } from "@playwright/test";

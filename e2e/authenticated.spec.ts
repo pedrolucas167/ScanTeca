@@ -1,5 +1,56 @@
 import { clerk, clerkSetup } from "@clerk/testing/playwright";
-import { expect, signInAs, test } from "./fixtures";
+import { acceptCurrentTerms, expect, signInAs, test } from "./fixtures";
+
+test("exportação privada isolada entre contas", async ({ page, context, identity, identityFactory }) => {
+  test.setTimeout(120_000);
+  expect((await page.request.get("/api/privacy/export")).status()).toBe(401);
+  await signInAs(page, identity);
+  await page.goto("/configuracoes");
+  const title = "Conversa privada da primeira conta";
+  expect((await page.request.post("/api/oracle/sessions", { data: { title } })).status()).toBe(201);
+
+  const direct = await page.request.get("/api/privacy/export");
+  expect(direct.status()).toBe(200);
+  expect(direct.headers()["content-disposition"]).toContain("scanteca-meus-dados.json");
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Baixar meus dados" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("scanteca-meus-dados.json");
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const exported = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  expect(exported.conta.id).toBe(identity.userId);
+  expect(exported.dados.conversasOraculo).toEqual([expect.objectContaining({ title })]);
+  await download.delete();
+
+  const otherIdentity = await identityFactory();
+  const otherContext = await context.browser()!.newContext({ baseURL: new URL(page.url()).origin, serviceWorkers: "block" });
+  try {
+    const other = await otherContext.newPage();
+    await signInAs(other, otherIdentity);
+    const spoof = await other.request.get(`/api/privacy/export?userId=${encodeURIComponent(identity.userId)}`);
+    expect(spoof.status()).toBe(400);
+    const own = await other.request.get("/api/privacy/export");
+    expect(own.ok()).toBe(true);
+    expect(own.headers()["cache-control"]).toBe("private, no-store");
+    expect(await own.json()).toMatchObject({ conta: { id: otherIdentity.userId }, dados: { conversasOraculo: [] } });
+  } finally {
+    await otherContext.close();
+  }
+});
+
+test("aceite dos termos persiste por conta e libera a interface", async ({ page, identity }) => {
+  await signInAs(page, identity, { acceptTerms: false });
+  await page.goto("/manual-add");
+  await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toBeVisible();
+  await page.getByText("Aviso de Privacidade da ScanTeca", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Seus direitos" })).toBeVisible();
+  await acceptCurrentTerms(page);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toHaveCount(0);
+});
 
 // Mesmo worker: o token fica disponível sem arquivo de sessão ou projeto auxiliar.
 test.beforeAll(async () => { await clerkSetup(); });
