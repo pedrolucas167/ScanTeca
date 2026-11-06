@@ -33,10 +33,11 @@ operacional, não uma obrigação geral do Marco Civil. Use a janela menor
 sempre que atender à finalidade, sem estender padrões mais curtos.
 Documente separadamente eventual preservação legal específica.
 
-A Vercel documenta retenção dos logs de execução conforme o plano e o
-adicional de observabilidade. Confirme o plano, exportadores e destinos de
-logs ativos antes de afirmar um prazo no aviso. Logs de build são uma
-categoria separada e não devem conter dados pessoais de usuários.
+A consulta autenticada aos metadados da equipe Vercel confirmou o plano
+Hobby. A Vercel documenta retenção de uma hora para os logs de execução
+nativos desse plano. Exportações e destinos externos devem ser verificados
+separadamente. Logs de build são uma categoria separada e não devem conter
+dados pessoais de usuários.
 [Documentação de logs da Vercel](https://vercel.com/docs/logs/runtime).
 
 O OpenRouter informa que as práticas de retenção e uso das entradas variam

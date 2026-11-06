@@ -30,7 +30,8 @@ export default function PrivacyNotice() {
       </section>
       <section>
         <h2 className="font-semibold">Hospedagem e compartilhamento</h2>
-        <p>A operação usa Vercel para hospedagem, PostgreSQL no Neon, Redis para funções como limites de requisições e cache, e AWS para armazenar e entregar imagens de publicações. O navegador também pode carregar fontes do Google. Os prazos de retenção, regiões de processamento e condições de transferência dos fornecedores estão em verificação nesta minuta.</p>
+        <p>A operação usa Vercel para hospedagem, PostgreSQL no Neon, Redis para funções como limites de requisições e cache, e AWS para armazenar e entregar imagens de publicações. O navegador também pode carregar fontes do Google.</p>
+        <p className="mt-2">Os logs de execução nativos do plano atual da Vercel têm retenção de uma hora. O projeto Neon em São Paulo tem uma janela de restauração de seis horas. Cópias mantidas separadamente e as condições de tratamento e transferência dos demais fornecedores seguem em revisão.</p>
       </section>
       <section>
         <h2 className="font-semibold">Seus direitos</h2>
