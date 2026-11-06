@@ -45,6 +45,28 @@ Esta é a proposta para revisão do responsável. A base legal é vinculada à
 finalidade de cada operação. O aceite dos termos, por si só, não vale como
 consentimento para todas as operações.
 
+### Cadastro e enquadramento atual
+
+Em 05/11/2026, a tela pública de cadastro exigia nome de usuário, e-mail e
+senha na opção por e-mail e oferecia Google e GitHub como alternativas. A
+conferência foi feita sem preencher o formulário. Os campos da opção por
+e-mail não comprovam os dados recebidos de cada provedor social. Confirme os
+escopos no Clerk antes de publicar a descrição desses fluxos.
+
+O e-mail e a credencial atendem à autenticação por e-mail. O código identifica
+a conta pelo ID do Clerk. O nome de usuário aparece como alternativa de
+exibição em recursos sociais. Avalie torná-lo opcional ou pedi-lo quando a
+pessoa configurar o perfil, após validar o efeito no login de contas existentes.
+Cidade, métricas e notificações são escolhas separadas do cadastro.
+
+Pedro Lucas Marques informou que opera a ScanTeca como pessoa física, sem
+lucro, e descreve o projeto como de código aberto. A ScanTeca oferece uma
+aplicação de internet. No cenário informado, a obrigação ordinária de guarda
+de seis meses do art. 15, caput, não se aplica, pois o dispositivo exige
+provedor constituído como pessoa jurídica nas condições ali previstas.
+Documente e cumpra eventual ordem específica de preservação. Reavalie se a
+forma de operação ou a finalidade mudar.
+
 | Operação | Base legal aplicável ou a validar | Limite e descarte |
 | --- | --- | --- |
 | Conta, autenticação e recursos solicitados, incluindo biblioteca, publicações, notificações solicitadas e execução de uma consulta ao Oráculo | Execução do contrato ou procedimentos a pedido do titular, art. 7º, V, apenas para dados necessários à função solicitada. | Enquanto a conta ou o recurso exigir os dados. Ao excluir o conteúdo, retirar a preferência ou encerrar a conta, avaliar o término da finalidade e excluir o que não tiver fundamento específico para conservação. |
@@ -52,7 +74,7 @@ consentimento para todas as operações.
 | Cidade opcional e métricas opcionais | Consentimento específico, art. 7º, I e art. 8º. Salvar a cidade de forma voluntária e permitir métricas são escolhas distintas. Validar o registro que demonstra cada escolha. | Remover a cidade quando a pessoa retirar a preferência ou quando a finalidade terminar. Revogar métricas interrompe novas coletas. Os limites atuais de até 30 dias para contagens e 180 dias para a escolha no navegador são configurações do produto. Confirmar a necessidade desses limites antes de publicar. |
 | Memória, personalização, moderação e segurança operacional | Validar separadamente necessidade e base legal. Legítimo interesse, art. 7º, IX e art. 10, só se sustenta quando o teste de balanceamento documentado justificar a operação. Se houver dados sensíveis, analisar o art. 11 antes de tratar. | Reter somente o necessário para cada finalidade comprovada. Confirmar exclusão de memória, expiração de caches, retenção de logs e ciclo de backups com os fornecedores. |
 | Solicitações dos titulares e ordens de autoridade | Obrigação legal ou regulatória, art. 7º, II, quando aplicável. Exercício regular de direitos, art. 7º, VI, conforme o caso. | Guardar a evidência mínima necessária para concluir o atendimento ou cumprir a obrigação específica. O prazo de resposta do art. 19 não é prazo de guarda. |
-| Registros de acesso à aplicação | Obrigação legal somente quando aplicável. O art. 15 do Marco Civil prevê guarda de seis meses para provedor constituído como pessoa jurídica com atividade organizada, profissional e com fins econômicos. Confirmar o enquadramento da ScanTeca e eventuais ordens de preservação. | Se o art. 15 se aplicar, guardar sob sigilo apenas os registros de acesso definidos no art. 5º, VIII, por seis meses, observadas ordens ou hipóteses específicas de preservação. Esse prazo não abrange conversas, biblioteca, cidade, arquivos ou telemetria em geral. |
+| Registros de acesso à aplicação | No enquadramento informado acima, o art. 15, caput, não é base para guarda de rotina. Avaliar separadamente a base de logs operacionais e eventual determinação específica de preservação. | Guardar só os dados necessários à finalidade documentada ou os registros especificados em determinação aplicável, pelo período correspondente. A regra de seis meses, quando aplicável, refere-se a IP, data e hora de acesso à aplicação. |
 
 Os arts. 15 e 16 da LGPD estabelecem o término do tratamento e a eliminação,
 ressalvadas as hipóteses legais de conservação. Quando não houver um prazo

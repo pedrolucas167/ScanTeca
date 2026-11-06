@@ -26,7 +26,7 @@ export default function PrivacyNotice() {
       <section>
         <h2 className="font-semibold">Bases legais e retenção</h2>
         <p>Os dados necessários para prestar os recursos que você solicita são tratados para executar o serviço. A cidade opcional e as métricas dependem de escolhas específicas, que você pode retirar. O cumprimento de uma obrigação legal ou o exercício regular de direitos pode exigir o tratamento de dados específicos.</p>
-        <p className="mt-2">A regra de retenção é guardar cada dado somente enquanto ele for necessário à finalidade informada. Depois, ele deve ser eliminado, salvo se houver fundamento legal para conservar uma parte por mais tempo. Um prazo previsto em lei para registros de acesso só se aplica quando a obrigação incide sobre a ScanTeca e apenas àqueles registros.</p>
+        <p className="mt-2">A regra de retenção é guardar cada dado somente enquanto ele for necessário à finalidade informada. Depois, ele deve ser eliminado, salvo se houver fundamento legal para conservar uma parte por mais tempo. Na operação atual, como pessoa física, a ScanTeca não está sujeita à guarda de rotina de seis meses prevista no art. 15 do Marco Civil da Internet. Uma determinação específica de preservação pode exigir guarda pelo período aplicável.</p>
       </section>
       <section>
         <h2 className="font-semibold">Hospedagem e compartilhamento</h2>
