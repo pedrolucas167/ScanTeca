@@ -19,7 +19,7 @@ beforeEach(() => {
     id: "user_a", firstName: "Conta de teste", emailAddresses: [], phoneNumbers: [],
     createdAt: 0, privateMetadata: { internal: "private-fixture" },
   });
-  exportAccountData.mockReset().mockResolvedValue({ cidade: { city: "Recife" } });
+  exportAccountData.mockReset().mockResolvedValue({ conversasOraculo: [{ title: "Conversa de teste" }] });
 });
 
 it("rejeita visitantes, IDs fornecidos pelo cliente e uma conta Clerk divergente", async () => {
@@ -39,7 +39,7 @@ it("entrega um anexo privado restrito à conta da sessão", async () => {
   expect(exportAccountData).toHaveBeenCalledWith("user_a");
   const body = await response.text();
   expect(body).not.toContain("private-fixture");
-  expect(JSON.parse(body)).toMatchObject({ conta: { id: "user_a" }, dados: { cidade: { city: "Recife" } } });
+  expect(JSON.parse(body)).toMatchObject({ conta: { id: "user_a" }, dados: { conversasOraculo: [{ title: "Conversa de teste" }] } });
 });
 
 it("reprova a exportação incompleta sem retornar detalhes internos", async () => {

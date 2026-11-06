@@ -12,7 +12,6 @@ import { auth } from "@clerk/nextjs/server";
 import { clerkLocalization } from "@/lib/clerk-localization";
 import { clerkAppearance } from "@/lib/clerk-appearance";
 import { unstable_cache } from "next/cache";
-import { cookies } from "next/headers";
 import { BookOpen, Heart, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import ThemeToggle from "@/components/ui/ThemeToggle";
@@ -25,8 +24,6 @@ import AdminLink from "@/components/ui/AdminLink";
 import MobileNav from "@/components/ui/MobileNav";
 import NavigationDropdown from "@/components/ui/NavigationDropdown";
 import RoutePrefetch from "@/components/ui/RoutePrefetch";
-import AnalyticsConsent from "@/components/ui/AnalyticsConsent";
-import { analyticsCookie, parseAnalyticsPreference } from "@/lib/analytics-preference";
 import { measureServerTask } from "@/lib/server-timing";
 import TermsDocument from "./termos/TermsDocument";
 import PrivacyNotice from "./privacidade/PrivacyNotice";
@@ -98,7 +95,6 @@ const getAccentTheme = (userId: string) =>
   )();
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const analyticsPreference = parseAnalyticsPreference((await cookies()).get(analyticsCookie)?.value);
   let accent: string | null = null;
   let termsState: "pending" | "unavailable" | null = null;
   try {
@@ -275,7 +271,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Link href="/oracle" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
                   Oráculo
                 </Link>
-                <AnalyticsConsent initialPreference={analyticsPreference} />
                 <Link href="/privacidade" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
                   Aviso de Privacidade
                 </Link>

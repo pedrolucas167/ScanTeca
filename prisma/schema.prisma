@@ -6,11 +6,6 @@ datasource db {
   provider   = "postgresql"
 }
 
-model PrivacyPreference {
-  userId String @id
-  city   String @db.VarChar(100)
-}
-
 model TermsAcceptance {
   userId     String
   version    String

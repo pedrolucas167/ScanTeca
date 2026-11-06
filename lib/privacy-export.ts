@@ -6,7 +6,6 @@ export async function exportAccountData(userId: string) {
   // de compartilhamento ficam fora do arquivo.
   const where = { userId };
   const [
-    cidade,
     perfil,
     termos,
     preferenciasBiblioteca,
@@ -38,7 +37,6 @@ export async function exportAccountData(userId: string) {
     seguidores,
     bloqueiosFeitos,
   ] = await prisma.$transaction([
-    prisma.privacyPreference.findUnique({ where, select: { city: true } satisfies Prisma.PrivacyPreferenceSelect }),
     prisma.socialProfile.findUnique({ where, select: { displayName: true, bio: true, visibility: true, createdAt: true, updatedAt: true } satisfies Prisma.SocialProfileSelect }),
     prisma.termsAcceptance.findMany({ where, select: { version: true, acceptedAt: true } satisfies Prisma.TermsAcceptanceSelect }),
     prisma.librarySetting.findUnique({ where, select: { name: true, shareEnabled: true, oracleProfile: true, oracleMemoryEnabled: true, yearlyGoal: true, accentTheme: true } satisfies Prisma.LibrarySettingSelect }),
@@ -71,7 +69,6 @@ export async function exportAccountData(userId: string) {
     prisma.socialBlock.findMany({ where: { blockerId: userId }, select: { createdAt: true } satisfies Prisma.SocialBlockSelect }),
   ]);
   return {
-    cidade,
     perfil,
     termos,
     preferenciasBiblioteca,

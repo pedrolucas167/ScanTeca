@@ -20,11 +20,11 @@ export default function TermsDocument() {
         </section>
         <section>
           <h2 className="font-semibold">Aceite e preferências</h2>
-          <p>Ao aceitar, sua conta registra a versão deste texto e a data e hora do aceite. Se os termos forem atualizados, a ScanTeca poderá pedir um novo aceite. Você controla a coleta de métricas opcionais em Preferências de métricas, no rodapé.</p>
+          <p>Ao aceitar, sua conta registra a versão deste texto e a data e hora do aceite. Se os termos forem atualizados, a ScanTeca poderá pedir um novo aceite.</p>
         </section>
         <section>
-          <h2 className="font-semibold">Cidade e acesso aos seus dados</h2>
-          <p>Em Configurações, você pode guardar uma cidade como preferência privada, editá-la ou removê-la. Nessa mesma tela, você pode baixar os dados disponíveis da sua conta e consultar o contato para solicitações complementares.</p>
+          <h2 className="font-semibold">Acesso aos seus dados</h2>
+          <p>Em Configurações, você pode baixar os dados disponíveis da sua conta e consultar o contato para solicitações complementares.</p>
         </section>
         <section>
           <h2 className="font-semibold">Contato do responsável</h2>

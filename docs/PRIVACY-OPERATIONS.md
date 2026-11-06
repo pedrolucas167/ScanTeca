@@ -10,15 +10,14 @@ Marques antes de publicar o aviso. O endereço de atendimento é
 | Tratamento e finalidade | Dados e sistemas identificados | Pendente de confirmação |
 | --- | --- | --- |
 | Cadastro, autenticação e aceite | Cadastro e sessão no Clerk. ID da conta, versão e data do aceite no PostgreSQL. | Configuração de cadastro, base legal, retenção, região, subprocessadores e exclusão de contas. |
-| Biblioteca, leitura e cidade | Acervo, diário, anotações, preferências e cidade opcional no PostgreSQL. Buscas bibliográficas usam Google Books e Open Library. | Retenção após encerramento, backups e destinatários de buscas e capas. |
+| Biblioteca e leitura | Acervo, diário, anotações e preferências no PostgreSQL. Buscas bibliográficas usam Google Books e Open Library. | Retenção após encerramento, backups e destinatários de buscas e capas. |
 | Comunidade e imagens | Perfil, publicações, interações e moderação. Imagens enviadas ao S3 e entregues pelo CloudFront. Alguns conteúdos ficam disponíveis conforme a visibilidade do recurso. | Acesso a objetos, política de cache, remoção de cópias e retenção. |
 | IA e Oráculo | Histórico, memória, artefatos e entradas enviadas ao OpenRouter, incluindo áudio nas funções de voz. O código também usa IA para recomendações, embeddings e moderação. | Modelos e provedores realmente ativos, dados enviados por função, retenção, uso posterior e destinos. |
 | Segurança, hospedagem e entrega | Vercel e instrumentação OTel, PostgreSQL no Neon, Redis para limites e cache, serviços de Web Push e fontes externas do Google. | Retenção de logs e backups, regiões, contratos, serviços habilitados e acessos operacionais. Revisar a retenção dos logs de Web Vitals anteriores à mudança. |
-| Métricas opcionais | Eventos de páginas permitidas após escolha positiva, contagens diárias no Redis por até 30 dias e preferência no navegador por até 180 dias. | Confirmar a configuração real de Redis e logs e registrar a evidência do fluxo de escolha e revogação por versão. |
 
 Referências técnicas no repositório: `prisma/schema.prisma`, `lib/s3.ts`,
 `lib/redis.ts`, `instrumentation.ts`, `modules/oracle`,
-`app/api/oracle`, `app/api/vitals/route.ts` e
+`app/api/oracle` e
 `docs/CI-DEPLOY-RUNBOOK.md`. Configurações declaradas e exemplos de ambiente
 não comprovam as regiões, os serviços ativos nem as garantias contratuais.
 
@@ -57,7 +56,9 @@ O e-mail e a credencial atendem à autenticação por e-mail. O código identifi
 a conta pelo ID do Clerk. O nome de usuário aparece como alternativa de
 exibição em recursos sociais. Avalie torná-lo opcional ou pedi-lo quando a
 pessoa configurar o perfil, após validar o efeito no login de contas existentes.
-Cidade, métricas e notificações são escolhas separadas do cadastro.
+Notificações são uma escolha separada do cadastro. Esta entrega retira a
+coleta de Web Vitals no navegador e adia a preferência de cidade. Os traces
+operacionais e a retenção dos logs históricos exigem revisão própria.
 
 Pedro Lucas Marques informou que opera a ScanTeca como pessoa física, sem
 lucro, e descreve o projeto como de código aberto. A ScanTeca oferece uma
@@ -71,7 +72,6 @@ forma de operação ou a finalidade mudar.
 | --- | --- | --- |
 | Conta, autenticação e recursos solicitados, incluindo biblioteca, publicações, notificações solicitadas e execução de uma consulta ao Oráculo | Execução do contrato ou procedimentos a pedido do titular, art. 7º, V, apenas para dados necessários à função solicitada. | Enquanto a conta ou o recurso exigir os dados. Ao excluir o conteúdo, retirar a preferência ou encerrar a conta, avaliar o término da finalidade e excluir o que não tiver fundamento específico para conservação. |
 | Aceite dos termos | Art. 7º, V, para administrar o vínculo. Após o encerramento, avaliar conservação estritamente necessária para exercício regular de direitos, art. 7º, VI, quando aplicável. | Enquanto necessário ao vínculo. Se houver fundamento para conservação posterior, guardar apenas a evidência mínima pelo prazo aplicável ao caso e registrar a data de descarte. |
-| Cidade opcional e métricas opcionais | Consentimento específico, art. 7º, I e art. 8º. Salvar a cidade de forma voluntária e permitir métricas são escolhas distintas. Validar o registro que demonstra cada escolha. | Remover a cidade quando a pessoa retirar a preferência ou quando a finalidade terminar. Revogar métricas interrompe novas coletas. Os limites atuais de até 30 dias para contagens e 180 dias para a escolha no navegador são configurações do produto. Confirmar a necessidade desses limites antes de publicar. |
 | Memória, personalização, moderação e segurança operacional | Validar separadamente necessidade e base legal. Legítimo interesse, art. 7º, IX e art. 10, só se sustenta quando o teste de balanceamento documentado justificar a operação. Se houver dados sensíveis, analisar o art. 11 antes de tratar. | Reter somente o necessário para cada finalidade comprovada. Confirmar exclusão de memória, expiração de caches, retenção de logs e ciclo de backups com os fornecedores. |
 | Solicitações dos titulares e ordens de autoridade | Obrigação legal ou regulatória, art. 7º, II, quando aplicável. Exercício regular de direitos, art. 7º, VI, conforme o caso. | Guardar a evidência mínima necessária para concluir o atendimento ou cumprir a obrigação específica. O prazo de resposta do art. 19 não é prazo de guarda. |
 | Registros de acesso à aplicação | No enquadramento informado acima, o art. 15, caput, não é base para guarda de rotina. Avaliar separadamente a base de logs operacionais e eventual determinação específica de preservação. | Guardar só os dados necessários à finalidade documentada ou os registros especificados em determinação aplicável, pelo período correspondente. A regra de seis meses, quando aplicável, refere-se a IP, data e hora de acesso à aplicação. |

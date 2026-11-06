@@ -16,21 +16,21 @@ export default function PrivacyNotice() {
           <li><strong>Conta e segurança.</strong> Usamos os dados de cadastro e a sessão do Clerk para identificar a conta e proteger o acesso. A ScanTeca registra a versão e a data do aceite dos termos.</li>
           <li><strong>Biblioteca e comunidade.</strong> Guardamos registros de leitura, anotações, preferências e conteúdo que você publica para oferecer esses recursos. Perfis, publicações e links podem disponibilizar conteúdo a outras pessoas conforme a visibilidade do recurso. Consultas por título, autor ou ISBN podem usar Google Books e Open Library.</li>
           <li><strong>Oráculo.</strong> Perguntas, áudio quando você usa voz e o contexto usado para responder podem ser enviados ao OpenRouter e ao provedor do modelo selecionado. O app também usa serviços de IA em recursos como recomendações e moderação. Você pode gerenciar a memória do Oráculo na interface.</li>
-          <li><strong>Cidade e notificações.</strong> A cidade é uma preferência privada e opcional, exibida nas configurações e na exportação da conta. Você pode removê-la ao limpar o campo e salvar. Se habilitar notificações, usamos a inscrição do navegador para entregá-las.</li>
+          <li><strong>Notificações.</strong> Se você habilitar notificações, usamos a inscrição do navegador para entregá-las.</li>
         </ul>
       </section>
       <section>
-        <h2 className="font-semibold">Preferências do navegador e métricas</h2>
-        <p>O navegador pode guardar escolhas como tema e preferência de métricas. Se você permitir as métricas opcionais, contamos visitas e faixas de desempenho na inicial, no Manifesto e no Feed. A ScanTeca guarda esses totais diários por até 30 dias e sua escolha por até 180 dias no navegador. Você pode recusar ou revogar pelo botão Preferências de métricas no rodapé.</p>
+        <h2 className="font-semibold">Preferências do navegador</h2>
+        <p>O navegador pode guardar escolhas como tema e aparência, para preservá-las entre visitas.</p>
       </section>
       <section>
         <h2 className="font-semibold">Bases legais e retenção</h2>
-        <p>Os dados necessários para prestar os recursos que você solicita são tratados para executar o serviço. A cidade opcional e as métricas dependem de escolhas específicas, que você pode retirar. O cumprimento de uma obrigação legal ou o exercício regular de direitos pode exigir o tratamento de dados específicos.</p>
+        <p>Os dados necessários para prestar os recursos que você solicita são tratados para executar o serviço. O cumprimento de uma obrigação legal ou o exercício regular de direitos pode exigir o tratamento de dados específicos.</p>
         <p className="mt-2">A regra de retenção é guardar cada dado somente enquanto ele for necessário à finalidade informada. Depois, ele deve ser eliminado, salvo se houver fundamento legal para conservar uma parte por mais tempo. Na operação atual, como pessoa física, a ScanTeca não está sujeita à guarda de rotina de seis meses prevista no art. 15 do Marco Civil da Internet. Uma determinação específica de preservação pode exigir guarda pelo período aplicável.</p>
       </section>
       <section>
         <h2 className="font-semibold">Hospedagem e compartilhamento</h2>
-        <p>A operação usa Vercel para hospedagem, PostgreSQL no Neon, Redis para funções como limites de requisições e métricas, e AWS para armazenar e entregar imagens de publicações. O navegador também pode carregar fontes do Google. Os prazos de retenção, regiões de processamento e condições de transferência dos fornecedores estão em verificação nesta minuta.</p>
+        <p>A operação usa Vercel para hospedagem, PostgreSQL no Neon, Redis para funções como limites de requisições e cache, e AWS para armazenar e entregar imagens de publicações. O navegador também pode carregar fontes do Google. Os prazos de retenção, regiões de processamento e condições de transferência dos fornecedores estão em verificação nesta minuta.</p>
       </section>
       <section>
         <h2 className="font-semibold">Seus direitos</h2>

@@ -1,17 +1,13 @@
 import { clerk, clerkSetup } from "@clerk/testing/playwright";
 import { acceptCurrentTerms, expect, signInAs, test } from "./fixtures";
 
-test("cidade privada e exportação isolada entre contas", async ({ page, context, identity, identityFactory }) => {
+test("exportação privada isolada entre contas", async ({ page, context, identity, identityFactory }) => {
   test.setTimeout(120_000);
   expect((await page.request.get("/api/privacy/export")).status()).toBe(401);
   await signInAs(page, identity);
   await page.goto("/configuracoes");
-  const city = page.getByLabel("Cidade (opcional)");
-  await city.fill("São Luís");
-  await page.getByRole("button", { name: "Salvar cidade" }).click();
-  await expect(page.getByText("Cidade salva.")).toBeVisible();
-  await page.reload();
-  await expect(city).toHaveValue("São Luís");
+  const title = "Conversa privada da primeira conta";
+  expect((await page.request.post("/api/oracle/sessions", { data: { title } })).status()).toBe(201);
 
   const direct = await page.request.get("/api/privacy/export");
   expect(direct.status()).toBe(200);
@@ -26,7 +22,7 @@ test("cidade privada e exportação isolada entre contas", async ({ page, contex
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
   const exported = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   expect(exported.conta.id).toBe(identity.userId);
-  expect(exported.dados.cidade.city).toBe("São Luís");
+  expect(exported.dados.conversasOraculo).toEqual([expect.objectContaining({ title })]);
   await download.delete();
 
   const otherIdentity = await identityFactory();
@@ -39,15 +35,10 @@ test("cidade privada e exportação isolada entre contas", async ({ page, contex
     const own = await other.request.get("/api/privacy/export");
     expect(own.ok()).toBe(true);
     expect(own.headers()["cache-control"]).toBe("private, no-store");
-    expect(await own.json()).toMatchObject({ conta: { id: otherIdentity.userId }, dados: { cidade: null } });
+    expect(await own.json()).toMatchObject({ conta: { id: otherIdentity.userId }, dados: { conversasOraculo: [] } });
   } finally {
     await otherContext.close();
   }
-  await city.clear();
-  await page.getByRole("button", { name: "Salvar cidade" }).click();
-  await expect(page.getByText("Cidade removida.")).toBeVisible();
-  const updated = await page.request.get("/api/privacy/export");
-  expect(await updated.json()).toMatchObject({ dados: { cidade: null } });
 });
 
 test("aceite dos termos persiste por conta e libera a interface", async ({ page, identity }) => {
@@ -59,7 +50,6 @@ test("aceite dos termos persiste por conta e libera a interface", async ({ page,
   await acceptCurrentTerms(page);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Termos de uso da ScanTeca" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Preferências de métricas" })).toHaveAttribute("aria-expanded", "true");
 });
 
 // Mesmo worker: o token fica disponível sem arquivo de sessão ou projeto auxiliar.
