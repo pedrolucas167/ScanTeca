@@ -29,7 +29,7 @@ export default function TermsDocument() {
         <section>
           <h2 className="font-semibold">Contato do responsável</h2>
           <p>
-            Para dúvidas sobre estes termos ou solicitações de privacidade, escreva para{" "}
+            Pedro Lucas Marques é o responsável pela ScanTeca. Para dúvidas sobre estes termos ou solicitações de privacidade, escreva para{" "}
             <a href="mailto:pedro_marques_dev@hotmail.com" className="underline underline-offset-4">
               pedro_marques_dev@hotmail.com
             </a>.
