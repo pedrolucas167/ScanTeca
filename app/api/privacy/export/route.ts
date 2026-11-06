@@ -6,6 +6,7 @@ import { rateLimitGuard } from "@/lib/rate-limit";
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 
 export async function GET(request: NextRequest) {
+  let stage = "session";
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Entre na sua conta." }, { status: 401, headers });
@@ -19,10 +20,13 @@ export async function GET(request: NextRequest) {
       return limited;
     }
 
+    stage = "account";
     const user = await currentUser();
     if (!user || user.id !== userId) return Response.json({ error: "Sessão inválida." }, { status: 401, headers });
+    stage = "database";
     const dados = await exportAccountData(userId);
 
+    stage = "response";
     return Response.json({
       versao: 1,
       geradoEm: new Date().toISOString(),
@@ -52,6 +56,7 @@ export async function GET(request: NextRequest) {
       headers: { ...headers, "Content-Disposition": 'attachment; filename="scanteca-meus-dados.json"' },
     });
   } catch {
+    console.warn("[privacy-export] unavailable", { stage });
     return Response.json({ error: "Não foi possível gerar o arquivo. Tente novamente." }, { status: 503, headers });
   }
 }

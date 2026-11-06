@@ -21,7 +21,7 @@ export default function PrivacySettings({ initialCity }: { initialCity: string }
         {message && <p role="status" className="text-sm">{message}</p>}
       </form>
       <div className="space-y-2 border-t border-outline-variant pt-4">
-        <a href="/api/privacy/export" download className="inline-block rounded-md bg-indigo-700 px-4 py-2 font-medium text-white">Baixar meus dados</a>
+        <a href="/api/privacy/export" className="inline-block rounded-md bg-indigo-700 px-4 py-2 font-medium text-white">Baixar meus dados</a>
         <p className="text-sm">Baixe um arquivo JSON com os dados disponíveis da sua conta. Ele pode conter informações privadas. Guarde-o em um local seguro.</p>
         <p className="text-sm">Para outros pedidos de privacidade, escreva para{" "}
           <a className="underline" href="mailto:pedro_marques_dev@hotmail.com">pedro_marques_dev@hotmail.com</a>.

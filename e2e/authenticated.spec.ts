@@ -13,6 +13,9 @@ test("cidade privada e exportação isolada entre contas", async ({ page, contex
   await page.reload();
   await expect(city).toHaveValue("São Luís");
 
+  const direct = await page.request.get("/api/privacy/export");
+  expect(direct.status()).toBe(200);
+  expect(direct.headers()["content-disposition"]).toContain("scanteca-meus-dados.json");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("link", { name: "Baixar meus dados" }).click(),
