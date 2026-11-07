@@ -1,23 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import BookPreviewSheet, { type BookDraft } from "./BookPreviewSheet";
-
-interface SearchResult {
-  googleId: string;
-  title: string;
-  subtitle: string | null;
-  author: string;
-  publishedDate: string | null;
-  synopsis: string | null;
-  pages: number | null;
-  genre: string | null;
-  isbn: string | null;
-  coverUrl: string | null;
-}
+import BookPreviewSheet from "./BookPreviewSheet";
+import { useBookRegistration } from "./useBookRegistration";
+import { useBookSearch } from "./useBookSearch";
 
 function Icon({
   name,
@@ -40,166 +29,9 @@ function Icon({
 
 export default function BookSearch() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
-  const [searched, setSearched] = useState(false);
-  const [previewBook, setPreviewBook] = useState<BookDraft | null>(null);
-  const [previewGoogleId, setPreviewGoogleId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) return;
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
-    }
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    setLoading(true);
-    setMessage(null);
-    setSearched(true);
-
-    try {
-      const res = await fetch("/api/search-books", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery }),
-        signal: controller.signal,
-      });
-
-      const data = await res.json();
-
-      if (controller.signal.aborted) return;
-
-      if (res.ok) {
-        setResults(data.results || []);
-        if ((data.results || []).length === 0) {
-          setMessage("Nenhum livro encontrado. Tente outro termo.");
-        }
-      } else {
-        setMessage(data.error || "Erro ao buscar livros");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setMessage("Erro de rede ao buscar");
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const q = query.trim();
-    if (!q) return;
-
-    searchTimeoutRef.current = setTimeout(() => {
-      performSearch(q);
-    }, 500);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = null;
-      }
-    };
-  }, [query, performSearch]);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
-    }
-
-    performSearch(q);
-  };
-
-  const handleAdd = (book: SearchResult) => {
-    setPreviewBook({
-      title: book.title,
-      author: book.author,
-      publishedDate: book.publishedDate,
-      synopsis: book.synopsis,
-      coverUrl: book.coverUrl,
-      genre: book.genre,
-      pages: book.pages,
-      isbn: book.isbn,
-      collection: "Minha Biblioteca",
-    });
-    setPreviewGoogleId(book.googleId);
-  };
-
-  const handleSave = async (status: string) => {
-    if (!previewBook) return;
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      const res = await fetch("/api/books", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isbn: previewBook.isbn,
-          title: previewBook.title,
-          author: previewBook.author,
-          publishedDate: previewBook.publishedDate,
-          synopsis: previewBook.synopsis,
-          coverUrl: previewBook.coverUrl,
-          genre: previewBook.genre,
-          pages: previewBook.pages,
-          status,
-          collection: previewBook.collection,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        if (data.message === "Livro já cadastrado" && data.book?.id) {
-          setPreviewBook(null);
-          router.push(`/books/${data.book.id}`);
-          return;
-        }
-        if (previewGoogleId) {
-          setAddedIds((prev) => new Set(prev).add(previewGoogleId));
-        }
-        setMessage(`"${previewBook.title}" adicionado ao catálogo!`);
-        setPreviewBook(null);
-        setPreviewGoogleId(null);
-        setTimeout(() => setMessage(null), 3000);
-      } else {
-        setMessage(data.error || "Erro ao adicionar livro");
-      }
-    } catch {
-      setMessage("Erro de rede ao adicionar");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { query, results, loading, searched, changeQuery, searchNow } = useBookSearch(setMessage);
+  const { addedIds, previewBook, saving, openPreview, saveBook, closePreview } = useBookRegistration(setMessage);
 
   return (
     <div className="flex flex-1 flex-col bg-surface px-4 pb-6 pt-2 text-on-surface">
@@ -208,7 +40,13 @@ export default function BookSearch() {
         páginas são preenchidos automaticamente quando disponíveis.
       </p>
 
-      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void searchNow();
+        }}
+        className="mb-4 flex gap-2"
+      >
         <div className="relative flex-1">
           <Icon
             name="search"
@@ -217,19 +55,7 @@ export default function BookSearch() {
           <input
             type="text"
             value={query}
-            onChange={(e) => {
-              const value = e.target.value;
-              setQuery(value);
-              if (!value.trim()) {
-                setResults([]);
-                setSearched(false);
-                setMessage(null);
-                if (searchTimeoutRef.current) {
-                  clearTimeout(searchTimeoutRef.current);
-                  searchTimeoutRef.current = null;
-                }
-              }
-            }}
+            onChange={(event) => changeQuery(event.target.value)}
             placeholder="Ex: Dom Casmurro, Machado de Assis, 97885..."
             className="w-full rounded-full border border-outline-variant/40 bg-surface-container py-2.5 pl-10 pr-4 font-body-sm text-body-sm text-on-surface placeholder:text-outline/70 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             autoFocus
@@ -326,7 +152,7 @@ export default function BookSearch() {
 
               <div className="flex shrink-0 items-start">
                 <button
-                  onClick={() => handleAdd(book)}
+                  onClick={() => openPreview(book)}
                   disabled={loading || added}
                   className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 font-label-sm text-label-sm font-semibold transition-colors ${
                     added
@@ -367,11 +193,8 @@ export default function BookSearch() {
         <BookPreviewSheet
           book={previewBook}
           loading={saving}
-          onConfirm={handleSave}
-          onCancel={() => {
-            setPreviewBook(null);
-            setPreviewGoogleId(null);
-          }}
+          onConfirm={saveBook}
+          onCancel={closePreview}
         />
       )}
     </div>
