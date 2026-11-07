@@ -29,3 +29,14 @@ Na execução integrada do PR de E2E, a implantação Vercel de preview ficou em
 falha. A implantação de produção do merge concluiu e o smoke da principal passou;
 por isso o erro de preview não afetou a publicação. As duas evidências devem ser
 consultadas separadamente.
+
+## Relevância da busca em Adicionar livro
+
+1. **Implementado.** Buscar por título e autor com retorno à frase inteira quando
+   a separação for incerta. Ordenar por correspondência antes do idioma, conferir
+   a edição pelo ISBN e manter os autores na ordem do provedor.
+2. **Validar com o Google Books.** Conferir os primeiros resultados e o tempo de
+   resposta para títulos brasileiros e estrangeiros, nomes com iniciais, títulos
+   com vírgulas e ISBNs de edições diferentes.
+3. **Validar o cadastro no navegador.** Buscar, abrir a prévia e salvar um livro
+   com dois autores em ambiente descartável. Confirmar os nomes e o ISBN no catálogo.
