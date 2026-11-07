@@ -9,7 +9,7 @@ import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES_STITCH } from "@/lib/constants/
 import { LITERARY_QUOTES } from "@/lib/constants/literary-quotes";
 import type { Book, CatalogBook } from "@/lib/types/book";
 import { toCatalogBook } from "@/lib/catalog-book";
-import { bookSpineSource, compareSpineHeight, estimateBookSpineCm, formatSpineCm, summarizeBookSpines } from "@/lib/book-spine";
+import { compareSpineHeight, estimateBookSpineCm, formatSpineCm, summarizeBookSpines } from "@/lib/book-spine";
 
 const PAGE_SIZE = 24;
 
@@ -823,6 +823,8 @@ export default function Catalog({
     ? "—"
     : (showMeters ? stackMeters.toFixed(2) : totalCm.toFixed(1)).replace(".", ",");
   const heightComparison = compareSpineHeight(stackMeters);
+  const comparisonLabel = heightComparison &&
+    `${heightComparison.label} (${heightComparison.meters.toFixed(2).replace(".", ",")} m)`;
 
   const resultsKey = JSON.stringify([query, statusFilter, collectionFilter, ratingFilter, yearFilter, genreFilter, noCoverOnly, sortBy, viewMode]);
   const visibleLimit = displayPage.key === resultsKey ? displayPage.limit : PAGE_SIZE;
@@ -952,24 +954,21 @@ export default function Catalog({
               <div className="inline-flex w-fit items-center gap-space-xs rounded-full border border-white/10 bg-surface-container px-space-md py-space-xs">
                 <Icon name="height" className="text-body-md text-tertiary" />
                 <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  Perto da altura{" "}
-                  <a href={heightComparison.source} target="_blank" rel="noreferrer" className="font-medium text-tertiary underline">
-                    {heightComparison.label} ({heightComparison.meters.toFixed(2).replace(".", ",")} m)
-                  </a>
+                  {stackMeters < heightComparison.meters ? "Quase" : "Aproximadamente"}{" "}
+                  {heightComparison.source ? (
+                    <a href={heightComparison.source} target="_blank" rel="noreferrer" className="font-medium text-tertiary underline">
+                      {comparisonLabel}
+                    </a>
+                  ) : (
+                    <strong className="font-medium text-tertiary">{comparisonLabel}</strong>
+                  )}
                 </span>
               </div>
             )}
             <p className="font-caption text-caption text-on-surface-variant">
-              {stats.spine.counted === 0 ? "Sem páginas cadastradas para estimar a altura. " : (
-                stats.spine.missing > 0
-                  ? `Inclui ${stats.spine.counted} de ${stats.total} volumes, apenas os que têm páginas cadastradas. `
-                  : ""
-              )}
-              Referência de{" "}
-              <a href={bookSpineSource} target="_blank" rel="noreferrer" className="text-tertiary underline">
-                brochura em papel branco (KDP)
-              </a>
-              . A espessura varia com o papel e a encadernação.
+              {stats.spine.counted === 0
+                ? "Sem páginas cadastradas para estimar a altura."
+                : `Estimativa baseada em ${stats.spine.counted} de ${stats.total} volumes com páginas cadastradas.`}
             </p>
             <div className="grid grid-cols-3 gap-space-xs pt-space-xs">
               <div className="flex flex-col rounded border border-white/5 bg-surface-container/60 p-space-sm">
