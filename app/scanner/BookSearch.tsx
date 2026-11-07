@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import BookPreviewSheet from "./BookPreviewSheet";
+import { observeBookSearchThumbnail } from "./book-search-timing";
 import { useBookRegistration } from "./useBookRegistration";
 import { useBookSearch } from "./useBookSearch";
 
@@ -106,6 +107,7 @@ export default function BookSearch() {
               <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-md border border-outline-variant/30 bg-surface-container-high">
                 {book.coverUrl ? (
                   <Image
+                    ref={observeBookSearchThumbnail}
                     src={book.coverUrl}
                     alt={`Capa de ${book.title}`}
                     fill
