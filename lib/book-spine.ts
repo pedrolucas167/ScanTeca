@@ -1,6 +1,5 @@
-export const bookSpineSource = "https://m.media-amazon.com/images/G/01/kindle-publication/KDP_Print_Publishing_Guidelines_01_24_2018._CB1516837113_.pdf#page=27";
-
 // KDP paperback with black ink on white paper: inches per page × cm per inch.
+// https://m.media-amazon.com/images/G/01/kindle-publication/KDP_Print_Publishing_Guidelines_01_24_2018._CB1516837113_.pdf#page=27
 const spineCmPerPage = 0.002252 * 2.54;
 
 export function estimateBookSpineCm(pages: number | null): number | null {
@@ -30,17 +29,22 @@ export function formatSpineCm(cm: number | null): string {
 
 const heightReferences = [
   {
-    label: "do travessão de futebol",
+    label: "o comprimento de cinco réguas de 30 cm enfileiradas",
+    meters: 5 * 0.30,
+    source: null,
+  },
+  {
+    label: "a altura do travessão de futebol",
     meters: 2.44,
     source: "https://www.theifab.com/laws/latest/the-field-of-play/?side-menu-open=true",
   },
   {
-    label: "do aro de basquete",
+    label: "a altura do aro de basquete",
     meters: 3.05,
     source: "https://assets.fiba.basketball/image/upload/documents-corporate-fiba-official-rules-2024-official-basketball-rules-and-basketball-equipment.pdf#page=9",
   },
   {
-    label: "de um macho adulto de girafa",
+    label: "a altura de um macho adulto de girafa",
     meters: 5.49,
     source: "https://sdzwildlifeexplorers.org/animals/giraffe",
   },
