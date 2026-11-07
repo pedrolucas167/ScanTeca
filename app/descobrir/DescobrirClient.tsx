@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, type CSSProperties } from "react";
+import { estimateBookSpineCm, formatSpineCm } from "@/lib/book-spine";
 import {
   type BookForClient as Book,
   type RecommendationsPayload,
@@ -270,7 +271,7 @@ export default function DescobrirClient({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Icon name="straighten" className="text-[15px] text-primary" />
-                    <span>Lombada: ~{primary.spine} cm estimada</span>
+                    <span>Lombada estimada: {formatSpineCm(estimateBookSpineCm(primary.pages))}</span>
                   </div>
                 </div>
                 <div className="mt-2.5 flex items-baseline gap-1.5">

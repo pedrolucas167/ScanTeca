@@ -9,6 +9,7 @@ import { BOOK_STATUS_LABELS, BOOK_STATUS_CLASSES_STITCH } from "@/lib/constants/
 import { LITERARY_QUOTES } from "@/lib/constants/literary-quotes";
 import type { Book, CatalogBook } from "@/lib/types/book";
 import { toCatalogBook } from "@/lib/catalog-book";
+import { bookSpineSource, compareSpineHeight, estimateBookSpineCm, formatSpineCm, summarizeBookSpines } from "@/lib/book-spine";
 
 const PAGE_SIZE = 24;
 
@@ -62,7 +63,7 @@ function BookShelfCover({
   onDelete,
 }: {
   book: CatalogBook;
-  spineCmValue: number;
+  spineCmValue: number | null;
   onEdit: (book: CatalogBook) => void;
   onDelete: (book: CatalogBook) => void;
 }) {
@@ -122,7 +123,7 @@ function BookShelfCover({
         </p>
         <p className="truncate font-caption text-[10px] text-outline">
           {book.author.split(" ").pop() || book.author} •{" "}
-          {spineCmValue.toFixed(1).replace(".", ",")}cm
+          {formatSpineCm(spineCmValue)}
         </p>
       </div>
       <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -233,15 +234,7 @@ export default function Catalog({
         ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length
         : 0;
 
-    const stackMeters =
-      bookList.reduce((sum, b) => {
-        const pages = b.pages;
-        const spineCmValue =
-          !pages || pages <= 0
-            ? 1.0
-            : Math.max(0.8, Math.round((pages * 0.08) * 10) / 10);
-        return sum + spineCmValue;
-      }, 0) / 100;
+    const spine = summarizeBookSpines(bookList);
     const readingHours = Math.round(allPages / 40);
 
     const authorCount = new Map<string, number>();
@@ -283,7 +276,7 @@ export default function Catalog({
       allPages,
       avgRating: Math.round(avgRating * 10) / 10,
       noCover: bookList.filter((b) => !b.coverUrl).length,
-      stackMeters,
+      spine,
       readingHours,
       topAuthor,
       oldest,
@@ -822,19 +815,14 @@ export default function Catalog({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const spineCm = (pages: number | null) => {
-    if (!pages || pages <= 0) return 1.0;
-    return Math.max(0.8, Math.round((pages * 0.08) * 10) / 10);
-  };
-
-  const metricEquivalent = (meters: number) => {
-    if (meters < 0.3) return "pasta de papéis";
-    if (meters < 1.0) return "tornozelo";
-    if (meters < 1.5) return "cachorro pequeno";
-    if (meters < 2.5) return "criança em pé";
-    if (meters < 4.0) return "porta";
-    return "girafa adulta";
-  };
+  const totalCm = stats.spine.totalCm;
+  const stackMeters = (totalCm ?? 0) / 100;
+  const showMeters = stackMeters >= 1;
+  const stackUnit = showMeters ? "m" : "cm";
+  const stackValue = totalCm === null
+    ? "—"
+    : (showMeters ? stackMeters.toFixed(2) : totalCm.toFixed(1)).replace(".", ",");
+  const heightComparison = compareSpineHeight(stackMeters);
 
   const resultsKey = JSON.stringify([query, statusFilter, collectionFilter, ratingFilter, yearFilter, genreFilter, noCoverOnly, sortBy, viewMode]);
   const visibleLimit = displayPage.key === resultsKey ? displayPage.limit : PAGE_SIZE;
@@ -843,6 +831,7 @@ export default function Catalog({
   const stackBooks = filtered
     .filter((b) => b.status === "READING" || b.status === "TO_READ")
     .slice(0, 6);
+  const weeklyStack = summarizeBookSpines(stackBooks);
 
   return (
     <div className="relative flex min-h-screen flex-col bg-surface pb-6 text-on-surface">
@@ -948,23 +937,40 @@ export default function Catalog({
                 </span>
               </div>
               <span className="rounded-full bg-surface-container-highest px-2 py-0.5 font-caption text-caption text-primary">
-                RAG Vectorizado
+                Estimativa
               </span>
             </div>
             <div className="flex items-baseline gap-space-xs">
               <h1 className="font-headline-lg text-headline-lg font-bold tracking-tight text-on-surface">
-                {stats.stackMeters.toFixed(2).replace(".", ",")}
+                {stackValue}
               </h1>
-              <span className="font-headline-md text-headline-md font-serif text-primary">metros</span>
+              {totalCm !== null && (
+                <span className="font-headline-md text-headline-md font-serif text-primary">{stackUnit}</span>
+              )}
             </div>
-            <div className="inline-flex w-fit items-center gap-space-xs rounded-full border border-white/10 bg-surface-container px-space-md py-space-xs">
-              <Icon name="height" className="text-body-md text-tertiary" />
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Equivalente à altura de uma{" "}
-                <strong className="font-medium text-tertiary">{metricEquivalent(stats.stackMeters)}</strong>{" "}
-                em livros impressos
-              </span>
-            </div>
+            {heightComparison && (
+              <div className="inline-flex w-fit items-center gap-space-xs rounded-full border border-white/10 bg-surface-container px-space-md py-space-xs">
+                <Icon name="height" className="text-body-md text-tertiary" />
+                <span className="font-body-sm text-body-sm text-on-surface-variant">
+                  Perto da altura{" "}
+                  <a href={heightComparison.source} target="_blank" rel="noreferrer" className="font-medium text-tertiary underline">
+                    {heightComparison.label} ({heightComparison.meters.toFixed(2).replace(".", ",")} m)
+                  </a>
+                </span>
+              </div>
+            )}
+            <p className="font-caption text-caption text-on-surface-variant">
+              {stats.spine.counted === 0 ? "Sem páginas cadastradas para estimar a altura. " : (
+                stats.spine.missing > 0
+                  ? `Inclui ${stats.spine.counted} de ${stats.total} volumes, apenas os que têm páginas cadastradas. `
+                  : ""
+              )}
+              Referência de{" "}
+              <a href={bookSpineSource} target="_blank" rel="noreferrer" className="text-tertiary underline">
+                brochura em papel branco (KDP)
+              </a>
+              . A espessura varia com o papel e a encadernação.
+            </p>
             <div className="grid grid-cols-3 gap-space-xs pt-space-xs">
               <div className="flex flex-col rounded border border-white/5 bg-surface-container/60 p-space-sm">
                 <span className="font-caption text-caption text-outline">Acervo Total</span>
@@ -974,10 +980,9 @@ export default function Catalog({
               <div className="flex flex-col rounded border border-white/5 bg-surface-container/60 p-space-sm">
                 <span className="font-caption text-caption text-outline">Lombada Média</span>
                 <span className="mt-0.5 font-headline-md text-headline-md font-semibold text-primary">
-                  {stats.total > 0 ? (stats.stackMeters * 100 / stats.total).toFixed(1).replace(".", ",") : "0,0"}{" "}
-                  <span className="font-caption text-caption">cm</span>
+                  {formatSpineCm(stats.spine.averageCm)}
                 </span>
-                <span className="font-caption text-caption text-on-surface-variant">espessura física</span>
+                <span className="font-caption text-caption text-on-surface-variant">volumes com páginas</span>
               </div>
               <div className="flex flex-col rounded border border-white/5 bg-surface-container/60 p-space-sm">
                 <span className="font-caption text-caption text-outline">Em {new Date().getFullYear()}</span>
@@ -1189,7 +1194,7 @@ export default function Catalog({
                 { label: "Lidos", value: stats.read },
                 { label: "Lendo", value: stats.reading },
                 { label: "Páginas lidas", value: stats.totalPages.toLocaleString("pt-BR") },
-                { label: "Pilha de livros", value: `${stats.stackMeters}m` },
+                { label: "Pilha estimada", value: totalCm === null ? "—" : `${stackValue} ${stackUnit}` },
                 { label: "Horas de leitura", value: `${stats.readingHours}h` },
                 { label: "Média de avaliação", value: stats.avgRating },
                 { label: "Ritmo de leitura", value: `${stats.pace}/mês` },
@@ -1259,7 +1264,7 @@ export default function Catalog({
                   <BookShelfCover
                     key={book.id}
                     book={book}
-                    spineCmValue={spineCm(book.pages)}
+                    spineCmValue={estimateBookSpineCm(book.pages)}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                   />
@@ -1282,9 +1287,9 @@ export default function Catalog({
               </div>
               <div className="text-right">
                 <span className="font-headline-md text-headline-md font-serif font-bold text-primary">
-                  {stackBooks.reduce((sum, b) => sum + spineCm(b.pages), 0).toFixed(1).replace(".", ",")} cm
+                  {formatSpineCm(weeklyStack.totalCm)}
                 </span>
-                <p className="font-caption text-caption text-outline">altura total</p>
+                <p className="font-caption text-caption text-outline">altura estimada dos livros com páginas</p>
               </div>
             </div>
             <div className="relative flex items-center gap-space-md rounded-lg border border-white/5 bg-surface-container-low p-space-lg">
@@ -1317,12 +1322,12 @@ export default function Catalog({
                   </p>
                 )}
                 {stackBooks.map((book) => {
-                  const cm = spineCm(book.pages);
+                  const cm = estimateBookSpineCm(book.pages);
                   const colorClass =
                     book.status === "READING"
                       ? "bg-emerald-400"
                       : "bg-amber-400";
-                  const heightPx = Math.max(28, cm * 18);
+                  const heightPx = Math.max(28, (cm ?? 0) * 18);
                   const wide = book.pages && book.pages > 300;
                   return (
                     <div
@@ -1346,7 +1351,7 @@ export default function Catalog({
                         <span className="truncate font-caption text-[10px] text-outline">{book.author}</span>
                       </div>
                       <span className="relative z-10 font-caption text-[10px] font-medium text-on-surface-variant">
-                        {cm.toFixed(1).replace(".", ",")} cm
+                        {formatSpineCm(cm)}
                       </span>
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 z-20">
                         <button

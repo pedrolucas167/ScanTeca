@@ -201,7 +201,7 @@ export default function LandingPage() {
                   </span>
                 </div>
                 <div className="flex flex-col rounded-md border border-outline-variant/20 bg-surface-container-low p-2.5">
-                  <span className="text-outline">Espessura Fís.</span>
+                  <span className="text-outline">Lombada estimada</span>
                   <span className="font-mono font-medium text-on-surface">
                     1,4 cm (Estante A2)
                   </span>
@@ -411,15 +411,15 @@ export default function LandingPage() {
                 Métricas Físicas da Estante
               </h3>
               <p className="mb-6 font-body-md text-body-md text-on-surface-variant">
-                Transforme números abstratos em presença palpável. Veja a altura
-                real de todas as suas lombadas empilhadas.
+                Veja a altura estimada das lombadas empilhadas a partir do número
+                de páginas dos seus livros.
               </p>
             </div>
             <div className="space-y-4 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-caption text-caption text-outline">
-                    Altura da Pilha Total
+                    Exemplo de altura estimada
                   </span>
                   <div className="font-headline-lg text-headline-lg tracking-tight text-primary">
                     4,82 metros
@@ -430,11 +430,10 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-md border border-outline-variant/20 bg-surface-container p-3">
-                <Icon decorative name="pets" className="text-2xl text-secondary" />
+                <Icon decorative name="menu_book" className="text-2xl text-secondary" />
                 <div className="font-caption text-caption text-on-surface-variant">
-                  Equivalente à altura de uma{" "}
-                  <strong className="text-on-surface">girafa adulta</strong> em
-                  lombadas de livros de verdade!
+                  A estimativa considera os volumes com páginas cadastradas e
+                  usa uma brochura em papel branco como referência.
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">

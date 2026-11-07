@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useCallback } from "react";
+import { formatSpineCm, summarizeBookSpines } from "@/lib/book-spine";
 
 function Icon({
   name,
@@ -74,10 +75,7 @@ export default function RotaNaEstante({ initialData }: { initialData: RouteData 
   const collectedCount = collected.size;
   const remaining = steps.length - collectedCount;
 
-  const totalSpineCm = steps.reduce((sum, s) => {
-    const cm = s.pages ? Math.max(0.8, Math.round(s.pages * 0.08 * 10) / 10) : 1;
-    return sum + cm;
-  }, 0);
+  const spine = summarizeBookSpines(steps);
 
   return (
     <div className="flex flex-1 flex-col bg-surface text-on-surface">
@@ -167,10 +165,13 @@ export default function RotaNaEstante({ initialData }: { initialData: RouteData 
                 <span className="font-body-sm text-body-sm text-on-surface font-medium">{steps.length}</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-outline">Lombada Total</span>
+                <span className="font-label-sm text-label-sm text-outline">Lombada Estimada</span>
                 <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                  {totalSpineCm.toFixed(1).replace(".", ",")} cm
+                  {formatSpineCm(spine.totalCm)}
                 </span>
+                {spine.missing > 0 && (
+                  <span className="font-caption text-caption text-outline">{spine.counted} de {steps.length} com páginas</span>
+                )}
               </div>
               <div className="flex flex-col">
                 <span className="font-label-sm text-label-sm text-outline">Progresso</span>
