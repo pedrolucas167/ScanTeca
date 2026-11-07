@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { generateEmbedding } from "./embeddings";
 import { fetchWithRetry } from "./fetch-with-retry";
 import { fetchWithTimeout } from "./fetch-with-timeout";
+import { estimateBookSpineCm } from "./book-spine";
 import {
   cleanTitle,
   normalize,
@@ -271,8 +272,9 @@ function assignColor(score: number): AffinityNode["color"] {
 }
 
 function buildSpineEstimate(pages: number | null): number {
-  if (!pages || pages <= 0) return 1.4;
-  return Math.round((pages / 140) * 10) / 10;
+  const cm = estimateBookSpineCm(pages);
+  // Keep the legacy numeric fallback in the recommendations payload.
+  return cm === null ? 1.4 : Number(cm.toFixed(1));
 }
 
 function estimatedRating(score: number): number {

@@ -13,6 +13,22 @@ function showCatalog() {
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it("mostra a estimativa física e explica a exclusão dos volumes sem páginas", () => {
+  const sample = catalogBooks(2).map((book, index) => toCatalogBook({ ...book, pages: index === 0 ? 250 : null }));
+  render(<Catalog books={sample} libraryName="Estante" shareEnabled={false} shareId={null} />);
+  expect(screen.getByRole("heading", { name: "1,4" })).toBeTruthy();
+  expect(screen.getByText(/Inclui 1 de 2 volumes/)).toBeTruthy();
+  expect(screen.getByRole("link", { name: "brochura em papel branco (KDP)" })).toBeTruthy();
+  expect(screen.queryByText(/Perto da altura/)).toBeNull();
+});
+
+it("exibe ausência de estimativa quando nenhuma contagem de páginas está cadastrada", () => {
+  const sample = catalogBooks(1).map((book) => toCatalogBook({ ...book, pages: null }));
+  render(<Catalog books={sample} libraryName="Estante" shareEnabled={false} shareId={null} />);
+  expect(screen.getByRole("heading", { name: "—" })).toBeTruthy();
+  expect(screen.getByText(/Sem páginas cadastradas para estimar a altura/)).toBeTruthy();
+});
+
 it("limita a renderização inicial sem buscar detalhes e encontra livros fora da primeira página", async () => {
   const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
   const { container } = showCatalog();

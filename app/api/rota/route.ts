@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { NextRequest } from "next/server";
+import { estimateBookSpineCm, formatSpineCm } from "@/lib/book-spine";
 
 interface SourceEntry {
   id: string;
@@ -76,9 +77,7 @@ export async function GET(request: NextRequest) {
       author: book.author,
       genre: book.genre,
       pages: book.pages,
-      spine: book.pages
-        ? `${Math.max(0.8, Math.round(book.pages * 0.08 * 10) / 10).toFixed(1).replace(".", ",")} cm`
-        : "—",
+      spine: formatSpineCm(estimateBookSpineCm(book.pages)),
       coverUrl: book.coverUrl,
       status: book.status,
       collection: book.collection.name,
