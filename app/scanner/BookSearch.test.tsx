@@ -29,6 +29,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  sessionStorage.removeItem("scanteca:book-search-timing");
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -162,4 +164,61 @@ it("abre a ficha existente quando a API informa um cadastro duplicado", async ()
   });
   expect(push).toHaveBeenCalledWith("/books/existing");
   expect(screen.queryByRole("heading", { name: book.title, level: 1 })).toBeNull();
+});
+
+it("não registra tempos de busca ou capa sem ativação na sessão", async () => {
+  const log = vi.spyOn(console, "info").mockImplementation(() => {});
+  fetchMock.mockResolvedValueOnce(Response.json({ results: [{
+    ...book,
+    coverUrl: "https://books.google.com/books/content?id=cover",
+  }] }));
+  render(<BookSearch />);
+  changeQuery(book.title);
+  await advance(500);
+  fireEvent.load(screen.getByRole("img", { name: `Capa de ${book.title}` }));
+  expect(log).not.toHaveBeenCalled();
+});
+
+it("registra tempos separados e apenas dados diagnósticos para a consulta e as capas", async () => {
+  sessionStorage.setItem("scanteca:book-search-timing", "1");
+  const log = vi.spyOn(console, "info").mockImplementation(() => {});
+  const pending = Promise.withResolvers<Response>();
+  fetchMock.mockReturnValueOnce(pending.promise);
+  render(<BookSearch />);
+  changeQuery("consulta privada");
+  await advance(500);
+  await advance(120);
+  await act(async () => {
+    pending.resolve(Response.json({ results: [
+      { ...book, coverUrl: "https://books.google.com/books/content?id=cover" },
+      { ...book, googleId: "other", title: "Outro livro", coverUrl: "https://books.google.com/books/content?id=other" },
+    ] }));
+  });
+  const cover = screen.getByRole("img", { name: `Capa de ${book.title}` });
+  await advance(250);
+  fireEvent.load(cover);
+  fireEvent.load(cover);
+  await advance(100);
+  fireEvent.error(screen.getByRole("img", { name: "Capa de Outro livro" }));
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(log.mock.calls).toEqual([
+    ["[ScanTeca book search]", { stage: "results", outcome: "ok", status: 200, durationMs: 120 }],
+    ["[ScanTeca book search]", { stage: "thumbnail", outcome: "load", durationMs: 250 }],
+    ["[ScanTeca book search]", { stage: "thumbnail", outcome: "error", durationMs: 350 }],
+  ]);
+});
+
+it("registra o status HTTP da busca sem registrar o corpo do erro", async () => {
+  sessionStorage.setItem("scanteca:book-search-timing", "1");
+  const log = vi.spyOn(console, "info").mockImplementation(() => {});
+  fetchMock.mockResolvedValueOnce(Response.json({ error: "Tente mais tarde" }, { status: 429 }));
+  render(<BookSearch />);
+  changeQuery(book.title);
+  await advance(500);
+
+  expect(screen.getByText("Tente mais tarde")).toBeTruthy();
+  expect(log.mock.calls).toEqual([
+    ["[ScanTeca book search]", { stage: "results", outcome: "http-error", status: 429, durationMs: 0 }],
+  ]);
 });

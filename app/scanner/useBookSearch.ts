@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { logBookSearchTiming, startBookSearchTiming } from "./book-search-timing";
 
 export interface SearchResult {
   googleId: string;
@@ -33,6 +34,9 @@ export function useBookSearch(setMessage: (message: string | null) => void) {
     setMessage(null);
     setSearched(true);
 
+    const startedAt = startBookSearchTiming();
+    let status: number | undefined;
+    let outcome: "ok" | "http-error" | "request-error" = "request-error";
     try {
       const res = await fetch("/api/search-books", {
         method: "POST",
@@ -41,7 +45,9 @@ export function useBookSearch(setMessage: (message: string | null) => void) {
         signal: controller.signal,
       });
 
+      status = res.status;
       const data = await res.json();
+      outcome = res.ok ? "ok" : "http-error";
 
       if (controller.signal.aborted) return;
 
@@ -58,6 +64,11 @@ export function useBookSearch(setMessage: (message: string | null) => void) {
       if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
       setMessage("Erro de rede ao buscar");
     } finally {
+      logBookSearchTiming(startedAt, {
+        stage: "results",
+        outcome: controller.signal.aborted ? "aborted" : outcome,
+        status,
+      });
       if (!controller.signal.aborted) {
         setLoading(false);
       }
