@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useSyncExternalStore } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Markdown from "./Markdown";
 import { Icon } from "@/components/ui/Icon";
 import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
 import { OracleMemoryDialog } from "@/components/oracle/OracleMemoryDialog";
 import { OracleComposer } from "@/components/oracle/OracleComposer";
+import { useLocalDictation } from "@/components/oracle/useLocalDictation";
+import { useOnlineRecording } from "@/components/oracle/useOnlineRecording";
 import { useOracleViewport } from "@/components/oracle/useOracleViewport";
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { consumeOracleEvents } from "@/lib/oracle-stream";
@@ -23,7 +25,6 @@ export default function OraclePage() {
   const [loading, setLoading] = useState(false);
   const [generationStage, setGenerationStage] = useState("Consultando sua estante...");
   const [error, setError] = useState<string | null>(null);
-  const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
@@ -60,26 +61,17 @@ export default function OraclePage() {
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
   const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<string | null>(null);
   const [playingTtsIndex, setPlayingTtsIndex] = useState<number | null>(null);
-  const micSupported = useSyncExternalStore(
-    () => () => {},
-    () =>
-      typeof navigator !== "undefined" &&
-      !!navigator.mediaDevices?.getUserMedia,
-    () => false
-  );
   const shellRef = useRef<HTMLDivElement>(null);
   useOracleViewport(shellRef);
   const scrollRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const transcriptionRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const loadingRef = useRef(false);
   const voiceOnRef = useRef(false);
   const audioPlayingRef = useRef(false);
   const audioDoneRef = useRef<(() => void) | null>(null);
   const ttsBufferRef = useRef("");
-  const micBusyRef = useRef(false);
   const streamDoneRef = useRef(true);
   const voiceChatDataRef = useRef<string[]>([]);
   const pendingCharsRef = useRef("");
@@ -88,6 +80,26 @@ export default function OraclePage() {
   const stickToBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const receivedAnyRef = useRef(false);
+
+  const appendTranscript = (text: string) => {
+    setInput(previous => [previous.trimEnd(), text].filter(Boolean).join(" "));
+  };
+
+  const dictation = useLocalDictation(appendTranscript);
+  const onlineRecording = useOnlineRecording(setError);
+  const voiceBusy = () => dictation.isActive() || onlineRecording.isActive() || !!transcriptionRef.current;
+
+  useEffect(() => () => {
+    transcriptionRef.current?.abort();
+  }, []);
+
+  const cancelVoice = () => {
+    dictation.cancel();
+    onlineRecording.cancel();
+    transcriptionRef.current?.abort();
+    transcriptionRef.current = null;
+    setTranscribing(false);
+  };
 
   useEffect(() => {
     const panel = scrollRef.current;
@@ -282,7 +294,7 @@ export default function OraclePage() {
     question: string,
     opts?: { regenerate?: boolean; retry?: boolean }
   ) => {
-    if (!question || loadingRef.current || recording || transcribing) return;
+    if (!question || loadingRef.current || voiceBusy()) return;
     const previousMessages = opts?.regenerate ? messages : null;
     loadingRef.current = true;
     streamDoneRef.current = false;
@@ -381,8 +393,9 @@ export default function OraclePage() {
   };
 
   const sendAudio = async (blob: Blob) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
+    if (loadingRef.current || voiceBusy()) return;
+    const controller = new AbortController();
+    transcriptionRef.current = controller;
     setTranscribing(true);
     setError(null);
     setFailedSend(null);
@@ -393,21 +406,25 @@ export default function OraclePage() {
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(blob);
       });
+      if (controller.signal.aborted) return;
       const res = await fetch("/api/oracle/transcribe", {
         method: "POST", headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({ audio: { data: dataUrl.split(",")[1],
-          format: blob.type.split("/")[1]?.split(";")[0] || "webm" } }),
+          format: blob.type.split("/")[1]?.split(";")[0] } }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Não consegui transcrever o áudio.");
-      setInput(previous => [previous.trimEnd(), data.transcript].filter(Boolean).join(" "));
+      if (!controller.signal.aborted) appendTranscript(data.transcript);
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Não consegui transcrever o áudio.");
       setFailedSend({ kind: "audio", blob, voice: false });
     } finally {
-      loadingRef.current = false;
-      setTranscribing(false);
-      inputRef.current?.focus();
+      if (transcriptionRef.current === controller && !controller.signal.aborted) {
+        transcriptionRef.current = null;
+        setTranscribing(false);
+      }
     }
   };
 
@@ -543,7 +560,7 @@ export default function OraclePage() {
   };
 
   const sendVoice = async (blob: Blob) => {
-    if (loadingRef.current) return;
+    if (loadingRef.current || voiceBusy()) return;
     loadingRef.current = true;
     streamDoneRef.current = false;
     receivedAnyRef.current = false;
@@ -634,7 +651,7 @@ export default function OraclePage() {
   };
 
   const regenerateResponse = () => {
-    if (loadingRef.current) return;
+    if (loadingRef.current || voiceBusy()) return;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUser) return;
     setMessages((prev) =>
@@ -649,7 +666,7 @@ export default function OraclePage() {
 
   const retryFailedSend = () => {
     const failed = failedSend;
-    if (!failed || loadingRef.current) return;
+    if (!failed || loadingRef.current || voiceBusy()) return;
     setFailedSend(null);
     setError(null);
     if (failed.kind === "audio") {
@@ -686,6 +703,7 @@ export default function OraclePage() {
     setConfirmDeleteSessionId(null);
     setSessions((prev) => prev.filter((s) => s.id !== id));
     if (sessionId === id) {
+      cancelVoice();
       stopAudio();
       stopReveal();
       setSessionId(null);
@@ -696,45 +714,16 @@ export default function OraclePage() {
     await fetch(`/api/oracle/sessions/${id}`, { method: "DELETE" }).catch(() => {});
   };
 
-  const handleMic = async () => {
-    if (recording) {
-      mediaRecorderRef.current?.stop();
-      return;
-    }
-    if (micBusyRef.current || loadingRef.current) return;
-    micBusyRef.current = true;
-    try {
-      stopAudio();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "audio/ogg";
-      const rec = new MediaRecorder(stream, { mimeType: mime });
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      rec.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setRecording(false);
-        mediaRecorderRef.current = null;
-        const blob = new Blob(chunksRef.current, { type: mime });
-        chunksRef.current = [];
-        if (blob.size > 0) {
-          void sendAudio(blob);
-        }
-      };
-      mediaRecorderRef.current = rec;
-      setRecording(true);
-      rec.start();
-    } catch {
-      setError("Não consegui acessar o microfone. Verifique a permissão.");
-    } finally {
-      micBusyRef.current = false;
-    }
+  const startVoice = (start: () => Promise<void>) => {
+    if (voiceBusy() || loadingRef.current) return;
+    stopAudio();
+    setError(null);
+    setFailedSend(null);
+    void start();
   };
 
   const handleClear = async () => {
+    cancelVoice();
     stopAudio();
     stopReveal();
     setMessages([]);
@@ -778,7 +767,7 @@ export default function OraclePage() {
   };
 
   const compareSelected = () => {
-    if (selectedCompare.length !== 2) return;
+    if (selectedCompare.length !== 2 || voiceBusy()) return;
     const [first, second] = selectedCompare;
     if (!first || !second) return;
     setSelectedCompare([]);
@@ -788,6 +777,7 @@ export default function OraclePage() {
   };
 
   const startNewSession = () => {
+    cancelVoice();
     stopAudio();
     stopReveal();
     setSessionId(null);
@@ -801,6 +791,7 @@ export default function OraclePage() {
 
   const loadSession = async (session: OracleSession) => {
     if (loadingRef.current) return;
+    cancelVoice();
     stopReveal();
     stickToBottomRef.current = true;
     setError(null);
@@ -901,7 +892,7 @@ export default function OraclePage() {
 
   const maybeAutoListen = () => {
     // Auto-listen logic if voice is on and not busy
-    if (voiceOnRef.current && !micBusyRef.current && !loadingRef.current) {
+    if (voiceOnRef.current && !voiceBusy() && !loadingRef.current) {
       // Would trigger mic listening here
     }
   };
@@ -909,6 +900,16 @@ export default function OraclePage() {
   const releaseAutoScroll = () => {
     stickToBottomRef.current = false;
   };
+
+  const recordingOnline = onlineRecording.phase === "recording";
+  const dictating = dictation.phase === "listening";
+  const voiceInProgress = transcribing || onlineRecording.phase !== "idle" || dictation.phase !== "idle";
+  const onlineNotice = {
+    idle: null,
+    starting: "Abrindo o microfone…",
+    recording: "Gravando áudio. Toque em parar para enviá-lo ao serviço online, o que pode gerar custo de transcrição.",
+    finishing: "Finalizando a gravação…",
+  }[onlineRecording.phase];
 
   return (
     <div ref={shellRef} data-oracle-chat className="oracle-chat-shell flex h-[calc(100dvh-4rem)] min-h-0 flex-col bg-surface text-on-surface">
@@ -1480,7 +1481,7 @@ export default function OraclePage() {
                 className="flex flex-shrink-0 items-center gap-1 rounded-full border border-error/40 px-3 py-1 font-caption text-caption font-semibold transition-colors hover:bg-error-container/40"
               >
                 <Icon decorative name="refresh" className="text-sm" />
-                Tentar novamente
+                {failedSend.kind === "audio" ? "Reenviar áudio ao serviço online" : "Tentar novamente"}
               </button>
             )}
           </div>
@@ -1534,8 +1535,15 @@ export default function OraclePage() {
 
           <OracleComposer
             inputRef={inputRef} value={input} onChange={setInput} onSend={question => void sendMessage(question)}
-            loading={loading} recording={recording} transcribing={transcribing}
-            micSupported={micSupported} onMic={() => void handleMic()} onStop={stopGeneration}
+            loading={loading} recording={recordingOnline || dictating}
+            transcribing={voiceInProgress && !recordingOnline && !dictating}
+            micSupported={dictation.supported} onlineRecording={recordingOnline}
+            voiceNotice={transcribing ? "Transcrevendo no serviço online…" : onlineNotice ?? dictation.notice}
+            onMic={recordingOnline ? onlineRecording.stopAndSubmit : dictating ? dictation.stop : () => startVoice(dictation.start)}
+            onOnlineMic={onlineRecording.supported ? () => startVoice(() => onlineRecording.start(blob => void sendAudio(blob))) : undefined}
+            onInstallVoice={dictation.canInstall ? () => startVoice(dictation.install) : undefined}
+            onCancelVoice={voiceInProgress ? cancelVoice : undefined}
+            onStop={stopGeneration}
           />
         </div>
       </div>
