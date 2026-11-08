@@ -127,6 +127,28 @@ it("encerra ao fim da fala e preserva o rascunho em caso de permissão negada ou
   expect(requests()).toEqual([]);
 });
 
+it.each(["", "Texto reconhecido"])("libera o rascunho quando o navegador não encerra após parar (%j)", async text => {
+  render(<OraclePage />);
+  const speech = await startDictation();
+  if (text) act(() => speech.onresult?.({ resultIndex: 0, results: [result(text)] }));
+  const lateEnd = speech.onend;
+
+  vi.useFakeTimers();
+  try {
+    fireEvent.click(button("Parar ditado e revisar"));
+    expect(draft().disabled).toBe(true);
+    act(() => vi.advanceTimersByTime(4000));
+    expect(speech.abort).toHaveBeenCalledOnce();
+    expect(draft().disabled).toBe(false);
+    if (!text) expect(screen.getByText(/Não consegui iniciar ou concluir o ditado local/)).toBeTruthy();
+    act(() => lateEnd?.());
+    expect(draft().value).toBe(text);
+    expect(requests()).toEqual([]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("instala o pacote apenas por ação explícita e espera um novo toque para ouvir", async () => {
   vi.stubGlobal("SpeechRecognition", undefined);
   vi.stubGlobal("webkitSpeechRecognition", LocalRecognition);

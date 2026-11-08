@@ -27,6 +27,7 @@ const options: LanguageOptions = { langs: [language], processLocally: true };
 const unavailable = "Ditado local em português do Brasil indisponível. Você pode digitar sua pergunta.";
 const noSpeech = "Não identifiquei fala. Tente ditar novamente ou digite sua pergunta.";
 const failed = "Não consegui iniciar ou concluir o ditado local. Tente novamente ou digite sua pergunta.";
+const finishTimeoutMs = 4000;
 const permissionDenied = "Permita o acesso ao microfone no navegador ou digite sua pergunta.";
 const errors: Partial<Record<SpeechRecognitionErrorCode, string>> = {
   "no-speech": noSpeech,
@@ -49,9 +50,10 @@ const subscribe = () => () => {};
 const getSupported = () => Boolean(getRecognition());
 const getServerSupported = () => false;
 type Phase = "idle" | "checking" | "installing" | "listening" | "finishing";
-type Attempt = { recognition?: Recognition; stopping?: boolean };
+type Attempt = { recognition?: Recognition; finishTimer?: number; stop?: () => void };
 
 function discard(attempt: Attempt | null) {
+  window.clearTimeout(attempt?.finishTimer);
   const recognition = attempt?.recognition;
   if (!recognition) return;
   recognition.onstart = null;
@@ -98,6 +100,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
     setCanInstall(false);
 
     function finish(message: string | null) {
+      window.clearTimeout(attempt.finishTimer);
       active.current = null;
       setPhase("idle");
       setNotice(message);
@@ -129,7 +132,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
 
       const segments = new Map<number, string>();
       recognition.onstart = () => {
-        if (active.current === attempt && !attempt.stopping) setPhase("listening");
+        if (active.current === attempt && attempt.finishTimer === undefined) setPhase("listening");
       };
       recognition.onresult = event => {
         if (active.current !== attempt) return;
@@ -143,12 +146,27 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
         finish(errors[event.error] ?? failed);
         discard(attempt);
       };
-      recognition.onend = () => {
+      const finishWithResults = (emptyMessage: string) => {
         if (active.current !== attempt) return;
         const transcript = [...segments].sort(([a], [b]) => a - b)
           .map(([, text]) => text).filter(Boolean).join(" ");
-        finish(transcript ? null : noSpeech);
+        finish(transcript ? null : emptyMessage);
         if (transcript) onTranscript(transcript);
+      };
+      recognition.onend = () => finishWithResults(noSpeech);
+      attempt.stop = () => {
+        if (attempt.finishTimer !== undefined) return;
+        setPhase("finishing");
+        attempt.finishTimer = window.setTimeout(() => {
+          finishWithResults(failed);
+          discard(attempt);
+        }, finishTimeoutMs);
+        try {
+          recognition.stop();
+        } catch {
+          finishWithResults(failed);
+          discard(attempt);
+        }
       };
       recognition.start();
     } catch (error) {
@@ -183,16 +201,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
   }
 
   function stop() {
-    const attempt = active.current;
-    if (!attempt?.recognition || attempt.stopping) return;
-    attempt.stopping = true;
-    setPhase("finishing");
-    try {
-      attempt.recognition.stop();
-    } catch {
-      cancel();
-      setNotice(failed);
-    }
+    active.current?.stop?.();
   }
 
   const progress = {
