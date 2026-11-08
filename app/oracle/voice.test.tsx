@@ -162,7 +162,7 @@ it("sugere nomes literários e tenta uma vez sem dicas quando o pacote as rejeit
   await waitFor(() => expect(LocalRecognition.current?.start).toHaveBeenCalledOnce());
   const speech = LocalRecognition.current as RecognitionWithHints;
   expect(speech.phrases.map(({ phrase }) => phrase)).toEqual(expect.arrayContaining([
-    "Günter Grass", "Byung-Chul Han", "Michel Foucault", "Jean-Paul Sartre",
+    "Günter Grass", "Byung-Chul Han", "Michel Foucault", "Jean-Paul Sartre", "Die Blechtrommel",
   ]));
   act(() => speech.onerror?.({ error: "phrases-not-supported" }));
   expect(speech.phrases).toEqual([]);
@@ -175,6 +175,21 @@ it("sugere nomes literários e tenta uma vez sem dicas quando o pacote as rejeit
   expect(draft().disabled).toBe(false);
   const next = await startDictation() as RecognitionWithHints;
   expect(next.phrases).toEqual([]);
+  expect(requests()).toEqual([]);
+});
+
+it.each([
+  ["Você conhece as obras de ganter? Graça", "Você conhece as obras de Günter Grass?"],
+  ["Quero comparar as obras gigantesergras com as de Aristóteles.", "Quero comparar as obras de Günter Grass com as de Aristóteles."],
+  ["Você falou com Ganter Graça?", "Você falou com Ganter Graça?"],
+])("revisa o nome de Grass apenas em contexto literário (%s)", async (spoken, expected) => {
+  render(<OraclePage />);
+  const speech = await startDictation();
+  act(() => {
+    speech.onresult?.({ resultIndex: 0, results: [result(spoken)] });
+    speech.onend?.();
+  });
+  expect(draft().value).toBe(expected);
   expect(requests()).toEqual([]);
 });
 

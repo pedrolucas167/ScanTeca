@@ -27,11 +27,13 @@ type RecognitionConstructor = {
 
 const language = "pt-BR";
 const options: LanguageOptions = { langs: [language], processLocally: true };
-const literaryNames = [
+const literaryHints = [
   "William Shakespeare", "Günter Grass", "Martin Heidegger", "Byung-Chul Han",
   "Karl Marx", "Oppenheimer", "Werner Heisenberg", "Michel Foucault",
   "Jean-Paul Sartre", "Arthur Rimbaud",
+  "O Tambor", "Die Blechtrommel",
 ];
+const grassInLiteraryContext = /\b((?:obras?|livros?|romances?)\s+)(d[eo]\s+)?(ganter(?:\s*\?\s*|\s+)graça|gigantesergras)(?![\p{L}\p{M}\p{N}])/giu;
 const unavailable = "Ditado local em português do Brasil indisponível. Você pode digitar sua pergunta.";
 const noSpeech = "Não identifiquei fala. Tente ditar novamente ou digite sua pergunta.";
 const failed = "Não consegui iniciar ou concluir o ditado local. Tente novamente ou digite sua pergunta.";
@@ -60,11 +62,19 @@ function addLiteraryHints(recognition: Recognition) {
   };
   if (!SpeechRecognitionPhrase || !("phrases" in recognition)) return false;
   try {
-    recognition.phrases = literaryNames.map(name => new SpeechRecognitionPhrase(name, 3));
+    recognition.phrases = literaryHints.map(phrase => new SpeechRecognitionPhrase(phrase, 3));
     return true;
   } catch {
     return false;
   }
+}
+
+function correctLiteraryTranscript(transcript: string) {
+  return transcript.replace(grassInLiteraryContext, (match, reference: string, preposition: string | undefined,
+    name: string, offset: number) => {
+    const questionEndsHere = name.includes("?") && offset + match.length === transcript.length;
+    return `${reference}${preposition ?? "de "}Günter Grass${questionEndsHere ? "?" : ""}`;
+  });
 }
 
 const subscribe = () => () => {};
@@ -171,7 +181,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
         const transcript = [...segments].sort(([a], [b]) => a - b)
           .map(([, text]) => text).filter(Boolean).join(" ");
         finish(transcript ? transcriptMessage : emptyMessage);
-        if (transcript) onTranscript(transcript);
+        if (transcript) onTranscript(correctLiteraryTranscript(transcript));
       };
       recognition.onerror = event => {
         if (active.current !== attempt) return;
