@@ -83,12 +83,16 @@ async function startDictation() {
 }
 
 it("exige processamento local, consolida resultados e só gera após envio explícito do texto revisado", async () => {
+  vi.stubGlobal("SpeechRecognition", class extends LocalRecognition {
+    unspokenPunctuation = false;
+  });
   render(<OraclePage />);
   fireEvent.change(draft(), { target: { value: "Quero saber:" } });
   const speech = await startDictation();
   expect(LocalRecognition.available).toHaveBeenCalledWith(language);
   expect(speech.lang).toBe("pt-BR");
   expect(speech.processLocally).toBe(true);
+  expect(speech).toHaveProperty("unspokenPunctuation", true);
   expect(getUserMedia).not.toHaveBeenCalled();
 
   act(() => {
@@ -112,6 +116,7 @@ it("exige processamento local, consolida resultados e só gera após envio expl�
 it("encerra ao fim da fala e preserva o rascunho em caso de permissão negada ou silêncio", async () => {
   render(<OraclePage />);
   const speech = await startDictation();
+  expect(speech).not.toHaveProperty("unspokenPunctuation");
   act(() => {
     speech.onresult?.({ resultIndex: 0, results: [result("Uma pergunta")] });
     speech.onend?.();

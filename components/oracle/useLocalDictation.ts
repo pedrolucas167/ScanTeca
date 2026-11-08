@@ -7,6 +7,7 @@ type Recognition = {
   processLocally: boolean;
   continuous: boolean;
   interimResults: boolean;
+  unspokenPunctuation?: boolean;
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
@@ -129,6 +130,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
       }
       recognition.continuous = false;
       recognition.interimResults = false;
+      if ("unspokenPunctuation" in recognition) recognition.unspokenPunctuation = true;
 
       const segments = new Map<number, string>();
       recognition.onstart = () => {
