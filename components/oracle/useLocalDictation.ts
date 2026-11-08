@@ -2,12 +2,14 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 type Availability = "available" | "unavailable" | "downloadable" | "downloading";
 type LanguageOptions = { langs: string[]; processLocally: true };
+type RecognitionPhrase = { phrase: string; boost: number };
 type Recognition = {
   lang: string;
   processLocally: boolean;
   continuous: boolean;
   interimResults: boolean;
   unspokenPunctuation?: boolean;
+  phrases?: RecognitionPhrase[];
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
@@ -25,6 +27,11 @@ type RecognitionConstructor = {
 
 const language = "pt-BR";
 const options: LanguageOptions = { langs: [language], processLocally: true };
+const literaryNames = [
+  "William Shakespeare", "Günter Grass", "Martin Heidegger", "Byung-Chul Han",
+  "Karl Marx", "Oppenheimer", "Werner Heisenberg", "Michel Foucault",
+  "Jean-Paul Sartre", "Arthur Rimbaud",
+];
 const unavailable = "Ditado local em português do Brasil indisponível. Você pode digitar sua pergunta.";
 const noSpeech = "Não identifiquei fala. Tente ditar novamente ou digite sua pergunta.";
 const failed = "Não consegui iniciar ou concluir o ditado local. Tente novamente ou digite sua pergunta.";
@@ -45,6 +52,19 @@ function getRecognition() {
   };
   return [browser.SpeechRecognition, browser.webkitSpeechRecognition]
     .find(Recognition => typeof Recognition?.available === "function" && "processLocally" in Recognition.prototype);
+}
+
+function addLiteraryHints(recognition: Recognition) {
+  const { SpeechRecognitionPhrase } = window as Window & {
+    SpeechRecognitionPhrase?: new (phrase: string, boost: number) => RecognitionPhrase;
+  };
+  if (!SpeechRecognitionPhrase || !("phrases" in recognition)) return false;
+  try {
+    recognition.phrases = literaryNames.map(name => new SpeechRecognitionPhrase(name, 3));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const subscribe = () => () => {};
@@ -74,6 +94,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
   const [notice, setNotice] = useState<string | null>(null);
   const [canInstall, setCanInstall] = useState(false);
   const active = useRef<Attempt | null>(null);
+  const hintsRejected = useRef(false);
 
   useEffect(() => () => {
     const attempt = active.current;
@@ -131,9 +152,11 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
       recognition.continuous = true;
       recognition.interimResults = false;
       if ("unspokenPunctuation" in recognition) recognition.unspokenPunctuation = true;
+      let retryWithoutHints = !hintsRejected.current && addLiteraryHints(recognition);
 
       const segments = new Map<number, string>();
       recognition.onstart = () => {
+        retryWithoutHints = false;
         if (active.current === attempt && attempt.finishTimer === undefined) setPhase("listening");
       };
       recognition.onresult = event => {
@@ -151,6 +174,18 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
         if (transcript) onTranscript(transcript);
       };
       recognition.onerror = event => {
+        if (active.current !== attempt) return;
+        if (event.error === "phrases-not-supported" && retryWithoutHints) {
+          retryWithoutHints = false;
+          hintsRejected.current = true;
+          try {
+            recognition.phrases = [];
+            recognition.start();
+            return;
+          } catch {
+            // Report the failure if the browser cannot start without hints.
+          }
+        }
         const message = errors[event.error] ?? failed;
         finishWithResults(message, message);
         discard(attempt);

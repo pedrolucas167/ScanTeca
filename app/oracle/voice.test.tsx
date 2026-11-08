@@ -144,6 +144,40 @@ it("preserva o rascunho quando o navegador encerra ou interrompe a escuta", asyn
   expect(requests()).toEqual([]);
 });
 
+it("sugere nomes literários e tenta uma vez sem dicas quando o pacote as rejeita", async () => {
+  class Phrase {
+    constructor(public phrase: string, public boost: number) {}
+  }
+  class RecognitionWithHints extends LocalRecognition {
+    phrases: Phrase[] = [];
+    start = vi.fn(() => {
+      if (this.phrases.length === 0) this.onstart?.();
+    });
+  }
+  vi.stubGlobal("SpeechRecognitionPhrase", Phrase);
+  vi.stubGlobal("SpeechRecognition", RecognitionWithHints);
+
+  render(<OraclePage />);
+  fireEvent.click(button("Ditar no aparelho"));
+  await waitFor(() => expect(LocalRecognition.current?.start).toHaveBeenCalledOnce());
+  const speech = LocalRecognition.current as RecognitionWithHints;
+  expect(speech.phrases.map(({ phrase }) => phrase)).toEqual(expect.arrayContaining([
+    "Günter Grass", "Byung-Chul Han", "Michel Foucault", "Jean-Paul Sartre",
+  ]));
+  act(() => speech.onerror?.({ error: "phrases-not-supported" }));
+  expect(speech.phrases).toEqual([]);
+  expect(speech.start).toHaveBeenCalledTimes(2);
+  expect(speech.processLocally).toBe(true);
+  expect(button("Parar ditado e revisar")).toBeTruthy();
+
+  act(() => speech.onerror?.({ error: "phrases-not-supported" }));
+  expect(speech.start).toHaveBeenCalledTimes(2);
+  expect(draft().disabled).toBe(false);
+  const next = await startDictation() as RecognitionWithHints;
+  expect(next.phrases).toEqual([]);
+  expect(requests()).toEqual([]);
+});
+
 it.each(["", "Texto reconhecido"])("libera o rascunho quando o navegador não encerra após parar (%j)", async text => {
   render(<OraclePage />);
   const speech = await startDictation();
