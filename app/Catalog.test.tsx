@@ -13,13 +13,21 @@ function showCatalog() {
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("mostra a estimativa física e explica a exclusão dos volumes sem páginas", () => {
-  const sample = catalogBooks(2).map((book, index) => toCatalogBook({ ...book, pages: index === 0 ? 250 : null }));
+it.each([[1, "1,4"], [2, "2,9"]] as const)("mostra a estimativa física com %i de 2 volumes com páginas", (count, height) => {
+  const sample = catalogBooks(2).map((book, index) => toCatalogBook({ ...book, pages: index < count ? 250 : null }));
   render(<Catalog books={sample} libraryName="Estante" shareEnabled={false} shareId={null} />);
-  expect(screen.getByRole("heading", { name: "1,4" })).toBeTruthy();
-  expect(screen.getByText(/Inclui 1 de 2 volumes/)).toBeTruthy();
-  expect(screen.getByRole("link", { name: "brochura em papel branco (KDP)" })).toBeTruthy();
-  expect(screen.queryByText(/Perto da altura/)).toBeNull();
+  expect(screen.getByRole("heading", { name: height })).toBeTruthy();
+  expect(screen.getByText(`Estimativa baseada em ${count} de 2 volumes com páginas cadastradas.`)).toBeTruthy();
+  expect(screen.queryByText(/KDP/)).toBeNull();
+  expect(screen.queryByText(/travessão|aro de basquete|girafa|réguas/)).toBeNull();
+});
+
+it("compara 1,38 m ao comprimento de cinco réguas de 30 cm", () => {
+  const sample = catalogBooks(97).map((book, index) => toCatalogBook({ ...book, pages: index < 84 ? 287 : null }));
+  render(<Catalog books={sample} libraryName="Estante" shareEnabled={false} shareId={null} />);
+  expect(screen.getByRole("heading", { name: "1,38" })).toBeTruthy();
+  expect(screen.getByText("Estimativa baseada em 84 de 97 volumes com páginas cadastradas.")).toBeTruthy();
+  expect(screen.getByText("Quase").textContent).toBe("Quase o comprimento de cinco réguas de 30 cm enfileiradas (1,50 m)");
 });
 
 it("exibe ausência de estimativa quando nenhuma contagem de páginas está cadastrada", () => {

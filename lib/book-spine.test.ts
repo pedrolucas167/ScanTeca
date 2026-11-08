@@ -23,6 +23,7 @@ it("exibe ausência de estimativa para acervo vazio ou sem páginas válidas", (
 });
 
 it.each([
+  [1.38, 1.50],
   [2.2, 2.44],
   [2.44, 2.44],
   [3.02, 3.05],
@@ -32,6 +33,6 @@ it.each([
   expect(compareSpineHeight(meters)?.meters).toBe(reference);
 });
 
-it.each([0, 2.19, 2.72, 4.82, 6.04, 19.42])("exibe %f m sem analogia distante", (meters) => {
+it.each([0, 1.34, 1.66, 2.19, 2.72, 4.82, 6.04, 19.42])("exibe %f m sem analogia distante", (meters) => {
   expect(compareSpineHeight(meters)).toBeNull();
 });
