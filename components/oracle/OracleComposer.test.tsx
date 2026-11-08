@@ -57,11 +57,11 @@ describe("compositor do Oráculo", () => {
 
   it("mantém gravação revisável e bloqueia envio enquanto transcreve", () => {
     const props = setup({ recording: true });
-    fireEvent.click(screen.getByRole("button", { name: "Parar e transcrever" }));
+    fireEvent.click(screen.getByRole("button", { name: "Parar ditado e revisar" }));
     expect(props.onMic).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Enviar mensagem" })).toHaveProperty("disabled", true);
     cleanup();
-    setup({ transcribing: true });
+    setup({ transcribing: true, voiceNotice: "Transcrevendo áudio…" });
     expect(screen.getByRole("status").textContent).toBe("Transcrevendo áudio…");
     expect(screen.getByRole("textbox")).toHaveProperty("disabled", true);
   });
