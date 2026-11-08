@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { openRouterChat } from "@/lib/openrouter-chat";
+import { oracleChat } from "./chat";
 
 interface ProfileSnapshot {
   oracleProfile: string | null;
@@ -17,7 +17,7 @@ export async function updateReaderProfile({ userId, snapshot, question, apiKey, 
 }) {
   if (!snapshot.oracleMemoryEnabled || signal.aborted) return;
   try {
-    const response = await openRouterChat({
+    const response = await oracleChat({
       apiKey, timeoutMs: 8000,
       signal,
       body: { model, stream: false, max_tokens: 120, messages: [{ role: "user", content:

@@ -12,6 +12,7 @@ import { groundedFallbackResponse } from "./responses";
 import { buildOracleSystemPrompt } from "./prompt";
 import { generateOracleResponse, type OracleChatMessage } from "./generation";
 import { createOraclePipeline } from "./pipeline";
+import { usesMaritaca } from "./chat";
 
 export async function answerOracleQuestion({ userId, question: trimmed, mode, sessionId, currentRequestMessageId,
   temperature, scope, regenerate, apiKey, signal: requestSignal, schedule }: {
@@ -31,7 +32,7 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     ));
     const retrievalStartedAt = Date.now();
     stage("search");
-    const questionEmbedding = await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
+    const questionEmbedding = usesMaritaca() ? null : await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
       signal, onUsage: usage => metrics.recordUsage("embedding", usage),
     }));
     signal.throwIfAborted();

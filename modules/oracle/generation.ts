@@ -1,7 +1,7 @@
 import type { LibrarySetting } from "@prisma/client";
 import type { OracleMode } from "@/lib/constants/oracle";
 import type { Source, RetrievalStats } from "@/lib/types/oracle";
-import { openRouterChat } from "@/lib/openrouter-chat";
+import { oracleChat } from "./chat";
 import { validateOracleResponse } from "@/lib/oracle-quality";
 import { readOracleCompletion } from "./completion";
 import { validateCitations, validateInventoryClaims } from "./evidence";
@@ -23,7 +23,7 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
   let consumerCancelled = false;
   const generationSignal = AbortSignal.any([signal, cancellation.signal]);
   stage("generation");
-  const llmRes = await metrics.measure("generation", () => openRouterChat({
+  const llmRes = await metrics.measure("generation", () => oracleChat({
     apiKey,
     signal: generationSignal,
     body: {
@@ -37,7 +37,7 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
 
   if (!llmRes.ok || !llmRes.body) {
     await llmRes.body?.cancel().catch(() => undefined);
-    console.error("[oracle] OpenRouter chat error:", llmRes.status);
+    console.error("[oracle] Chat provider error:", llmRes.status);
     return new Response(
       JSON.stringify({ error: "Erro ao consultar o Oráculo" }),
       { status: 502, headers: { "Content-Type": "application/json" } }
