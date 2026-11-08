@@ -128,7 +128,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
         finish(unavailable);
         return;
       }
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = false;
       if ("unspokenPunctuation" in recognition) recognition.unspokenPunctuation = true;
 
@@ -143,19 +143,20 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
           if (result?.isFinal) segments.set(index, result[0]?.transcript.trim() ?? "");
         }
       };
-      recognition.onerror = event => {
-        if (active.current !== attempt) return;
-        finish(errors[event.error] ?? failed);
-        discard(attempt);
-      };
-      const finishWithResults = (emptyMessage: string) => {
+      const finishWithResults = (emptyMessage: string, transcriptMessage: string | null = null) => {
         if (active.current !== attempt) return;
         const transcript = [...segments].sort(([a], [b]) => a - b)
           .map(([, text]) => text).filter(Boolean).join(" ");
-        finish(transcript ? null : emptyMessage);
+        finish(transcript ? transcriptMessage : emptyMessage);
         if (transcript) onTranscript(transcript);
       };
-      recognition.onend = () => finishWithResults(noSpeech);
+      recognition.onerror = event => {
+        const message = errors[event.error] ?? failed;
+        finishWithResults(message, message);
+        discard(attempt);
+      };
+      recognition.onend = () => finishWithResults(noSpeech,
+        attempt.finishTimer === undefined ? "O navegador encerrou o ditado. Revise o texto no rascunho." : null);
       attempt.stop = () => {
         if (attempt.finishTimer !== undefined) return;
         setPhase("finishing");
@@ -210,7 +211,7 @@ export function useLocalDictation(onTranscript: (text: string) => void) {
     idle: null,
     checking: "Preparando o ditado local…",
     installing: "Preparando o pacote de português do Brasil…",
-    listening: "Ouvindo no aparelho. Pare o ditado para revisar o texto.",
+    listening: "Ouvindo no aparelho. Você pode fazer pausas. Toque em parar quando terminar.",
     finishing: "Finalizando o ditado local…",
   };
   return { supported, phase, notice: progress[phase] ?? notice ?? (!supported ? unavailable : null),

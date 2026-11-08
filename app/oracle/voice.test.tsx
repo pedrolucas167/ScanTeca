@@ -13,6 +13,7 @@ class LocalRecognition {
   static install = vi.fn();
   static current: LocalRecognition | undefined;
   lang = "";
+  continuous = false;
   private local = false;
   get processLocally() { return this.local; }
   set processLocally(value: boolean) { this.local = value; }
@@ -92,18 +93,22 @@ it("exige processamento local, consolida resultados e só gera após envio expl�
   expect(LocalRecognition.available).toHaveBeenCalledWith(language);
   expect(speech.lang).toBe("pt-BR");
   expect(speech.processLocally).toBe(true);
+  expect(speech.continuous).toBe(true);
   expect(speech).toHaveProperty("unspokenPunctuation", true);
   expect(getUserMedia).not.toHaveBeenCalled();
 
-  act(() => {
-    speech.onresult?.({ resultIndex: 0, results: [result("quais livros"), result("sug", false)] });
-    speech.onresult?.({ resultIndex: 0, results: [result("quais livros"), result("sugere?")] });
-  });
+  const firstSentence = result("Quais livros você sugere?");
+  const secondSentence = result("Prefiro livros curtos.");
+  act(() => speech.onresult?.({ resultIndex: 0, results: [firstSentence, result("pre", false)] }));
+  expect(button("Parar ditado e revisar")).toBeTruthy();
+  expect(speech.stop).not.toHaveBeenCalled();
+  act(() => speech.onresult?.({ resultIndex: 1, results: [firstSentence, secondSentence] }));
+  act(() => speech.onresult?.({ resultIndex: 0, results: [firstSentence, secondSentence] }));
   fireEvent.click(button("Parar ditado e revisar"));
   expect(speech.stop).toHaveBeenCalledOnce();
   expect(requests()).toEqual([]);
   act(() => speech.onend?.());
-  expect(draft().value).toBe("Quero saber: quais livros sugere?");
+  expect(draft().value).toBe("Quero saber: Quais livros você sugere? Prefiro livros curtos.");
   expect(requests()).toEqual([]);
 
   fireEvent.change(draft(), { target: { value: "Quais livros curtos você sugere?" } });
@@ -113,7 +118,7 @@ it("exige processamento local, consolida resultados e só gera após envio expl�
   expect(JSON.parse(requests()[0]?.[1].body).question).toBe("Quais livros curtos você sugere?");
 });
 
-it("encerra ao fim da fala e preserva o rascunho em caso de permissão negada ou silêncio", async () => {
+it("preserva o rascunho quando o navegador encerra ou interrompe a escuta", async () => {
   render(<OraclePage />);
   const speech = await startDictation();
   expect(speech).not.toHaveProperty("unspokenPunctuation");
@@ -122,13 +127,20 @@ it("encerra ao fim da fala e preserva o rascunho em caso de permissão negada ou
     speech.onend?.();
   });
   expect(draft().value).toBe("Uma pergunta");
+  expect(screen.getByText(/O navegador encerrou o ditado/)).toBeTruthy();
+  const interrupted = await startDictation();
+  act(() => {
+    interrupted.onresult?.({ resultIndex: 0, results: [result("Mais um detalhe")] });
+    interrupted.onerror?.({ error: "audio-capture" });
+  });
+  expect(screen.getByText(/Microfone indisponível/)).toBeTruthy();
   const denied = await startDictation();
   act(() => denied.onerror?.({ error: "not-allowed" }));
   expect(screen.getByText(/Permita o acesso ao microfone/)).toBeTruthy();
   const silent = await startDictation();
   act(() => silent.onend?.());
   expect(screen.getByText(/Não identifiquei fala/)).toBeTruthy();
-  expect(draft().value).toBe("Uma pergunta");
+  expect(draft().value).toBe("Uma pergunta Mais um detalhe");
   expect(requests()).toEqual([]);
 });
 
