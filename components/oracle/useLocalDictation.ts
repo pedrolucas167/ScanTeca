@@ -31,7 +31,7 @@ const literaryHints = [
   "William Shakespeare", "Günter Grass", "Martin Heidegger", "Byung-Chul Han",
   "Karl Marx", "Oppenheimer", "Werner Heisenberg", "Michel Foucault",
   "Jean-Paul Sartre", "Arthur Rimbaud",
-  "O Tambor", "Die Blechtrommel",
+  "O Tambor", "Der Butt", "Die Blechtrommel", "Das Treffen in Telgte",
 ];
 const grassInLiteraryContext = /\b((?:obras?|livros?|romances?)\s+)(d[eo]\s+)?(ganter(?:\s*\?\s*|\s+)graça|gigantesergras)(?![\p{L}\p{M}\p{N}])/giu;
 const unavailable = "Ditado local em português do Brasil indisponível. Você pode digitar sua pergunta.";

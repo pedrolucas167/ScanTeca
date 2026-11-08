@@ -162,7 +162,8 @@ it("sugere nomes literários e tenta uma vez sem dicas quando o pacote as rejeit
   await waitFor(() => expect(LocalRecognition.current?.start).toHaveBeenCalledOnce());
   const speech = LocalRecognition.current as RecognitionWithHints;
   expect(speech.phrases.map(({ phrase }) => phrase)).toEqual(expect.arrayContaining([
-    "Günter Grass", "Byung-Chul Han", "Michel Foucault", "Jean-Paul Sartre", "Die Blechtrommel",
+    "Günter Grass", "Byung-Chul Han", "Michel Foucault", "Jean-Paul Sartre",
+    "Der Butt", "Die Blechtrommel", "Das Treffen in Telgte",
   ]));
   act(() => speech.onerror?.({ error: "phrases-not-supported" }));
   expect(speech.phrases).toEqual([]);
