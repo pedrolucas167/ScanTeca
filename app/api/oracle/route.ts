@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
 
     const sessionId = request.nextUrl.searchParams.get("sessionId");
     return new Response(
-      JSON.stringify(await getOracleHome(userId, sessionId)),
+      JSON.stringify({ ...await getOracleHome(userId, sessionId), ...(usesMaritaca() ? { browserTts: true } : {}) }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },

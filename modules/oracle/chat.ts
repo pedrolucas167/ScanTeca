@@ -18,10 +18,11 @@ export function oracleChat(options: Parameters<typeof openRouterChat>[0]) {
 
   const key = maritacaKey();
   if (!key) return Promise.resolve(Response.json({ error: "Chave da Maritaca indisponível." }, { status: 503 }));
+  const { messages, stream, max_tokens } = options.body;
   return fetchWithTimeout("https://chat.maritaca.ai/api/chat/completions", {
     method: "POST",
     signal: options.signal,
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ ...options.body, model: "S5-free", reasoning_effort: "none" }),
+    body: JSON.stringify({ model: "S5-free", messages, stream, max_tokens, reasoning_effort: "none" }),
   }, options.timeoutMs ?? 60000);
 }

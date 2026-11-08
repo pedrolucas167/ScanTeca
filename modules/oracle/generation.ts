@@ -12,11 +12,11 @@ import { CHAT_MODEL, MAX_TOKENS_CHAT } from "./config";
 
 export interface OracleChatMessage { role: "system" | "user" | "assistant"; content: string }
 export async function generateOracleResponse({ pipeline, userId, sessionId, mode, question: trimmed, apiKey,
-  temperature, messages, sources, retrievalStats, setting, conversationLength, replacesId }: {
+  temperature, messages, sources, retrievalStats, setting, conversationLength, replacesId, generalAnswer }: {
   pipeline: OraclePipelineContext; userId: string; sessionId: string; mode: OracleMode; question: string; apiKey: string;
   temperature: number; messages: OracleChatMessage[]; sources: Source[]; retrievalStats: RetrievalStats;
   setting: Pick<LibrarySetting, "oracleProfile" | "oracleMemoryEnabled" | "oracleProfileVersion"> | null;
-  conversationLength: number; replacesId?: string;
+  conversationLength: number; replacesId?: string; generalAnswer?: boolean;
 }) {
   const { signal, stage, metrics } = pipeline;
   const cancellation = new AbortController();
@@ -67,7 +67,7 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
               : validateOracleResponse(fullText);
         });
         const outputText = quality.valid
-          ? fullText.trim()
+          ? (generalAnswer ? "**Conhecimento geral** · sem fontes do acervo\n\n" : "") + fullText.trim()
           : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
         if (!quality.valid) {
           pipeline.reject();
