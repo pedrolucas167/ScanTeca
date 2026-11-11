@@ -61,12 +61,14 @@ export default function OraclePage() {
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
   const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<string | null>(null);
   const [playingTtsIndex, setPlayingTtsIndex] = useState<number | null>(null);
+  const [browserTts, setBrowserTts] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   useOracleViewport(shellRef);
   const scrollRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const transcriptionRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const loadingRef = useRef(false);
   const voiceOnRef = useRef(false);
   const audioPlayingRef = useRef(false);
@@ -91,6 +93,10 @@ export default function OraclePage() {
 
   useEffect(() => () => {
     transcriptionRef.current?.abort();
+    if (speechRef.current) {
+      speechRef.current = null;
+      window.speechSynthesis.cancel();
+    }
   }, []);
 
   const cancelVoice = () => {
@@ -142,6 +148,10 @@ export default function OraclePage() {
         }
         setSessions(data?.sessions ?? []);
         setArtifacts(data?.artifacts ?? []);
+        if (data?.browserTts === true) {
+          setBrowserTts(true);
+          window.speechSynthesis?.getVoices();
+        }
       })
       .catch(() => {});
   }, []);
@@ -152,6 +162,34 @@ export default function OraclePage() {
       setPlayingTtsIndex(index);
       // Remove citations from text before sending to TTS
       const textWithoutCitations = text.replace(/\[\d+\]/g, "");
+      if (browserTts) {
+        setError(null);
+        const synthesis = window.speechSynthesis;
+        const localPortugueseVoices = synthesis?.getVoices().filter(voice => voice.localService && /^pt(?:-|$)/i.test(voice.lang));
+        const voice = localPortugueseVoices?.find(item => item.lang.toLowerCase() === "pt-br") ?? localPortugueseVoices?.[0];
+        if (!voice || typeof SpeechSynthesisUtterance === "undefined") {
+          setPlayingTtsIndex(null);
+          setError("Nenhuma voz local em português está disponível neste navegador.");
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(textWithoutCitations);
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+        utterance.rate = playbackRate;
+        const finish = () => {
+          if (speechRef.current !== utterance) return false;
+          speechRef.current = null;
+          setPlayingTtsIndex(null);
+          return true;
+        };
+        utterance.onend = finish;
+        utterance.onerror = () => {
+          if (finish()) setError("O navegador não conseguiu ler a resposta.");
+        };
+        speechRef.current = utterance;
+        synthesis.speak(utterance);
+        return;
+      }
       const res = await fetch("/api/oracle/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,6 +216,10 @@ export default function OraclePage() {
       };
       await audio.play();
     } catch {
+      if (browserTts) {
+        speechRef.current = null;
+        setError("O navegador não conseguiu ler a resposta.");
+      }
       setPlayingTtsIndex(null);
     }
   };
@@ -850,6 +892,11 @@ export default function OraclePage() {
 
   // Helper functions for TTS and reveal animations
   const stopAudio = () => {
+    if (speechRef.current) {
+      speechRef.current = null;
+      window.speechSynthesis.cancel();
+    }
+    setPlayingTtsIndex(null);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;

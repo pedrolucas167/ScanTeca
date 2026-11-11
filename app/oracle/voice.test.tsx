@@ -77,6 +77,30 @@ const draft = () => screen.getByRole("textbox", { name: "Sua mensagem" }) as HTM
 const result = (transcript: string, isFinal = true) => ({ isFinal, 0: { transcript } });
 const requests = () => fetchMock.mock.calls.filter(([, init]) => init?.method === "POST");
 
+it("lê a resposta com voz portuguesa local e permite parar sem chamar o provedor remoto", async () => {
+  const localVoice = { localService: true, lang: "pt-BR" };
+  const synthesis = {
+    getVoices: vi.fn(() => [{ localService: false, lang: "pt-BR" }, localVoice]),
+    speak: vi.fn(),
+    cancel: vi.fn(),
+  };
+  vi.stubGlobal("speechSynthesis", synthesis);
+  vi.stubGlobal("SpeechSynthesisUtterance", class {
+    constructor(public text: string) {}
+  });
+  fetchMock.mockResolvedValueOnce(Response.json({
+    browserTts: true, messages: [{ role: "assistant", content: "Günter Grass escreveu O Tambor." }],
+  }));
+  render(<OraclePage />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Ouvir resposta" }));
+  expect(synthesis.speak).toHaveBeenCalledWith(expect.objectContaining({ voice: localVoice, lang: "pt-BR" }));
+  fireEvent.click(button("Parar"));
+  expect(synthesis.cancel).toHaveBeenCalledOnce();
+  expect(button("Ouvir resposta")).toBeTruthy();
+  expect(requests()).toEqual([]);
+});
+
 async function startDictation() {
   fireEvent.click(button("Ditar no aparelho"));
   await screen.findByRole("button", { name: "Parar ditado e revisar" });

@@ -12,6 +12,7 @@ import { groundedFallbackResponse } from "./responses";
 import { buildOracleSystemPrompt } from "./prompt";
 import { generateOracleResponse, type OracleChatMessage } from "./generation";
 import { createOraclePipeline } from "./pipeline";
+import { usesMaritaca } from "./chat";
 
 export async function answerOracleQuestion({ userId, question: trimmed, mode, sessionId, currentRequestMessageId,
   temperature, scope, regenerate, apiKey, signal: requestSignal, schedule }: {
@@ -31,7 +32,7 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     ));
     const retrievalStartedAt = Date.now();
     stage("search");
-    const questionEmbedding = await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
+    const questionEmbedding = usesMaritaca() ? null : await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
       signal, onUsage: usage => metrics.recordUsage("embedding", usage),
     }));
     signal.throwIfAborted();
@@ -71,7 +72,9 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     const formatted = formatOracleContext({ contextBooks, externalBooks, readingNow, weekLogs, diaryEntries,
       similarBooks, semanticDiary, semanticReviews, semanticExternal, retrievalQuery });
     const { sources, hasGrounding } = formatted;
-    if (!hasGrounding) {
+    const generalAnswer = !hasGrounding && usesMaritaca() &&
+      (scope === "all" || /^quem\s+(?:escreveu\b|(?:é|foi)\s+(?:o\s+autor|a\s+autora)\s+d[eoas]\b)/iu.test(trimmed));
+    if (!hasGrounding && !generalAnswer) {
       return groundedFallbackResponse();
     }
 
@@ -91,7 +94,10 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     const profile = setting?.oracleProfile?.trim();
     const systemPrompt = buildOracleSystemPrompt({ mode, scope, profile });
 
-    const messages: OracleChatMessage[] = [
+    const messages: OracleChatMessage[] = generalAnswer ? [
+      { role: "system", content: "Responda em português à pergunta literária com conhecimento geral. Se faltar informação para identificar a obra, peça esclarecimento. Não invente fontes ou citações. Você não tem dados sobre o acervo pessoal. Se a pergunta depender da posse, localização ou histórico de leitura do usuário, explique que não pode verificar isso." },
+      { role: "user", content: trimmed },
+    ] : [
       { role: "system" as const, content: systemPrompt },
       ...[...conversationHistory].reverse().map((m) => ({
         role: m.role as "user" | "assistant",
@@ -104,6 +110,7 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     ];
 
     return generateOracleResponse({ pipeline, userId, sessionId, mode, question: trimmed, apiKey, temperature,
-      messages, sources, retrievalStats, setting, conversationLength: conversationHistory.length, replacesId: previousAnswer?.id });
+      messages, sources, retrievalStats, setting, conversationLength: generalAnswer ? 0 : conversationHistory.length,
+      generalAnswer, replacesId: previousAnswer?.id });
   } });
 }

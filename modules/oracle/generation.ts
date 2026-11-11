@@ -1,7 +1,7 @@
 import type { LibrarySetting } from "@prisma/client";
 import type { OracleMode } from "@/lib/constants/oracle";
 import type { Source, RetrievalStats } from "@/lib/types/oracle";
-import { openRouterChat } from "@/lib/openrouter-chat";
+import { oracleChat } from "./chat";
 import { validateOracleResponse } from "@/lib/oracle-quality";
 import { readOracleCompletion } from "./completion";
 import { validateCitations, validateInventoryClaims } from "./evidence";
@@ -12,18 +12,18 @@ import { CHAT_MODEL, MAX_TOKENS_CHAT } from "./config";
 
 export interface OracleChatMessage { role: "system" | "user" | "assistant"; content: string }
 export async function generateOracleResponse({ pipeline, userId, sessionId, mode, question: trimmed, apiKey,
-  temperature, messages, sources, retrievalStats, setting, conversationLength, replacesId }: {
+  temperature, messages, sources, retrievalStats, setting, conversationLength, replacesId, generalAnswer }: {
   pipeline: OraclePipelineContext; userId: string; sessionId: string; mode: OracleMode; question: string; apiKey: string;
   temperature: number; messages: OracleChatMessage[]; sources: Source[]; retrievalStats: RetrievalStats;
   setting: Pick<LibrarySetting, "oracleProfile" | "oracleMemoryEnabled" | "oracleProfileVersion"> | null;
-  conversationLength: number; replacesId?: string;
+  conversationLength: number; replacesId?: string; generalAnswer?: boolean;
 }) {
   const { signal, stage, metrics } = pipeline;
   const cancellation = new AbortController();
   let consumerCancelled = false;
   const generationSignal = AbortSignal.any([signal, cancellation.signal]);
   stage("generation");
-  const llmRes = await metrics.measure("generation", () => openRouterChat({
+  const llmRes = await metrics.measure("generation", () => oracleChat({
     apiKey,
     signal: generationSignal,
     body: {
@@ -37,7 +37,7 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
 
   if (!llmRes.ok || !llmRes.body) {
     await llmRes.body?.cancel().catch(() => undefined);
-    console.error("[oracle] OpenRouter chat error:", llmRes.status);
+    console.error("[oracle] Chat provider error:", llmRes.status);
     return new Response(
       JSON.stringify({ error: "Erro ao consultar o Oráculo" }),
       { status: 502, headers: { "Content-Type": "application/json" } }
@@ -67,7 +67,7 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
               : validateOracleResponse(fullText);
         });
         const outputText = quality.valid
-          ? fullText.trim()
+          ? (generalAnswer ? "**Conhecimento geral** · sem fontes do acervo\n\n" : "") + fullText.trim()
           : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
         if (!quality.valid) {
           pipeline.reject();
