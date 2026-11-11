@@ -52,8 +52,8 @@ describe("grounded answers and evidence", () => {
   const book = { id: "dune", title: "Duna", author: "Frank Herbert", publishedDate: "1965",
     genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
 
-  it("usa somente o S5-free no experimento local, mantendo as fontes do acervo", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("usa somente o S5-free em produção quando configurado, mantendo as fontes do acervo", async () => {
+    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
     vi.stubEnv("MARITACA_API_KEY", "");
     vi.stubEnv("key_maritaca_ai", "fixture-maritaca");

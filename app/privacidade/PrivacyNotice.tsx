@@ -17,7 +17,8 @@ export default function PrivacyNotice() {
           <li>
             <strong>Inteligência artificial.</strong> A ScanTeca usa o OpenRouter para processar solicitações de IA, que podem incluir texto, áudio e contexto. Saiba mais nos{" "}
             <a className="underline" href="https://openrouter.ai/terms">Termos do OpenRouter</a> e na{" "}
-            <a className="underline" href="https://openrouter.ai/privacy">Política de Privacidade do OpenRouter</a>.
+            <a className="underline" href="https://openrouter.ai/privacy">Política de Privacidade do OpenRouter</a>. As respostas do Oráculo também podem ser processadas pela Maritaca AI, incluindo a pergunta e o contexto necessário. Consulte a{" "}
+            <a className="underline" href="https://www.maritaca.ai/privacidade/">Política de Privacidade da Maritaca AI</a>.
           </li>
           <li><strong>Notificações.</strong> Se você habilitar notificações, usamos a inscrição do navegador para entregá-las.</li>
         </ul>
