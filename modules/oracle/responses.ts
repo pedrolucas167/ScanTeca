@@ -1,6 +1,6 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import type { RoutingDecision } from "@/lib/jev-routing";
-import { openRouterChat } from "@/lib/openrouter-chat";
+import { oracleChat } from "./chat";
 import { readOracleCompletion } from "./completion";
 import { CHAT_MODEL } from "./config";
 
@@ -9,7 +9,7 @@ export async function directChatResponse(question: string, apiKey: string, reque
   let consumerCancelled = false;
   const signal = AbortSignal.any([requestSignal, cancellation.signal]);
   try {
-    const res = await openRouterChat({
+    const res = await oracleChat({
       apiKey, timeoutMs: 8000,
       signal,
       body: {

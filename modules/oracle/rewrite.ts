@@ -1,4 +1,4 @@
-import { openRouterChat } from "@/lib/openrouter-chat";
+import { oracleChat } from "./chat";
 import { parseOracleUsage, type OracleUsage } from "@/lib/oracle-usage";
 import { CHAT_MODEL, MAX_TOKENS_REWRITE } from "./config";
 
@@ -10,7 +10,7 @@ export async function contextualizeQuestion(
 ): Promise<string> {
   if (history.length === 0) return question;
   try {
-    const res = await openRouterChat({
+    const res = await oracleChat({
       apiKey, timeoutMs: 8000,
       signal: options.signal,
       body: {

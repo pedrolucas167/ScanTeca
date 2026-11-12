@@ -52,6 +52,44 @@ describe("grounded answers and evidence", () => {
   const book = { id: "dune", title: "Duna", author: "Frank Herbert", publishedDate: "1965",
     genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
 
+  it("usa somente o S5-free em produção quando configurado, mantendo as fontes do acervo", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "");
+    vi.stubEnv("key_maritaca_ai", "fixture-maritaca");
+    vi.mocked(generateEmbedding).mockClear();
+    vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [book], metadataCandidates: 0, lexicalCandidates: 1 });
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      new Response('data: {"choices":[{"delta":{"content":"Duna aborda ecologia [1]."}}]}\n\ndata: [DONE]\n\n'));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(questionRequest("Quais temas aparecem em Duna?"));
+    expect(await response.text()).toContain("Duna aborda ecologia [1].");
+    expect(generateEmbedding).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://chat.maritaca.ai/api/chat/completions");
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: "Bearer fixture-maritaca" });
+    const providerBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(providerBody).toMatchObject({ model: "S5-free", stream: true });
+    expect(providerBody).not.toHaveProperty("temperature");
+  });
+
+  it("responde sobre autoria com acervo vazio, sem apresentar a resposta como evidência do acervo", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      new Response('data: {"choices":[{"delta":{"content":"O Tambor foi escrito por Günter Grass."}}]}\n\ndata: [DONE]\n\n'));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(questionRequest("Quem escreveu O Tambor?"));
+    const body = await response.text();
+    expect(body).toContain("Conhecimento geral");
+    expect(body).toContain("Günter Grass");
+    expect(body).toContain('"sources":[]');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it.each(["valid", "citation", "inventory", "inventory-exhaustive"])("checks the grounded response before persistence (%s)", async kind => {
     vi.stubEnv("PERFORMANCE_DIAGNOSTICS", "1");
     const info = vi.spyOn(console, "info").mockImplementation(() => {});

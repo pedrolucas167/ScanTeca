@@ -6,7 +6,7 @@ import { oracleHttpError } from "@/lib/oracle-http-error";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
-import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory } from "@/modules/oracle";
+import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, usesMaritaca } from "@/modules/oracle";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     });
     if (rateLimit) return rateLimit;
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY ?? "";
     const parsed = await readJson(request, oracleSchema);
     if (!parsed.ok) return parsed.response;
     const {
@@ -63,6 +63,9 @@ export async function POST(request: NextRequest) {
 
     let question = parsed.data.question?.trim() ?? "";
 
+    if (!question && audio?.data && usesMaritaca()) {
+      return Response.json({ error: "Use texto ou ditado no aparelho para testar o Oráculo com a Maritaca." }, { status: 400 });
+    }
     if (!question && audio?.data && !apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
 
     if (!question && audio?.data) {
@@ -110,7 +113,7 @@ export async function POST(request: NextRequest) {
     const routing = await jevRouteQuery(trimmed);
 
     if (shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
-    if (!apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
+    if (!hasOracleChatKey(apiKey)) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
     if (shouldDirectChat(routing)) return directChatResponse(trimmed, apiKey, request.signal);
     let prepared: Awaited<ReturnType<typeof prepareOracleSession>>;
     try {
@@ -147,7 +150,7 @@ export async function GET(request: NextRequest) {
 
     const sessionId = request.nextUrl.searchParams.get("sessionId");
     return new Response(
-      JSON.stringify(await getOracleHome(userId, sessionId)),
+      JSON.stringify({ ...await getOracleHome(userId, sessionId), ...(usesMaritaca() ? { browserTts: true } : {}) }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
