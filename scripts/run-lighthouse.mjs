@@ -49,7 +49,9 @@ try {
   stage = "build";
   run("docker", [...compose, "build"], "build", dockerEnv);
   composeStarted = true;
+  stage = "startup";
   run("docker", [...compose, "up", "--detach", "app"], "up", dockerEnv);
+  stage = "port-binding";
   const binding = run("docker", [...compose, "port", "app", "3000"], "port", dockerEnv);
   if (!/^127\.0\.0\.1:\d+$/u.test(binding)) throw new Error("Porta de performance não está em loopback.");
   const base = `http://${binding}`;
@@ -72,6 +74,7 @@ try {
   process.stdout.write("Páginas públicas verificadas; coletando seis amostras Lighthouse.\n");
   stage = "collection";
   run(process.execPath, [path.resolve("tools/lighthouse/node_modules/@lhci/cli/src/cli.js"), "collect", "--config", configPath], "collect", { ...environment, CHROME_PATH: chromium.executablePath() }, directory);
+  stage = "report-validation";
   const raw = path.join(directory, ".lighthouseci");
   const reports = fs.readdirSync(raw).filter(name => /^lhr-.*\.json$/u.test(name)).map(name => JSON.parse(fs.readFileSync(path.join(raw, name), "utf8")));
   const metrics = aggregateLighthouse(reports, base, chromiumVersion);
@@ -86,9 +89,10 @@ try {
   process.stdout.write(summary);
 } catch {
   fs.writeFileSync(path.join(directory, "failure.json"), JSON.stringify({ stage }));
-  const summary = "## Lighthouse\n\nExecução reprovada; nenhuma medição parcial constitui baseline válido. Logs e relatórios brutos não são publicados.\n";
+  const summary = `## Lighthouse\n\nExecução reprovada na etapa \`${stage}\`. Logs e relatórios brutos permanecem no diretório local de diagnóstico.\n`;
   fs.writeFileSync(path.join(output, "summary.md"), summary);
-  console.error("Medição Lighthouse reprovada. Diagnóstico restrito aos arquivos locais ignorados pelo Git.");
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+  console.error(`Medição Lighthouse reprovada na etapa: ${stage}.`);
   process.exitCode = 1;
 } finally {
   if (browser) {
@@ -101,7 +105,10 @@ try {
     }
     const cleanup = spawnSync("docker", [...compose, "down", "--volumes", "--remove-orphans"], { env: dockerEnv, encoding: "utf8", windowsHide: true, timeout: 60000 });
     fs.writeFileSync(path.join(directory, "cleanup.log"), `${cleanup.stdout || ""}\n${cleanup.stderr || ""}`);
-    if (cleanup.error || cleanup.status !== 0) process.exitCode = 1;
+    if (cleanup.error || cleanup.status !== 0) {
+      console.error("Lighthouse: falha ao remover o ambiente descartável (cleanup).");
+      process.exitCode = 1;
+    }
   }
   fs.unlinkSync(envFile);
 }
