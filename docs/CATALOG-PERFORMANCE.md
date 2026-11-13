@@ -14,7 +14,7 @@ Este primeiro pacote limita a renderização e reduz a largura da consulta; não
 
 ## Comparativo reproduzível
 
-Execute `npx vitest run --config vitest.catalog-performance.config.ts`. O teste usa o componente anterior obtido do Git na revisão `20246c508e228d4efe97598926811b961026d17f`. É possível selecionar outra revisão compatível pela variável `SCANTECA_CATALOG_BASELINE`.
+Execute `npx vitest run --config tests/config/vitest.catalog-performance.config.ts`. O teste usa o componente anterior obtido do Git na revisão `20246c508e228d4efe97598926811b961026d17f`. É possível selecionar outra revisão compatível pela variável `SCANTECA_CATALOG_BASELINE`.
 
 São usados os mesmos acervos sintéticos, sem chamadas externas: 24, 200 e 1.000 livros com sinopses e notas fictícias. Há aquecimento de ambas as implementações e cinco pares medidos por cenário. O relatório é salvo em `reports/catalog-performance.json`, ignorado pelo Git.
 

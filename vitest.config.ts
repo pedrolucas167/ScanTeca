@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 import path from "node:path";
-import coverage from "./vitest.coverage.mjs";
+import coverage from "./tests/config/vitest.coverage.mjs";
 
 export default mergeConfig(coverage, defineConfig({
   test: {

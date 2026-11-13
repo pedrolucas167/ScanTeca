@@ -90,7 +90,7 @@ As alterações ainda não foram publicadas. Não foi medido um antes/depois aut
 
 ## Comparativo mínimo reproduzível
 
-Comando: `npx vitest run --config vitest.performance.config.ts`. O teste carrega a implementação anterior diretamente de `origin/main:lib/recommendations.ts`; antes da execução, atualize essa referência com `git fetch origin main`. Para repetir exatamente a comparação registrada, defina `SCANTECA_PERF_BASELINE=6f7813b1e37d2bf1e9ed3a39e64c7e835232461d`. Essa revisão tem o mesmo código de recomendações do ponto de partida desta alteração. O relatório de cada execução é salvo em `reports/recommendations-performance.json` (ignorado pelo Git).
+Comando: `npx vitest run --config tests/config/vitest.performance.config.ts`. O teste carrega a implementação anterior diretamente de `origin/main:lib/recommendations.ts`; antes da execução, atualize essa referência com `git fetch origin main`. Para repetir exatamente a comparação registrada, defina `SCANTECA_PERF_BASELINE=6f7813b1e37d2bf1e9ed3a39e64c7e835232461d`. Essa revisão tem o mesmo código de recomendações do ponto de partida desta alteração. O relatório de cada execução é salvo em `reports/recommendations-performance.json` (ignorado pelo Git).
 
 Foram medidas cinco execuções por cenário, com o mesmo acervo, cinco sugestões, candidatos e embeddings simulados. As latências por operação foram fixadas em 80 ms para IA, 40 ms para Google Books, 20 ms para embeddings e 10 ms para Redis. O teste compara todo o resultado final, exceto o timestamp criado durante a execução, e verifica quantidade de chamadas e concorrência. Nenhuma integração real é chamada.
 

@@ -50,7 +50,7 @@ try {
   run("docker", ["run", "--detach", "--rm", "--name", redisName, "--publish", "127.0.0.1:56379:6379", "redis:7-alpine"]);
   redisStarted = true;
   run(process.execPath, ["scripts/prepare-test-database.mjs"]);
-  run(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--config", "vitest.integration.config.ts"]);
+  run(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--config", "tests/config/vitest.integration.config.ts"]);
   run(process.execPath, ["--import", "tsx", "scripts/benchmark-oracle-free.ts", ...live]);
 } catch {
   console.error("Benchmark não aprovado; as falhas permanecem no relatório local quando a rodada iniciou.");

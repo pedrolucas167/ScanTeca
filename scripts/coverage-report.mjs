@@ -47,7 +47,7 @@ try {
   }
   let regressions = [];
   if (process.argv.includes("--check")) {
-    const minimums = JSON.parse(fs.readFileSync(path.join(root, "coverage-baseline.json"), "utf8"));
+    const minimums = JSON.parse(fs.readFileSync(path.join(root, "tests", "config", "coverage-baseline.json"), "utf8"));
     if (minimums._collectorMajor !== undefined) {
       const collector = JSON.parse(fs.readFileSync(path.join(root, "node_modules/@vitest/coverage-v8/package.json"), "utf8"));
       assertCollectorMajor(collector.version, minimums._collectorMajor);
