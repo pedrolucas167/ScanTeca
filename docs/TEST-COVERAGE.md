@@ -84,7 +84,7 @@ suítes agora coletam cobertura e enviam seus JSONs como artefatos. O job `cover
 aguarda ambos, consolida os resultados, acrescenta uma tabela ao resumo da execução
 e publica o relatório completo por 14 dias. O token do workflow só tem leitura.
 
-`coverage-baseline.json` contém os mínimos globais de linhas, statements, funções
+`tests/config/coverage-baseline.json` contém os mínimos globais de linhas, statements, funções
 e branches, a partir da medição inicial. A CI reprova qualquer métrica abaixo
 do respectivo mínimo; dados ausentes ou inválidos também reprovam. O limite não
 é atualizado automaticamente. Aumente os mínimos quando novos testes produzirem

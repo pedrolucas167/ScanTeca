@@ -12,5 +12,5 @@ export default mergeConfig(coverage, defineConfig({
     hookTimeout: 15000,
     coverage: { reportsDirectory: "coverage/integration" },
   },
-  resolve: { alias: { "@": path.resolve(import.meta.dirname, ".") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname, "../..") } },
 }));
