@@ -9,7 +9,7 @@ const project = `scanteca-container-smoke-${process.pid}`;
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "scanteca-container-env-"));
 const envFile = path.join(temporary, "empty.env");
 fs.writeFileSync(envFile, "");
-const compose = ["compose", "--env-file", envFile, "--project-name", project, "--file", "compose.container-test.yml"];
+const compose = ["compose", "--env-file", envFile, "--project-name", project, "--file", "docker/compose.container-test.yml"];
 function docker(args, capture = false) {
   const result = spawnSync("docker", args, { stdio: capture ? "pipe" : "inherit", encoding: "utf8", timeout: 20 * 60 * 1000, windowsHide: true });
   if (result.error || result.status !== 0) throw new Error(`Comando Docker reprovado: ${args.slice(0, 2).join(" ")}`);

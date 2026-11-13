@@ -1,6 +1,6 @@
 # Aplicação em containers
 
-A publicação Vercel permanece independente. O Dockerfile cria uma imagem Node 24
+A publicação Vercel permanece independente. O `docker/Dockerfile` cria uma imagem Node 24
 com saída standalone Next.js, assets estáticos e Prisma gerado. Runtime usa usuário
 node, sem ferramentas de migrations, fonte completa, .git, .env ou caches locais.
 Somente o build Docker habilita standalone; o build Vercel continua como antes.
@@ -12,8 +12,8 @@ de desenvolvimento e sua chave secreta de desenvolvimento. Acrescente somente
 as integrações de desenvolvimento que pretende usar. Não use dados de produção.
 
 ```sh
-docker compose --env-file .env.container.local -f compose.container.yml up --build -d
-docker compose --env-file .env.container.local -f compose.container.yml down
+docker compose --env-file .env.container.local -f docker/compose.container.yml up --build -d
+docker compose --env-file .env.container.local -f docker/compose.container.yml down
 ```
 
 Acesse http://localhost:3000. PostgreSQL/pgvector não publica porta no host.
@@ -54,7 +54,7 @@ Não cobre saúde de Clerk, Redis, S3 ou IA. HEALTHCHECK usa esse endpoint.
 
 ### Atualizações da imagem base
 
-O Dependabot também acompanha o Dockerfile da raiz, semanalmente às segundas
+O Dependabot também acompanha o Dockerfile em `docker/`, semanalmente às segundas
 às 10h no fuso America/Sao_Paulo, com no máximo uma PR Docker aberta. A imagem
 Node continua fixada por digest nas duas etapas que a utilizam. Atualizações
 devem passar pelo build e smoke reais de containers já existentes e pela revisão
@@ -62,7 +62,7 @@ da PR. Não há merge automático nem alteração da imagem em execução por es
 
 Atualizações major de Node ficam fora dessa rotina: o projeto declara Node 24,
 e uma mudança de major exige revisão explícita. Atualizações npm e Actions
-mantêm seus grupos e agendas anteriores. Esta configuração cobre o Dockerfile;
+mantêm seus grupos e agendas anteriores. Esta configuração cobre o Dockerfile em `docker/`;
 imagens dos arquivos Compose e o scanner OWASP referenciado em JavaScript não
 estão incluídos nesse bloco. Dependabot Docker não substitui análise de CVEs da
 imagem ou inventário de componentes; Syft/Grype são a próxima etapa proposta.

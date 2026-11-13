@@ -68,7 +68,7 @@ dados sintéticos representativos são trabalhos separados.
 - `npm run migrations:check`: compara com `origin/main`; `MIGRATION_BASE_REF`
   permite informar outra referência Git existente após fetch.
 - `npm run migrations:verify`: prepara PostgreSQL temporário com
-  `compose.migrations.yml`, valida o SQL e executa testes positivos/negativos.
+  `docker/compose.migrations.yml`, valida o SQL e executa testes positivos/negativos.
   Ao terminar, remove somente o projeto Docker criado pelo próprio comando.
 
 Docker deve estar disponível e a porta 55440 deve estar livre. O banco usa tmpfs;

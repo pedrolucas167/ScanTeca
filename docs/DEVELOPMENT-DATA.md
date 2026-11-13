@@ -5,7 +5,7 @@ Use PostgreSQL local com pgvector e sua conta **Clerk de desenvolvimento**. O se
 ## Preparação (PowerShell)
 
 ```powershell
-docker compose -p scanteca-development -f compose.development.yml up -d --wait
+docker compose -p scanteca-development -f docker/compose.development.yml up -d --wait
 $env:SEED_DATABASE_URL = 'postgresql://scanteca_dev:scanteca_dev_local@127.0.0.1:55440/scanteca_development'
 $env:DATABASE_URL = $env:SEED_DATABASE_URL
 $env:DATABASE_URL_UNPOOLED = $env:SEED_DATABASE_URL
@@ -36,7 +36,7 @@ Repetir o seed preserva edições e não reinicia o progresso. A atividade perma
 O volume Docker mantém os dados entre reinícios. Para encerrar o banco preservando os dados:
 
 ```powershell
-docker compose -p scanteca-development -f compose.development.yml down
+docker compose -p scanteca-development -f docker/compose.development.yml down
 ```
 
 Esse conjunto cobre Biblioteca e Leitura. Scanner real, IA/Oráculo, envio de notificações e upload precisam de validação específica com os respectivos serviços.

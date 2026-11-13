@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 
 const database = "postgresql://scanteca_test:scanteca_migration_local@127.0.0.1:55440/scanteca_migration_test";
 const env = { ...process.env, SCANTECA_MIGRATION_DATABASE_URL: database, DATABASE_URL: database };
-const compose = ["compose", "--project-name", `scanteca-migrations-${process.pid}`, "--file", "compose.migrations.yml"];
+const compose = ["compose", "--project-name", `scanteca-migrations-${process.pid}`, "--file", "docker/compose.migrations.yml"];
 function run(command, args) {
   const result = spawnSync(command, args, { env, stdio: "inherit", windowsHide: true });
   if (result.error || result.status !== 0) throw new Error("Validação de migrations reprovada; veja as anotações acima.");

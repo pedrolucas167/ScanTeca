@@ -15,7 +15,8 @@ services:
   prepare:
     image: scanteca-container-tools:test
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: tools
     environment:
       DATABASE_URL: postgresql://scanteca_dev:scanteca_dev_local@database:5432/scanteca_container_dev
@@ -25,7 +26,8 @@ services:
   app:
     image: scanteca-container:test
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: runtime
       args:
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA}

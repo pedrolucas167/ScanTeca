@@ -18,3 +18,4 @@ export { createOraclePipeline } from "./pipeline";
 export type { OraclePipelineContext } from "./pipeline";
 export { buildEvaluationContext, checkEvaluationAnswer, parseOracleJudgment, ORACLE_JUDGE_PROMPT } from "./evaluation";
 export type { OracleEvaluationCase, OracleJudgment } from "./evaluation";
+export { generateOracleSpeech } from "./speech";

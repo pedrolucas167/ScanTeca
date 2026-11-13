@@ -68,7 +68,7 @@ Os oito cenários autenticados e os limites dos providers estão em
 Não exige exportar URLs ou instalar a CLI do Clerk. A porta local 55439 deve estar
 livre; um serviço existente nessa porta não é removido nem reutilizado.
 As chaves locais são lidas sem importar URLs de banco ou integrações do `.env`.
-O isolamento usa `compose.e2e.yml`, com armazenamento temporário em memória.
+O isolamento usa `docker/compose.e2e.yml`, com armazenamento temporário em memória.
 
 Na CI, abra **Actions → Browser tests → Run workflow** na `main`. O cenário
 autenticado vem selecionado por padrão; desmarque-o para rodar somente os 24

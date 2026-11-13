@@ -13,7 +13,7 @@ fs.mkdirSync(output, { recursive: true });
 const envFile = path.join(directory, "empty.env");
 fs.writeFileSync(envFile, "");
 const project = `scanteca-lighthouse-${process.pid}`;
-const compose = ["compose", "--env-file", envFile, "--project-name", project, "--file", "compose.container-test.yml", "--file", "compose.lighthouse.yml"];
+const compose = ["compose", "--env-file", envFile, "--project-name", project, "--file", "docker/compose.container-test.yml", "--file", "docker/compose.lighthouse.yml"];
 const publicKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const environment = {};
 // Never forward CI tokens, application credentials or the user's .env to browsers/tools.
