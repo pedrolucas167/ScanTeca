@@ -36,7 +36,7 @@ if (live.length) {
     return;
   }
 }
-const compose = ["compose", "--project-name", `scanteca-oracle-benchmark-${process.pid}`, "--file", "compose.e2e.yml"];
+const compose = ["compose", "--project-name", `scanteca-oracle-benchmark-${process.pid}`, "--file", "docker/compose.e2e.yml"];
 const redisName = `scanteca-oracle-redis-${process.pid}`;
 let databaseStarted = false;
 let redisStarted = false;

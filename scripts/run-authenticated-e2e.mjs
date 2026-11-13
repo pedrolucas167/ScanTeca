@@ -8,7 +8,7 @@ const env = {
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: "", VAPID_PRIVATE_KEY: "", OPENROUTER_API_KEY: "",
   UPSTASH_REDIS_REST_URL: "", UPSTASH_REDIS_REST_TOKEN: "", KV_REST_API_URL: "", KV_REST_API_TOKEN: "", KV_URL: "",
 };
-const compose = ["compose", "--project-name", `scanteca-e2e-${process.pid}`, "--file", "compose.e2e.yml"];
+const compose = ["compose", "--project-name", `scanteca-e2e-${process.pid}`, "--file", "docker/compose.e2e.yml"];
 function run(command, args) {
   const result = spawnSync(command, args, { env, stdio: "inherit", windowsHide: true });
   if (result.error || result.status !== 0) throw new Error("Etapa do E2E autenticado falhou; veja o diagnóstico acima.");
