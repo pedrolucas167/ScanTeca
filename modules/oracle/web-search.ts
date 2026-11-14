@@ -1,13 +1,16 @@
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { createEvidenceRegistry } from "./evidence";
 
+const webCommand = /^(?:por favor,?\s+)?(?:(?:pesquise|busque|procure|consulte|verifique|confirme|cheque)\s+(?:na internet|na web|no brave|em fontes externas)|(?:traga|mostre|busque)\s+fontes externas(?:\s+sobre)?)(?=$|[\s:,.!?])/iu;
+
 export function requestsWebSearch(question: string) {
-  return /^(?:por favor,?\s+)?(?:pesquise|busque|procure|consulte)\s+(?:na internet|na web|no brave)(?=$|[\s:,.!?])/iu.test(question);
+  return webCommand.test(question);
 }
 
 export function parseWebQuery(question: string) {
-  if (!requestsWebSearch(question)) return null;
-  const terms = question.replace(/^.*?\s+(?:na internet|na web|no brave)\s*[:,]?\s*/iu, "");
+  const prefix = webCommand.exec(question);
+  if (!prefix) return null;
+  const terms = question.slice(prefix[0].length).replace(/^\s*[:,]?\s*/u, "");
   const query = /^(?:"([^"“”\p{C}]{1,300})"|“([^"“”\p{C}]{1,300})”)[?.!]?$/u.exec(terms);
   return (query?.[1] ?? query?.[2])?.trim() || null;
 }

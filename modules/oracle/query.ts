@@ -6,7 +6,8 @@ import { retrieveBooks } from "./retrieval";
 import { formatOracleContext } from "./context-format";
 import { contextualizeQuestion } from "./rewrite";
 import { groundedFallbackResponse } from "./responses";
-import { buildOracleSystemPrompt } from "./prompt";
+import { buildOracleSystemPrompt, literaryConversationPrompt } from "./prompt";
+import { needsLibraryEvidence } from "./library-intent";
 import { generateOracleResponse, type OracleChatMessage } from "./generation";
 import { createOraclePipeline } from "./pipeline";
 import { usesMaritaca } from "./chat";
@@ -86,8 +87,12 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
       loadOracleContext({ userId, sessionId, question: trimmed, currentRequestMessageId,
         replacesId: previousAnswer?.id, signal }));
 
+    const userHistory = conversationHistory.filter(message => message.role === "user");
+    const libraryRequired = needsLibraryEvidence(trimmed, mode, userHistory.map(message => message.content));
+    const retrievalHistory = libraryRequired ? conversationHistory
+      : userHistory;
     const retrievalQuery = await metrics.measure("rewrite", () => contextualizeQuestion(
-      trimmed, conversationHistory, apiKey, { signal, onUsage: usage => metrics.recordUsage("rewrite", usage) }
+      trimmed, retrievalHistory, apiKey, { signal, onUsage: usage => metrics.recordUsage("rewrite", usage) }
     ));
     const retrievalStartedAt = Date.now();
     stage("search");
@@ -99,14 +104,18 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     const { similarBooks, semanticDiary, semanticReviews, semanticExternal } = await metrics.measure("retrieval", () =>
       retrieveOracleMemories(userId, questionEmbedding, signal));
 
-    const { books: contextBooks, metadataCandidates, lexicalCandidates } = await metrics.measure("retrieval", () => retrieveBooks(userId, retrievalQuery, similarBooks, mode));
+    const { books, metadataCandidates, lexicalCandidates } = await metrics.measure("retrieval", () => retrieveBooks(userId, retrievalQuery, similarBooks, mode));
+    const contextBooks = libraryRequired ? books : books.filter(book =>
+      /título mencionado|autor mencionado/.test(book.matchedBy ?? ""));
 
-    const formatted = formatOracleContext({ contextBooks, externalBooks: [], readingNow, weekLogs, diaryEntries,
-      similarBooks, semanticDiary, semanticReviews, semanticExternal, retrievalQuery });
+    const formatted = formatOracleContext({
+      contextBooks, externalBooks: [], readingNow: libraryRequired ? readingNow : [],
+      weekLogs: libraryRequired ? weekLogs : [], diaryEntries: libraryRequired ? diaryEntries : [],
+      similarBooks, semanticDiary: libraryRequired ? semanticDiary : [],
+      semanticReviews: libraryRequired ? semanticReviews : [], semanticExternal: libraryRequired ? semanticExternal : [], retrievalQuery,
+    });
     const { sources, hasGrounding } = formatted;
-    const generalAnswer = !hasGrounding && usesMaritaca() &&
-      (scope === "all" || /^quem\s+(?:escreveu\b|(?:é|foi)\s+(?:o\s+autor|a\s+autora)\s+d[eoas]\b)/iu.test(trimmed));
-    if (!hasGrounding && !generalAnswer) {
+    if (!hasGrounding && libraryRequired) {
       return groundedFallbackResponse();
     }
 
@@ -124,12 +133,9 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     };
 
     const profile = setting?.oracleProfile?.trim();
-    const systemPrompt = buildOracleSystemPrompt({ mode, scope, profile });
+    const systemPrompt = libraryRequired ? buildOracleSystemPrompt({ mode, scope, profile }) : literaryConversationPrompt;
 
-    const messages: OracleChatMessage[] = generalAnswer ? [
-      { role: "system", content: "Responda em português à pergunta literária com conhecimento geral. Se faltar informação para identificar a obra, peça esclarecimento. Não invente fontes ou citações. Você não tem dados sobre o acervo pessoal. Se a pergunta depender da posse, localização ou histórico de leitura do usuário, explique que não pode verificar isso." },
-      { role: "user", content: trimmed },
-    ] : [
+    const messages: OracleChatMessage[] = [
       { role: "system" as const, content: systemPrompt },
       ...[...conversationHistory].reverse().map((m) => ({
         role: m.role as "user" | "assistant",
@@ -137,12 +143,12 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
       })),
       {
         role: "user" as const,
-        content: `${formatted.content}\n\nPergunta do usuário: ${trimmed}`,
+        content: hasGrounding ? `${formatted.content}\n\nPergunta do usuário: ${trimmed}` : trimmed,
       },
     ];
 
     return generateOracleResponse({ pipeline, userId, sessionId, mode, question: trimmed, apiKey, temperature,
-      messages, sources, retrievalStats, setting, conversationLength: generalAnswer ? 0 : conversationHistory.length,
-      generalAnswer, replacesId: previousAnswer?.id });
+      messages, sources, retrievalStats, setting, conversationLength: conversationHistory.length,
+      generalAnswer: !libraryRequired, replacesId: previousAnswer?.id });
   } });
 }
