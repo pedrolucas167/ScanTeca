@@ -10,7 +10,7 @@ export interface Source {
   relevance?: number | null;
   matchedBy?: string;
   evidence?: string | null;
-  sourceType?: "book" | "diary" | "review";
+  sourceType?: "book" | "diary" | "review" | "place";
   external?: boolean;
   url?: string;
   mapLinks?: { google: string; apple: string; waze: string };

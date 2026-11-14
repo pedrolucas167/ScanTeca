@@ -20,13 +20,12 @@ export function cleanSearchText(value: unknown, limit: number) {
   return typeof value === "string" ? value.slice(0, limit * 2).replace(/\s+/gu, " ").trim().slice(0, limit) : "";
 }
 
-export async function fetchBraveContext(query: string, key: string, signal: AbortSignal, local = false) {
+async function fetchBraveContext(query: string, key: string, signal: AbortSignal) {
   const endpoint = new URL("https://api.search.brave.com/res/v1/llm/context");
   endpoint.searchParams.set("q", query);
   endpoint.searchParams.set("maximum_number_of_tokens", "2048");
   endpoint.searchParams.set("context_threshold_mode", "balanced");
-  endpoint.searchParams.set("enable_local", String(local));
-  if (local) endpoint.searchParams.set("search_lang", "pt-br");
+  endpoint.searchParams.set("enable_local", "false");
   const response = await fetchWithTimeout(endpoint, {
     headers: { Accept: "application/json", "X-Subscription-Token": key },
     cache: "no-store", redirect: "error", signal,
@@ -36,7 +35,7 @@ export async function fetchBraveContext(query: string, key: string, signal: Abor
     throw new Error("Busca web indisponível");
   }
 
-  const data: { grounding?: { generic?: unknown; map?: unknown; poi?: unknown } } = await response.json();
+  const data: { grounding?: { generic?: unknown } } = await response.json();
   return data?.grounding;
 }
 

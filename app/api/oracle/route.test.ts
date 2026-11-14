@@ -352,23 +352,23 @@ describe("explicit Brave place search", () => {
       const url = new URL(String(input));
       if (url.hostname === "api.search.brave.com") {
         expect(url.searchParams.get("q")).toBe("livrarias em Pinheiros, São Paulo");
-        expect(url.searchParams.get("enable_local")).toBe("true");
+        expect(url.pathname).toBe("/res/v1/local/place_search");
+        expect(url.searchParams.get("location")).toBe("Pinheiros São Paulo");
         expect([...new Headers(options?.headers).keys()]).toEqual(["accept", "x-subscription-token"]);
-        return Response.json({ grounding: {
-          poi: { name: "Livraria A", latitude: -23.56, longitude: -46.68, url: "https://example.org/a" },
-          map: [
-            { name: "Livraria A", latitude: -23.56, longitude: -46.68 },
-            { name: "Livraria B", address: "Rua Exemplo, 100, São Paulo", latitude: -91, longitude: -46.68 },
-            { name: "Livraria C", snippets: ["Endereço de outra unidade"], url: "javascript:alert(1)" },
-            { title: "Resultado sem nome" },
-          ],
-          generic: [{ title: "Resultado web genérico" }],
-        } });
+        const postal_address = { displayAddress: "Rua Exemplo, 100 - Pinheiros, São Paulo" };
+        return Response.json({ results: [
+          { title: "Livraria A", coordinates: [-23.56, -46.68], postal_address, url: "https://example.org/a" },
+          { title: "Livraria A", coordinates: [-23.56, -46.68], postal_address },
+          { title: "Livraria B", coordinates: [-91, -46.68], postal_address },
+          { title: "Livraria C", coordinates: [-23.56, -46.68], snippets: ["Endereço de outra unidade"], url: "javascript:alert(1)" },
+          { title: "Outra região", coordinates: [-8.05, -34.88], postal_address: { displayAddress: "Recife, PE" } },
+          { coordinates: [-23.56, -46.68], postal_address },
+        ] });
       }
       expect(url.hostname).toBe("chat.maritaca.ai");
       const payload = JSON.parse(String(options?.body));
       expect(payload).toMatchObject({ model: "S5-free", stream: true });
-      expect(payload.messages[1].content).not.toMatch(/Resultado web|outra unidade|Resultado sem nome/);
+      expect(payload.messages[1].content).not.toMatch(/outra unidade|Outra região/);
       return new Response('data: {"choices":[{"delta":{"content":"O Brave encontrou a Livraria A [1] e a Livraria B [2]."}}]}\n\ndata: [DONE]\n\n');
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -381,8 +381,9 @@ describe("explicit Brave place search", () => {
       apple: "https://maps.apple.com/place?coordinate=-23.56%2C-46.68&name=Livraria%20A",
       waze: "https://waze.com/ul?ll=-23.56%2C-46.68&navigate=yes",
     });
-    expect(new URL(sources[1].mapLinks.apple).searchParams.get("query")).toBe("Rua Exemplo, 100, São Paulo");
-    expect(new URL(sources[2].mapLinks.waze).searchParams.get("q")).toBe("Livraria C, Pinheiros, São Paulo");
+    expect(sources[1]).not.toHaveProperty("mapLinks");
+    expect(sources[2]).not.toHaveProperty("mapLinks");
+    expect(sources[2]).not.toHaveProperty("url");
     expect(body).toContain('"citations":[1,2]');
     expect(body).toContain("data: [DONE]");
     expect(body).not.toMatch(/javascript:|Endereço de outra unidade/);

@@ -1,5 +1,6 @@
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { createEvidenceRegistry } from "./evidence";
-import { cleanSearchText, fetchBraveContext } from "./web-search";
+import { cleanSearchText } from "./web-search";
 
 const placeCommand = /^(?:por favor,?\s+)?(?:encontre|busque|procure|pesquise|localize)\s+(livrarias?|bibliotecas?|lugares?)(?=$|[\s:?.!])/iu;
 
@@ -21,24 +22,34 @@ export function parsePlaceQuery(question: string) {
   return { area, query: `${category ?? kind} em ${area}` };
 }
 
-function coordinates(latitude: unknown, longitude: unknown) {
+function coordinates(value: unknown) {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [latitude, longitude] = value;
   if (typeof latitude !== "number" || typeof longitude !== "number" ||
     !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
-    Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    Math.abs(latitude) > 90 || Math.abs(longitude) > 180 ||
+    (latitude === 0 && longitude === 0)) return null;
   return `${latitude},${longitude}`;
 }
 
-function createMapLinks(name: string, area: string, address: string, coordinate: string | null) {
-  const search = address || `${name}, ${area}`;
+function createMapLinks(name: string, coordinate: string) {
+  const destination = encodeURIComponent(coordinate);
   return {
-    google: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coordinate ?? search)}`,
-    apple: coordinate
-      ? `https://maps.apple.com/place?coordinate=${encodeURIComponent(coordinate)}&name=${encodeURIComponent(name)}`
-      : `https://maps.apple.com/search?query=${encodeURIComponent(search)}`,
-    waze: coordinate
-      ? `https://waze.com/ul?ll=${encodeURIComponent(coordinate)}&navigate=yes`
-      : `https://waze.com/ul?q=${encodeURIComponent(search)}`,
+    google: `https://www.google.com/maps/search/?api=1&query=${destination}`,
+    apple: `https://maps.apple.com/place?coordinate=${destination}&name=${encodeURIComponent(name)}`,
+    waze: `https://waze.com/ul?ll=${destination}&navigate=yes`,
   };
+}
+
+function normalizeLocation(value: string) {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function addressMatchesArea(address: string, area: string) {
+  const parts = area.split(",").map(normalizeLocation).filter(Boolean);
+  const normalized = ` ${normalizeLocation(address)} `;
+  return parts.length > 0 && parts.every(part => normalized.includes(` ${part} `));
 }
 
 function placeWebsite(value: unknown) {
@@ -50,30 +61,46 @@ function placeWebsite(value: unknown) {
 }
 
 export async function lookupPlaceEvidence({ query, area }: { query: string; area: string }, key: string, signal: AbortSignal) {
-  const grounding = await fetchBraveContext(query, key, signal, true);
-  const results: unknown[] = [grounding?.poi, ...(Array.isArray(grounding?.map) ? grounding.map : [])];
+  const endpoint = new URL("https://api.search.brave.com/res/v1/local/place_search");
+  endpoint.search = new URLSearchParams({
+    q: query, location: area.replace(/[,\s]+/g, " ").trim(), search_lang: "pt-br", count: "8",
+  }).toString();
+  const response = await fetchWithTimeout(endpoint, {
+    headers: { Accept: "application/json", "X-Subscription-Token": key },
+    cache: "no-store", redirect: "error", signal,
+  }, 8000);
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("Busca de lugares indisponível");
+  }
+  const data: { results?: unknown } = await response.json();
+  const results = data?.results ?? [];
+  if (!Array.isArray(results)) throw new Error("Resposta de lugares inválida");
   const registry = createEvidenceRegistry();
   const seen = new Set<string>();
   const content: string[] = [];
   for (const result of results) {
     if (!result || typeof result !== "object") continue;
     const item = result as Record<string, unknown>;
-    const name = cleanSearchText(item.name, 160);
+    const name = cleanSearchText(item.title, 160);
     if (!name || !/\p{L}/u.test(name)) continue;
-    // The documented local results may contain only a name and website.
-    // Use structured location fields if present. Snippets can refer to another branch.
-    const address = cleanSearchText(item.address, 250);
-    const coordinate = coordinates(item.latitude, item.longitude);
+    const postal = item.postal_address as { displayAddress?: unknown } | null | undefined;
+    const address = cleanSearchText(postal?.displayAddress, 250);
+    // The location parameter biases results. Verify the returned address before linking.
+    if (address && !addressMatchesArea(address, area)) continue;
+    const coordinate = address ? coordinates(item.coordinates) : null;
     const identity = `${name.toLocaleLowerCase("pt-BR")}|${coordinate ?? address}`;
     if (seen.has(identity)) continue;
     seen.add(identity);
-    const mapLinks = createMapLinks(name, area, address, coordinate);
+    const mapLinks = coordinate ? createMapLinks(name, coordinate) : undefined;
     const website = placeWebsite(item.url);
+    const url = website ?? mapLinks?.google;
     content.push(registry.add({
       id: `brave-place-${seen.size}`, title: name, author: website ? new URL(website).hostname : area,
-      external: true, matchedBy: "Brave Search · Lugares", url: website ?? mapLinks.google,
-      evidence: address || null, mapLinks,
-    }, JSON.stringify({ name, address: address || undefined })));
+      external: true, sourceType: "place", matchedBy: "Brave Search · Lugares",
+      ...(url ? { url } : {}),
+      evidence: address || null, ...(mapLinks ? { mapLinks } : {}),
+    }, JSON.stringify({ name, address: address || undefined, hasMapLinks: Boolean(mapLinks) })));
     if (content.length === 5) break;
   }
   return { sources: registry.sources, content: content.join("\n") };

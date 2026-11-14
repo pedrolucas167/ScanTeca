@@ -15,6 +15,13 @@ import { consumeOracleEvents } from "@/lib/oracle-stream";
 import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, ORACLE_STAGE_LABELS, type OracleMode } from "@/lib/constants/oracle";
 import type { Source, Message, OracleSession, OracleArtifact, OracleStreamEvent } from "@/lib/types/oracle";
 
+function restoreSource(source: Source): Source {
+  // Older place results may contain text-search links instead of verified destinations.
+  if (!source.id.startsWith("brave-place-") || source.sourceType === "place") return source;
+  const { mapLinks, url, ...rest } = source;
+  return { ...rest, sourceType: "place", ...(url && url !== mapLinks?.google ? { url } : {}) };
+}
+
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(() =>
@@ -132,7 +139,7 @@ export default function OraclePage() {
               (m: { role: string; content: string; sources?: Source[] }) => ({
                 role: m.role as "user" | "assistant",
                 content: m.content,
-                sources: m.sources ?? undefined,
+                sources: m.sources?.map(restoreSource),
               })
             )
           );
@@ -849,7 +856,7 @@ export default function OraclePage() {
           (message: { role: string; content: string; sources?: Source[] }) => ({
             role: message.role as "user" | "assistant",
             content: message.content,
-            sources: message.sources ?? undefined,
+            sources: message.sources?.map(restoreSource),
           })
         )
       );
@@ -1282,7 +1289,7 @@ export default function OraclePage() {
                         <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
                           <span>Escopo</span>
                           <strong className="font-mono text-on-surface">
-                            {msg.sources?.find(source => source.url)?.matchedBy ?? (msg.retrievalStats.scope === "all" ? "Escopo ampliado" : "Meu acervo")}
+                            {msg.sources?.find(source => source.url || source.sourceType === "place")?.matchedBy ?? (msg.retrievalStats.scope === "all" ? "Escopo ampliado" : "Meu acervo")}
                           </strong>
                         </div>
                       </div>
@@ -1319,7 +1326,7 @@ export default function OraclePage() {
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
-                                  {source.url
+                                  {source.url || source.sourceType === "place"
                                     ? source.matchedBy ?? "Pesquisa externa"
                                     : source.external
                                     ? "Fora do acervo"
@@ -1329,7 +1336,7 @@ export default function OraclePage() {
                                         ? "Avaliação do leitor"
                                         : "Fonte do acervo"}
                                 </span>
-                                {source.external ? (
+                              {source.external ? (
                                   <h3 className="mt-1 whitespace-normal font-quote-md text-quote-md font-semibold text-on-surface">
                                     {source.title}
                                   </h3>
@@ -1407,7 +1414,10 @@ export default function OraclePage() {
                                   {copiedSourceId === source.id ? "Copiado" : "Copiar evidência"}
                                 </button>
                               )}
-                              {source.url ? (
+                              {source.sourceType === "place" && !source.mapLinks && (
+                                <span className="px-2 py-1 font-caption text-caption text-on-surface-variant">Coordenadas não verificadas</span>
+                              )}
+                              {source.url && source.url !== source.mapLinks?.google ? (
                                 <a
                                   href={source.url}
                                   target="_blank"
@@ -1416,7 +1426,7 @@ export default function OraclePage() {
                                 >
                                   <Icon decorative name="open_in_new" className="text-xs" /> Abrir fonte
                                 </a>
-                              ) : source.external ? (
+                              ) : source.external && source.sourceType !== "place" ? (
                                 <Link
                                   href="/search-add"
                                   className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
