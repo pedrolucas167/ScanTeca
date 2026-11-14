@@ -1,5 +1,11 @@
 # Oráculo: roadmap de qualidade
 
+Estado consolidado em 14/11/2026: veja [prioridades atuais](ROADMAP-STATUS.md).
+As pesquisas externa, de capas e de lugares de leitura estão integradas e
+publicadas. Persistência e isolamento já têm aceite autenticado local com IA
+simulada; avaliação representativa, revisão humana, aceite autenticado e métricas
+de produção continuam abertos. Câmera/scanner não bloqueiam o encerramento.
+
 Iniciado em 30/10/2026. A ordem prioriza qualidade percebida e evidências antes
 de ampliar personalização e operação. Implementação local não confirma deploy.
 

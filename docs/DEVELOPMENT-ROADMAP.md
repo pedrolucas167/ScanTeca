@@ -1,5 +1,13 @@
 # Roadmap de modularização — ScanTeca
 
+## Prioridades vigentes — 14/11/2026
+
+Consulte a [lista consolidada de entregas e pendências](ROADMAP-STATUS.md).
+Câmera e scanner físico são opcionais por decisão do responsável e não bloqueiam
+o encerramento. As ordens e estimativas abaixo são históricas. O próximo aceite
+é o de qualidade/produção do Oráculo; o próximo pacote de código é Comunidade e
+privacidade, seguido de Jobs e notificações e das integrações restantes.
+
 Continuação do Oráculo em 30/10/2026: [roadmap de qualidade](./ORACLE-QUALITY-ROADMAP.md).
 A modularização do fluxo fundamentado foi concluída, integrada e publicada.
 O aceite local do Oráculo foi ampliado em 05/11/2026: sete cenários aprovados,
@@ -27,7 +35,7 @@ O smoke público não comprova o aceite autenticado nem a qualidade representati
 | Próxima etapa marcada | Oráculo | Aceite local de persistência e isolamento aprovado em 05/11/2026 com IA simulada; faltam avaliação com acervo fictício representativo, revisão humana explícita e aceite de produção. Voz e métricas de produção continuam separadas |
 | Próximo pacote de código | Comunidade e privacidade | Consolidar regras de visibilidade, bloqueio e moderação entre feed, perfis, clubes e discussões, com cenários autenticados entre duas contas |
 | Seguinte | Jobs e notificações | Verificar execução real dos crons e recuperação em produção; tratar vazão do backlog e idempotência dos lembretes |
-| Operação e interface | Providers e experiência | Exercitar câmera/scanner, metadados reais, uploads, push em dispositivo e voz; separar melhor responsabilidades da interface do Oráculo |
+| Operação e interface | Providers e experiência | Exercitar metadados reais, uploads, push em dispositivo e voz; separar melhor responsabilidades da interface do Oráculo. Câmera/scanner são opcionais desde 14/11/2026 |
 | Operacional opcional | Releases | Confirmar ambiente e token dedicado antes de habilitar os modos de escrita do fluxo de releases |
 
 Há trabalho implementado nessas frentes: a fila já usa claim/lease atômicos,
