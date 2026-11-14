@@ -18,6 +18,7 @@ export interface Source {
 }
 
 export interface Message {
+  requestLocationFor?: string;
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
@@ -27,6 +28,7 @@ export interface Message {
 }
 
 export interface OracleStreamEvent {
+  requestLocationFor?: string;
   stage?: OracleStage;
   transcript?: string;
   sessionId?: string;

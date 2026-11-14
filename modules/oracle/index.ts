@@ -3,9 +3,11 @@ export { answerOracleQuestion } from "./query";
 export { requestsBibliographicSearch } from "./bibliographic-search";
 export { requestsWebSearch } from "./web-search";
 export { requestsPlaceSearch } from "./place-search";
+export { parsePlaceQuery, lookupPlaceEvidence } from "./place-search";
+export { braveSearchKey } from "./web-search";
 export { requestsImageSearch } from "./image-search";
 export { hasOracleChatKey, usesMaritaca } from "./chat";
-export { directChatResponse, toolExecutionResponse } from "./responses";
+export { directChatResponse, toolExecutionResponse, groundedFallbackResponse } from "./responses";
 export { getOracleHome, clearOracleHistory } from "./home";
 export { prepareOracleSession, OracleSessionError } from "./session";
 export { createOracleSessionSchema, updateOracleSessionSchema, listOracleSessions, createOracleSession,
