@@ -278,6 +278,66 @@ describe("explicit Google Books search", () => {
   });
 });
 
+describe("explicit Brave LLM Context search", () => {
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("key_brave_api", "fixture-brave");
+  });
+
+  const question = 'Pesquise na web: "Octavia Butler Kindred interview"';
+
+  it("calls Brave once with the delimited terms and streams cited evidence", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "api.search.brave.com") {
+        expect(url.pathname).toBe("/res/v1/llm/context");
+        expect(url.searchParams.get("q")).toBe("Octavia Butler Kindred interview");
+        expect(url.searchParams.get("maximum_number_of_tokens")).toBe("2048");
+        expect(options?.headers).toMatchObject({ "X-Subscription-Token": "fixture-brave" });
+        expect(options?.redirect).toBe("error");
+        return Response.json({ grounding: { generic: [
+          { url: "javascript:alert(1)", snippets: ["Unsafe source"] },
+          { url: "https://example.org/interview", title: "Interview", snippets: ["Butler researched slave narratives for Kindred."] },
+          { url: "https://example.org/interview#duplicate", snippets: ["Duplicate"] },
+        ] } });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[1].content).toContain('Butler researched slave narratives for Kindred.');
+      expect(payload.messages[1].content).not.toMatch(/Unsafe source|Duplicate|fixture-brave/);
+      return new Response('data: {"choices":[{"delta":{"content":"Butler pesquisou relatos de pessoas escravizadas para escrever Kindred [1]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain('"url":"https://example.org/interview"');
+    expect(body).toContain('"citations":[1]');
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toMatch(/javascript:|fixture-brave/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([429, 200])("reports unavailable or empty Brave evidence (%s)", async status => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ grounding: { generic: [] } }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei fontes relevantes" : "Não consegui consultar o Brave Search");
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("makes no outbound request if the key is missing or extra text follows the query", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await (await POST(questionRequest(question + " Veja também meu diário."))).text()).toContain("termos públicos da busca");
+    vi.stubEnv("key_brave_api", "");
+    expect(await (await POST(questionRequest(question))).text()).toContain("ainda não foi configurada");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("Oracle actions and interrupted providers", () => {
   it.each([
     ["NOT_FOUND", 404], ["DUPLICATE_REQUEST", 409],

@@ -167,7 +167,7 @@ function renderInline(text: string, sources?: Source[]): ReactNode[] {
           >
             {source.url ? (
               <a href={source.url} target="_blank" rel="noopener noreferrer"
-                aria-label={`Fonte ${citationNum}: ${source.title} no Google Books`}>
+                aria-label={`Fonte ${citationNum}: ${source.title}`}>
                 {citationNum}
               </a>
             ) : citationNum}

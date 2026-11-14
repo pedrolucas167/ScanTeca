@@ -1282,7 +1282,7 @@ export default function OraclePage() {
                         <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
                           <span>Escopo</span>
                           <strong className="font-mono text-on-surface">
-                            {msg.sources?.some(source => source.url) ? "Google Books" : msg.retrievalStats.scope === "all" ? "Escopo ampliado" : "Meu acervo"}
+                            {msg.sources?.find(source => source.url)?.matchedBy ?? (msg.retrievalStats.scope === "all" ? "Escopo ampliado" : "Meu acervo")}
                           </strong>
                         </div>
                       </div>
@@ -1320,7 +1320,7 @@ export default function OraclePage() {
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
                                   {source.url
-                                    ? "Google Books"
+                                    ? source.matchedBy ?? "Pesquisa externa"
                                     : source.external
                                     ? "Fora do acervo"
                                     : source.sourceType === "diary"
@@ -1404,7 +1404,7 @@ export default function OraclePage() {
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
                                 >
-                                  <Icon decorative name="open_in_new" className="text-xs" /> Abrir no Google Books
+                                  <Icon decorative name="open_in_new" className="text-xs" /> Abrir fonte
                                 </a>
                               ) : source.external ? (
                                 <Link
