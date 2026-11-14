@@ -13,6 +13,7 @@ export interface Source {
   sourceType?: "book" | "diary" | "review";
   external?: boolean;
   url?: string;
+  mapLinks?: { google: string; apple: string; waze: string };
 }
 
 export interface Message {

@@ -338,6 +338,71 @@ describe("explicit Brave LLM Context search", () => {
   });
 });
 
+describe("explicit Brave place search", () => {
+  const question = 'Encontre livrarias em "Pinheiros, São Paulo"';
+
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "fixture-brave");
+  });
+
+  it("streams only returned places and builds direct map links from valid destinations", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "api.search.brave.com") {
+        expect(url.searchParams.get("q")).toBe("livrarias em Pinheiros, São Paulo");
+        expect(url.searchParams.get("enable_local")).toBe("true");
+        expect([...new Headers(options?.headers).keys()]).toEqual(["accept", "x-subscription-token"]);
+        return Response.json({ grounding: {
+          poi: { name: "Livraria A", latitude: -23.56, longitude: -46.68, url: "https://example.org/a" },
+          map: [
+            { name: "Livraria A", latitude: -23.56, longitude: -46.68 },
+            { name: "Livraria B", address: "Rua Exemplo, 100, São Paulo", latitude: -91, longitude: -46.68 },
+            { name: "Livraria C", snippets: ["Endereço de outra unidade"], url: "javascript:alert(1)" },
+            { title: "Resultado sem nome" },
+          ],
+          generic: [{ title: "Resultado web genérico" }],
+        } });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[1].content).not.toMatch(/Resultado web|outra unidade|Resultado sem nome/);
+      return new Response('data: {"choices":[{"delta":{"content":"O Brave encontrou a Livraria A [1] e a Livraria B [2]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    const events = body.split("\n").filter(line => line.startsWith("data: {")).map(line => JSON.parse(line.slice(6)));
+    const sources = events.find(event => event.sources)?.sources;
+    expect(sources).toHaveLength(3);
+    expect(sources[0].mapLinks).toEqual({
+      google: "https://www.google.com/maps/search/?api=1&query=-23.56%2C-46.68",
+      apple: "https://maps.apple.com/place?coordinate=-23.56%2C-46.68&name=Livraria%20A",
+      waze: "https://waze.com/ul?ll=-23.56%2C-46.68&navigate=yes",
+    });
+    expect(new URL(sources[1].mapLinks.apple).searchParams.get("query")).toBe("Rua Exemplo, 100, São Paulo");
+    expect(new URL(sources[2].mapLinks.waze).searchParams.get("q")).toBe("Livraria C, Pinheiros, São Paulo");
+    expect(body).toContain('"citations":[1,2]');
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toMatch(/javascript:|Endereço de outra unidade/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks for an explicit area and keeps generic web results out of place answers", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ grounding: { generic: [{ title: "Resultado genérico" }], map: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const missingArea = await (await POST(questionRequest("Encontre bibliotecas perto de mim"))).text();
+    expect(missingArea).toContain("Informe a cidade ou o bairro");
+    const noPlaces = await (await POST(questionRequest('Encontre lugares: "museus" em "Recife"'))).text();
+    expect(noPlaces).toContain("Não encontrei lugares");
+    expect(noPlaces).toContain('"sources":[]');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("q")).toBe("museus em Recife");
+  });
+});
+
 describe("Oracle actions and interrupted providers", () => {
   it.each([
     ["NOT_FOUND", 404], ["DUPLICATE_REQUEST", 409],

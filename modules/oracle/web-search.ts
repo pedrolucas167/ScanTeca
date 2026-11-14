@@ -16,16 +16,17 @@ export function braveSearchKey() {
   return process.env.BRAVE_SEARCH_API_KEY?.trim() || process.env.key_brave_api?.trim();
 }
 
-function cleanText(value: unknown, limit: number) {
+export function cleanSearchText(value: unknown, limit: number) {
   return typeof value === "string" ? value.slice(0, limit * 2).replace(/\s+/gu, " ").trim().slice(0, limit) : "";
 }
 
-export async function lookupWebEvidence(query: string, key: string, signal: AbortSignal) {
+export async function fetchBraveContext(query: string, key: string, signal: AbortSignal, local = false) {
   const endpoint = new URL("https://api.search.brave.com/res/v1/llm/context");
   endpoint.searchParams.set("q", query);
   endpoint.searchParams.set("maximum_number_of_tokens", "2048");
   endpoint.searchParams.set("context_threshold_mode", "balanced");
-  endpoint.searchParams.set("enable_local", "false");
+  endpoint.searchParams.set("enable_local", String(local));
+  if (local) endpoint.searchParams.set("search_lang", "pt-br");
   const response = await fetchWithTimeout(endpoint, {
     headers: { Accept: "application/json", "X-Subscription-Token": key },
     cache: "no-store", redirect: "error", signal,
@@ -35,8 +36,12 @@ export async function lookupWebEvidence(query: string, key: string, signal: Abor
     throw new Error("Busca web indisponível");
   }
 
-  const data: { grounding?: { generic?: unknown } } = await response.json();
-  const items = data?.grounding?.generic ?? [];
+  const data: { grounding?: { generic?: unknown; map?: unknown; poi?: unknown } } = await response.json();
+  return data?.grounding;
+}
+
+export async function lookupWebEvidence(query: string, key: string, signal: AbortSignal) {
+  const items = (await fetchBraveContext(query, key, signal))?.generic ?? [];
   if (!Array.isArray(items)) throw new Error("Resposta de busca inválida");
   const registry = createEvidenceRegistry();
   const seen = new Set<string>();
@@ -48,10 +53,10 @@ export async function lookupWebEvidence(query: string, key: string, signal: Abor
     if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) continue;
     url.hash = "";
     if (seen.has(url.href)) continue;
-    const snippets = item.snippets.slice(0, 2).map((snippet: unknown) => cleanText(snippet, 1000)).filter(Boolean);
+    const snippets = item.snippets.slice(0, 2).map((snippet: unknown) => cleanSearchText(snippet, 1000)).filter(Boolean);
     if (!snippets.length) continue;
     seen.add(url.href);
-    const title = cleanText(item.title, 180) || url.hostname;
+    const title = cleanSearchText(item.title, 180) || url.hostname;
     const evidence = snippets.join("\n");
     content.push(registry.add({
       id: `brave-${seen.size}`, title, author: url.hostname, url: url.href, external: true,

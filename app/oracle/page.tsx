@@ -1387,6 +1387,16 @@ export default function OraclePage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5">
+                              {source.mapLinks && [
+                                ["Google Maps", source.mapLinks.google],
+                                ["Apple Maps", source.mapLinks.apple],
+                                ["Waze", source.mapLinks.waze],
+                              ].map(([label, href]) => (
+                                <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20">
+                                  <Icon decorative name="open_in_new" className="text-xs" /> {label}
+                                </a>
+                              ))}
                               {source.evidence && (
                                 <button
                                   type="button"
