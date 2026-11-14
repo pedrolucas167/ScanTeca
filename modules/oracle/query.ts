@@ -13,6 +13,7 @@ import { usesMaritaca } from "./chat";
 import { lookupBibliographicEvidence, parseBibliographicQuery, requestsBibliographicSearch } from "./bibliographic-search";
 import { braveSearchKey, lookupWebEvidence, parseWebQuery, requestsWebSearch } from "./web-search";
 import { lookupPlaceEvidence, parsePlaceQuery, requestsPlaceSearch } from "./place-search";
+import { parseImageQuery, requestsImageSearch, searchOracleImages } from "./image-search";
 
 export async function answerOracleQuestion({ userId, question: trimmed, mode, sessionId, currentRequestMessageId,
   temperature, scope, regenerate, apiKey, signal: requestSignal, schedule }: {
@@ -20,9 +21,23 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
   temperature: number; scope: "library" | "all"; regenerate?: boolean; apiKey: string;
   signal: AbortSignal; schedule: (job: () => Promise<void>) => void;
 }) {
-  const previousAnswer = regenerate ? await getOracleRegenerationTarget(userId, sessionId) : null;
+  const imageRequested = requestsImageSearch(trimmed);
+  const previousAnswer = regenerate && !imageRequested ? await getOracleRegenerationTarget(userId, sessionId) : null;
   return createOraclePipeline({ signal: requestSignal, schedule, initialEvents: [{ sessionId }, { transcript: trimmed }], run: async pipeline => {
     const { signal, stage, metrics } = pipeline;
+    if (imageRequested) {
+      const query = parseImageQuery(trimmed);
+      if (!query) return groundedFallbackResponse('Informe um tema público, por exemplo: Traga imagens da Bíblia de Gutenberg.');
+      const key = braveSearchKey();
+      if (!key) return groundedFallbackResponse("A busca de imagens está indisponível neste ambiente.");
+      stage("external");
+      const sources = await metrics.measure("external", () => searchOracleImages(query, key, signal)).catch(() => null);
+      signal.throwIfAborted();
+      if (!sources) return groundedFallbackResponse("Não consegui buscar imagens agora. Tente novamente.");
+      if (!sources.length) return groundedFallbackResponse("Não encontrei imagens com miniaturas e fontes disponíveis para essa busca.");
+      // Image Search results are transient and are not saved to the conversation database.
+      return groundedFallbackResponse("Abra uma miniatura para visitar a página de origem.", sources);
+    }
     const placeRequested = requestsPlaceSearch(trimmed);
     if (placeRequested || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed)) {
       const placeQuery = parsePlaceQuery(trimmed);

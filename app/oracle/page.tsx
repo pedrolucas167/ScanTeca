@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
 import { OracleMemoryDialog } from "@/components/oracle/OracleMemoryDialog";
 import { OracleComposer } from "@/components/oracle/OracleComposer";
+import { OracleImageResults } from "@/components/oracle/OracleImageResults";
 import { useLocalDictation } from "@/components/oracle/useLocalDictation";
 import { useOnlineRecording } from "@/components/oracle/useOnlineRecording";
 import { useOracleViewport } from "@/components/oracle/useOracleViewport";
@@ -1296,7 +1297,8 @@ export default function OraclePage() {
                     </details>
                   )}
 
-                  {msg.sources && msg.sources.length > 0 && (
+                  {msg.sources?.some(source => source.sourceType === "image") && <OracleImageResults sources={msg.sources} />}
+                  {msg.sources && msg.sources.some(source => source.sourceType !== "image") && (
                     <details className="group/sources min-w-0 max-w-full rounded-xl border border-outline-variant/30">
                       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-primary marker:hidden">
                         <span>Fontes usadas ({msg.sources.length})</span>
@@ -1515,14 +1517,14 @@ export default function OraclePage() {
                           />
                           {playingTtsIndex === i ? "Parar" : "Ouvir resposta"}
                         </button>
-                        <button
+                        {!msg.sources?.some(source => source.sourceType === "image") && <button
                           onClick={() => void saveArtifact(msg, i)}
                           disabled={savingArtifact === i}
                           className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary disabled:opacity-50"
                         >
                           <Icon decorative name="bookmark_add" className="text-sm" />
                           {savingArtifact === i ? "Salvando..." : "Salvar resultado"}
-                        </button>
+                        </button>}
                         <button
                           onClick={() => void copyResponse(msg.content, i)}
                           title="Copiar resposta"

@@ -404,6 +404,67 @@ describe("explicit Brave place search", () => {
   });
 });
 
+describe("explicit Brave Image Search", () => {
+  beforeEach(() => {
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("key_brave_api", "fixture-brave");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    vi.stubEnv("MARITACA_API_KEY", "");
+    vi.stubEnv("key_maritaca_ai", "");
+  });
+
+  it("streams only HTTPS source pages with Brave thumbnails and keeps results transient", async () => {
+    vi.mocked(saveOracleAnswer).mockClear();
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/images/search");
+      expect(url.searchParams.get("q")).toBe("Bíblia de Gutenberg");
+      expect(url.searchParams.get("safesearch")).toBe("strict");
+      expect(options?.cache).toBe("no-store");
+      expect(options?.headers).toMatchObject({ "X-Subscription-Token": "fixture-brave" });
+      const thumbnail = { src: "https://imgs.search.brave.com/example" };
+      return Response.json({ results: [
+        { title: "Bíblia em exposição", url: "https://museum.example/exhibit", thumbnail },
+        { url: "https://museum.example/duplicate", thumbnail },
+        { url: "http://museum.example/exhibit", thumbnail: { src: "https://imgs.search.brave.com/other" } },
+        { url: "https://museum.example/exhibit", thumbnail: { src: "https://imgs.search.brave.com.evil.example/test" } },
+        { url: "https://library.example/item", thumbnail: { src: "https://imgs.search.brave.com/book" } },
+      ] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"));
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    const sources = body.split("\n").filter(line => line.startsWith("data: {"))
+      .map(line => JSON.parse(line.slice(6))).find(event => event.sources)?.sources;
+    expect(sources).toHaveLength(2);
+    expect(sources[0]).toMatchObject({ sourceType: "image", url: "https://museum.example/exhibit",
+      thumbnail: { url: "https://imgs.search.brave.com/example", alt: "Bíblia em exposição" } });
+    expect(sources[1].thumbnail.alt).toContain("Bíblia de Gutenberg");
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(saveOracleAnswer).not.toHaveBeenCalled();
+  });
+
+  it.each([200, 429])("handles an empty or failed image response (%s)", async status => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ results: [] }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei imagens" : "Não consegui buscar imagens");
+    expect(body).toContain('"sources":[]');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("asks for public terms and handles missing credentials before calling Brave", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await (await POST(questionRequest("Traga imagens do meu acervo"))).text()).toContain("Informe um tema público");
+    vi.stubEnv("key_brave_api", "");
+    expect(await (await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"))).text()).toContain("indisponível neste ambiente");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("Oracle actions and interrupted providers", () => {
   it.each([
     ["NOT_FOUND", 404], ["DUPLICATE_REQUEST", 409],
