@@ -7,6 +7,7 @@ import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
 import { braveSearchKey, createOraclePipeline, groundedFallbackResponse, lookupPlaceEvidence, parsePlaceQuery } from "@/modules/oracle";
+import { requestsMediaSearch } from "@/modules/oracle";
 import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, usesMaritaca, requestsBibliographicSearch, requestsWebSearch, requestsPlaceSearch, requestsImageSearch } from "@/modules/oracle";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // Jev Query Routing - decide se precisa de busca vetorial
     const imageRequested = requestsImageSearch(trimmed);
-    const routing = imageRequested || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed) || requestsPlaceSearch(trimmed)
+    const routing = imageRequested || requestsMediaSearch(trimmed) || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed) || requestsPlaceSearch(trimmed)
       ? null : await jevRouteQuery(trimmed);
 
     if (routing && shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
