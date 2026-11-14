@@ -8,6 +8,7 @@ import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
 import { OracleMemoryDialog } from "@/components/oracle/OracleMemoryDialog";
 import { OracleComposer } from "@/components/oracle/OracleComposer";
 import { OracleImageResults } from "@/components/oracle/OracleImageResults";
+import { OracleLocationChoice } from "@/components/oracle/OracleLocationChoice";
 import { useLocalDictation } from "@/components/oracle/useLocalDictation";
 import { useOnlineRecording } from "@/components/oracle/useOnlineRecording";
 import { useOracleViewport } from "@/components/oracle/useOracleViewport";
@@ -244,6 +245,11 @@ export default function OraclePage() {
     await consumeOracleEvents<OracleStreamEvent>(res.body, (json) => {
       if (json.stage && Object.hasOwn(ORACLE_STAGE_LABELS, json.stage)) setGenerationStage(ORACLE_STAGE_LABELS[json.stage]);
       if (json.sessionId || json.transcript || json.text || json.action) receivedAnyRef.current = true;
+      if (json.requestLocationFor) {
+        const requestLocationFor = json.requestLocationFor;
+        setMessages(previous => previous.map((message, index) =>
+          index === previous.length - 1 && message.role === "assistant" ? { ...message, requestLocationFor } : message));
+      }
       if (isOracleAction(json.action)) {
         const action = json.action;
         setMessages(previous => previous.map((message, index) => index === previous.length - 1 && message.role === "assistant" ? { ...message, action } : message));
@@ -342,7 +348,7 @@ export default function OraclePage() {
 
   const sendMessage = async (
     question: string,
-    opts?: { regenerate?: boolean; retry?: boolean }
+    opts?: { regenerate?: boolean; retry?: boolean; placeCenter?: { latitude: number; longitude: number } }
   ) => {
     if (!question || loadingRef.current || voiceBusy()) return;
     const previousMessages = opts?.regenerate ? messages : null;
@@ -387,6 +393,7 @@ export default function OraclePage() {
           scope,
           regenerate: opts?.regenerate,
           requestId,
+          placeCenter: opts?.placeCenter,
         }),
         signal: controller.signal,
       });
@@ -429,7 +436,7 @@ export default function OraclePage() {
         stopReveal();
         setError(err instanceof Error ? err.message : "Erro de rede");
         setMessages((prev) => prev.slice(0, -1));
-        setFailedSend({ kind: "text", question, streamed: receivedAnyRef.current });
+        if (!opts?.placeCenter) setFailedSend({ kind: "text", question, streamed: receivedAnyRef.current });
       }
     } finally {
       abortRef.current = null;
@@ -1245,6 +1252,10 @@ export default function OraclePage() {
                       className="min-w-0 transition-opacity duration-300"
                     >
                       <Markdown content={msg.content} sources={msg.sources} />
+                      {msg.requestLocationFor && i === messages.length - 1 && (
+                        <OracleLocationChoice category={msg.requestLocationFor} disabled={loading}
+                          onSearch={(question, placeCenter) => void sendMessage(question, { placeCenter })} />
+                      )}
                       {msg.action && <Link className="inline-flex min-h-11 items-center rounded-lg border border-current px-4 mt-3 focus-visible:outline-2 focus-visible:outline-offset-2" href={ORACLE_ACTIONS[msg.action].href}>{ORACLE_ACTIONS[msg.action].label}</Link>}
                       {loading && i === messages.length - 1 && (
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary" />

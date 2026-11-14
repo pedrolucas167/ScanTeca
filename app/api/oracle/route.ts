@@ -6,12 +6,14 @@ import { oracleHttpError } from "@/lib/oracle-http-error";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
+import { braveSearchKey, createOraclePipeline, groundedFallbackResponse, lookupPlaceEvidence, parsePlaceQuery } from "@/modules/oracle";
 import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, usesMaritaca, requestsBibliographicSearch, requestsWebSearch, requestsPlaceSearch, requestsImageSearch } from "@/modules/oracle";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
 const oracleSchema = z.object({
   question: z.string().nullish(),
+  placeCenter: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }).strict().optional(),
   mode: z.enum(ORACLE_MODES).default("EXPLORE"),
   sessionId: z.string().cuid().nullish(),
   temperature: z.coerce.number().min(0).max(2).default(0.3),
@@ -108,6 +110,31 @@ export async function POST(request: NextRequest) {
     }
 
     const trimmed = question;
+    const place = parsePlaceQuery(trimmed);
+    const center = parsed.data.placeCenter;
+    if (center && (!place || place.area)) {
+      return Response.json({ error: "A localização só pode ser usada para buscar lugares ligados a livros nas proximidades." }, { status: 400 });
+    }
+    if (place && !place.area) {
+      return createOraclePipeline({
+        signal: request.signal, schedule: job => after(job),
+        initialEvents: center ? [] : [{ requestLocationFor: place.category }],
+        run: async ({ signal, stage, metrics }) => {
+          if (!center) return groundedFallbackResponse("Use sua localização ou informe uma cidade ou bairro para buscar.");
+          const key = braveSearchKey();
+          if (!key) return groundedFallbackResponse("A busca de lugares está indisponível neste ambiente.");
+          stage("external");
+          const found = await metrics.measure("external", () => lookupPlaceEvidence({ category: place.category, center }, key, signal)).catch(() => null);
+          signal.throwIfAborted();
+          if (!found?.sources.length) {
+            return groundedFallbackResponse(found
+              ? "Não encontrei lugares próximos com coordenadas verificadas. Você pode tentar por cidade ou bairro."
+              : "Não consegui buscar lugares agora. Tente novamente.", [], { requestLocationFor: place.category });
+          }
+          return groundedFallbackResponse("Lugares encontrados, do mais próximo ao mais distante em linha reta.", found.sources);
+        },
+      });
+    }
 
     // Jev Query Routing - decide se precisa de busca vetorial
     const imageRequested = requestsImageSearch(trimmed);

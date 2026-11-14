@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, after } from "next/server";
+import { get } from "node:https";
+import { Readable } from "node:stream";
+import { EventEmitter } from "node:events";
+vi.mock("node:https", async original => ({ ...await original<typeof import("node:https")>(), get: vi.fn() }));
 vi.mock("next/server", async importOriginal => ({ ...await importOriginal<typeof import("next/server")>(), after: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn().mockResolvedValue({ userId: "test-owner" }) }));
 vi.mock("@/lib/rate-limit", () => ({ rateLimitGuard: vi.fn().mockResolvedValue(null), rateLimits: {} }));
@@ -481,12 +485,86 @@ describe("explicit Brave place search", () => {
       Response.json({ grounding: { generic: [{ title: "Resultado genérico" }], map: [] } }));
     vi.stubGlobal("fetch", fetchMock);
     const missingArea = await (await POST(questionRequest("Encontre bibliotecas perto de mim"))).text();
-    expect(missingArea).toContain("Informe a cidade ou o bairro");
-    const noPlaces = await (await POST(questionRequest('Encontre lugares: "museus" em "Recife"'))).text();
+    expect(missingArea).toContain('"requestLocationFor":"bibliotecas"');
+    const noPlaces = await (await POST(questionRequest('Encontre sebos em "Recife"'))).text();
     expect(noPlaces).toContain("Não encontrei lugares");
     expect(noPlaces).toContain('"sources":[]');
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("q")).toBe("museus em Recife");
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("q")).toBe("sebos em Recife");
+  });
+
+  it.each(["Qual é a livraria mais próxima?", "quais sebos mais próximos?"])("offers a location choice before calling providers for %s", async question => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(prisma.$transaction).mockClear();
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain('"requestLocationFor"');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("sends the center only to Brave and orders nearby results without history or model access", async () => {
+    vi.mocked(prisma.$transaction).mockClear();
+    const fetchMock = vi.fn<typeof fetch>();
+    const httpsMock = vi.mocked(get).mockImplementationOnce(((input: URL, _options: unknown, callback: (response: unknown) => void) => {
+      const url = new URL(String(input));
+      expect(url.hostname).toBe("api.search.brave.com");
+      expect(url.searchParams.get("q")).toBe("sebos");
+      expect(url.searchParams.get("latitude")).toBe("-23.56");
+      expect(url.searchParams.get("longitude")).toBe("-46.68");
+      const response = Readable.from([JSON.stringify({ results: [
+        { title: "Sebo A", coordinates: [-23.58, -46.68] },
+        { title: "Sebo B", coordinates: [-23.565, -46.68] },
+        { title: "Sebo C", coordinates: [-8, -34] },
+      ] })]);
+      callback(Object.assign(response, { statusCode: 200 }));
+      return new EventEmitter();
+    }) as typeof get);
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new NextRequest("http://localhost/api/oracle", { method: "POST",
+      body: JSON.stringify({ question: "quais sebos mais próximos?", placeCenter: { latitude: -23.56, longitude: -46.68 } }) });
+    const body = await (await POST(request)).text();
+    expect(body.indexOf("Sebo B")).toBeLessThan(body.indexOf("Sebo A"));
+    expect(body).not.toContain("Sebo C");
+    expect(body).toContain('"mapLinks"');
+    expect(httpsMock).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects coordinates for an unrelated business on the server", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const question = "Qual é a loja de roupa masculina mais próxima?";
+    const request = new NextRequest("http://localhost/api/oracle", { method: "POST",
+      body: JSON.stringify({ question, placeCenter: { latitude: -23.56, longitude: -46.68 } }) });
+    expect((await POST(request)).status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue(new Response('data: {"choices":[{"delta":{"content":"Informe uma região para pesquisar."}}]}\n\ndata: [DONE]\n\n'));
+    expect(await (await POST(questionRequest(question))).text()).not.toContain("requestLocationFor");
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).hostname)).toEqual(["chat.maritaca.ai"]);
+  });
+
+  it("requires evidence of both categories for a café that doubles as a bookstore", async () => {
+    vi.mocked(get).mockClear();
+    const httpsMock = vi.mocked(get).mockImplementationOnce(((input: URL, _options: unknown, callback: (response: unknown) => void) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get("q")).toBe("cafés que também são livrarias");
+      const response = Readable.from([JSON.stringify({ results: [
+        { title: "Café com Livraria", coordinates: [-23.565, -46.68] },
+        { title: "Só Café", coordinates: [-23.566, -46.68] },
+        { title: "Só Livraria", coordinates: [-23.567, -46.68] },
+      ] })]);
+      callback(Object.assign(response, { statusCode: 200 }));
+      return new EventEmitter();
+    }) as typeof get);
+    const response = await POST(new NextRequest("http://localhost/api/oracle", { method: "POST",
+      body: JSON.stringify({ question: "Encontre cafés que também são livrarias perto de mim",
+        placeCenter: { latitude: -23.56, longitude: -46.68 } }) }));
+    const body = await response.text();
+    expect(body).toContain("Café com Livraria");
+    expect(body).not.toMatch(/Só Café|Só Livraria/);
+    expect(httpsMock).toHaveBeenCalledOnce();
   });
 });
 
