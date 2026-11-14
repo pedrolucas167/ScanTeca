@@ -67,7 +67,7 @@ export async function generateOracleResponse({ pipeline, userId, sessionId, mode
               : validateOracleResponse(fullText);
         });
         const outputText = quality.valid
-          ? (generalAnswer ? "**Conhecimento geral** · sem fontes do acervo\n\n" : "") + fullText.trim()
+          ? (generalAnswer ? "**Conhecimento geral**\n\n" : "") + fullText.trim()
           : "Não consegui gerar uma resposta confiável com as evidências disponíveis. Tente reformular a pergunta.";
         if (!quality.valid) {
           pipeline.reject();

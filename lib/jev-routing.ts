@@ -19,19 +19,11 @@ export interface RoutingDecision {
 }
 
 const GREETING_PATTERNS = [
-  /^(oi|olá|hey|e aí|bom dia|boa tarde|boa noite|oi tudo bem|olá tudo bem)/i,
-  /^(tudo bem|como vai|e aí|beleza|suave)/i,
-  /^(obrigado|valeu|thanks|agradeço)/i,
-  /^(sim|não|talvez|claro|com certeza)/i,
-  /^(ok|certo|entendido|beleza)/i,
+  /^(?:(?:oi|olá|hey)[,! ]+)?(?:oi|olá|hey|e aí|bom dia|boa tarde|boa noite|tudo bem|como vai|como você está|beleza|suave|obrigad[oa](?: pela ajuda)?|valeu|thanks|agradeço)[\s.!?,]*$/iu,
 ];
 
 const CHAT_PATTERNS = [
-  /^(quem é você|o que você faz|como funciona|me explique)/i,
-  /^(me conte|fale sobre|me diga)/i,
-  /^(gostei|não gostei|achei|parece)/i,
-  /^(interessante|legal|bacana|maneiro)/i,
-  /^(sabe|conhece|já leu)/i,
+  /^(?:quem é você|o que você faz|como funciona(?: o oráculo)?|interessante|legal|bacana|maneiro)[\s.!?]*$/iu,
 ];
 
 const TOOL_PATTERNS = [

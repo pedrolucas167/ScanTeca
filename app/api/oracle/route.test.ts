@@ -29,7 +29,7 @@ describe("audio transcription in every Oracle response path", () => {
   it.each([
     ["Oi, tudo bem?", "chat"],
     ["Quero adicionar um livro", "tool"],
-    ["Astronomia e estrelas distantes", "fallback"],
+    ["Quais livros sobre astronomia eu tenho?", "fallback"],
   ])("returns the transcript before the %s response", async (transcript) => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (url.endsWith("/audio/transcriptions")) return Response.json({ text: transcript });
@@ -50,7 +50,8 @@ describe("audio transcription in every Oracle response path", () => {
 
 describe("grounded answers and evidence", () => {
   const book = { id: "dune", title: "Duna", author: "Frank Herbert", publishedDate: "1965",
-    genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico" };
+    genre: "Ficção Científica", status: "TO_READ", rating: null, synopsis: "Ecologia em um planeta desértico",
+    matchedBy: "título mencionado" };
 
   it("usa somente o S5-free em produção quando configurado, mantendo as fontes do acervo", async () => {
     vi.stubEnv("NODE_ENV", "production");
@@ -183,7 +184,7 @@ describe("grounded answers and evidence", () => {
       prompt = JSON.parse(String(options.body)).messages.at(-1).content;
       return new Response('data: {"choices":[{"delta":{"content":"As fontes consultadas são [1], [2], [3] e [4]."}}]}\n\ndata: [DONE]\n\n');
     }));
-    const body = await (await POST(questionRequest("Quais temas aparecem em Duna?"))).text();
+    const body = await (await POST(questionRequest("O que meu diário diz sobre Duna?"))).text();
     const events = body.split("\n\n").filter(line => line.startsWith("data: {")).map(line => JSON.parse(line.slice(6)));
     expect(events.find(event => event.sources).sources.map((source: { id: string }) => source.id)).toEqual(["dune", "diary", "review", "research"]);
     expect(prompt).toContain('[1] "Duna"');
@@ -199,6 +200,87 @@ function questionRequest(question: string, signal?: AbortSignal, scope = "librar
     body: JSON.stringify({ question, scope }), signal,
   });
 }
+
+describe("literary knowledge and personal-library priority", () => {
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+  });
+
+  it.each([
+    ["Me explique o estilo de Clarice Lispector", false],
+    ["Fale sobre a ironia em Memórias Póstumas de Brás Cubas", true],
+    ["Como Virginia Woolf usa o tempo em Mrs Dalloway?", false],
+  ])("uses literary knowledge without relying on weak library matches for %s", async (question, irrelevant) => {
+    if (irrelevant) vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [{
+      id: "wrong", title: "Horta urbana", author: "Autora de teste", status: "READ",
+      synopsis: "Termo incidental", genre: null, publishedDate: null, rating: null, matchedBy: "termos do acervo",
+    }], metadataCandidates: 0, lexicalCandidates: 1 });
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      expect(String(input)).toBe("https://chat.maritaca.ai/api/chat/completions");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[0].content).toContain("exemplos concretos da obra");
+      expect(payload.messages.at(-1).content).toBe(question);
+      return new Response('data: {"choices":[{"delta":{"content":"A técnica narrativa pode ser examinada em exemplos da obra."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain("Conhecimento geral");
+    expect(body).toContain('"sources":[]');
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "Tenho A Hora da Estrela?",
+    "Em que página parei na minha leitura?",
+    "O que anotei sobre Conceição Evaristo?",
+    "O que posso ler da minha estante?",
+  ])("keeps the evidence fallback for %s", async question => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question, undefined, "all"))).text();
+    expect(body).toContain("Não encontrei evidências suficientes no seu acervo");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps literary follow-ups in the conversation after a conversational prefix", async () => {
+    vi.mocked(prisma.oracleMessage.findMany).mockResolvedValueOnce([
+      { id: "prior", role: "user", content: "Como é o estilo de Clarice Lispector?" },
+    ] as never);
+    const fetchMock = vi.fn<typeof fetch>(async (_input, options) => {
+      const payload = JSON.parse(String(options?.body));
+      if (!payload.stream) return Response.json({ choices: [{ message: { content: "Exemplos do estilo de Clarice Lispector" } }] });
+      expect(payload.messages).toContainEqual({ role: "user", content: "Como é o estilo de Clarice Lispector?" });
+      return new Response('data: {"choices":[{"delta":{"content":"Um exemplo é o fluxo de consciência em Perto do Coração Selvagem."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Sim, pode dar exemplos?"))).text();
+    expect(body).toContain("Perto do Coração Selvagem");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses library evidence for possession and a dependent follow-up", async () => {
+    vi.mocked(prisma.oracleMessage.findMany).mockResolvedValueOnce([
+      { id: "prior", role: "user", content: "Tenho livros de Clarice Lispector?" },
+    ] as never);
+    vi.mocked(retrieval.retrieveBooks).mockResolvedValueOnce({ books: [{
+      id: "clarice", title: "A Hora da Estrela", author: "Clarice Lispector", status: "READ",
+      synopsis: null, genre: null, publishedDate: null, rating: null,
+    }], metadataCandidates: 1, lexicalCandidates: 0 });
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (_input, options) => {
+      const payload = JSON.parse(String(options?.body));
+      if (!payload.stream) return Response.json({ choices: [{ message: { content: "Quais livros de Clarice Lispector tenho?" } }] });
+      expect(payload.messages[0].content).toContain("seleção parcial");
+      expect(payload.messages.at(-1).content).toContain('[1] "A Hora da Estrela"');
+      return new Response('data: {"choices":[{"delta":{"content":"A Hora da Estrela aparece nas fontes recuperadas [1]."}}]}\n\ndata: [DONE]\n\n');
+    }));
+    const body = await (await POST(questionRequest("E quais são?"))).text();
+    expect(body).toContain('"citations":[1]');
+    expect(body).not.toContain("Conhecimento geral");
+  });
+});
 
 describe("explicit Google Books search", () => {
   beforeEach(() => {
@@ -288,7 +370,11 @@ describe("explicit Brave LLM Context search", () => {
 
   const question = 'Pesquise na web: "Octavia Butler Kindred interview"';
 
-  it("calls Brave once with the delimited terms and streams cited evidence", async () => {
+  it.each([
+    question,
+    'Verifique na web: "Octavia Butler Kindred interview"',
+    'Traga fontes externas sobre "Octavia Butler Kindred interview"',
+  ])("calls Brave once with the delimited terms and streams cited evidence for %s", async request => {
     const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
       const url = new URL(String(input));
       if (url.hostname === "api.search.brave.com") {
@@ -311,7 +397,7 @@ describe("explicit Brave LLM Context search", () => {
       return new Response('data: {"choices":[{"delta":{"content":"Butler pesquisou relatos de pessoas escravizadas para escrever Kindred [1]."}}]}\n\ndata: [DONE]\n\n');
     });
     vi.stubGlobal("fetch", fetchMock);
-    const body = await (await POST(questionRequest(question))).text();
+    const body = await (await POST(questionRequest(request))).text();
     expect(body).toContain('"url":"https://example.org/interview"');
     expect(body).toContain('"citations":[1]');
     expect(body).toContain("data: [DONE]");
