@@ -1,5 +1,10 @@
 # Próximas melhorias
 
+Revisão de 14/11/2026: o pacote principal abaixo está concluído. As validações
+da busca em Adicionar livro continuam abertas, separadas das buscas já publicadas
+no Oráculo. Veja a [lista consolidada](ROADMAP-STATUS.md); câmera/scanner físico
+são opcionais e não bloqueiam o encerramento.
+
 Plano aprovado em 28 de outubro de 2026. Cada pacote usa branch própria,
 Conventional Commits sem coautoria e PR com evidências e limites de validação.
 Integração exige os checks da principal; publicação segue pela Vercel.

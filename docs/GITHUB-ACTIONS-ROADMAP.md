@@ -1,6 +1,18 @@
 # Proposta: proteger main e ampliar GitHub Actions
 
-Estado: proposta para revisão, sem ativação de regras ou novos workflows.
+## Estado vigente — 14/11/2026
+
+A proteção da principal e os pacotes iniciais foram implantados, conforme o
+registro de 27/10 ao final deste documento. O E2E autenticado avançou desde a
+proposta; veja [evidências e limites](AUTHENTICATED-E2E.md) e o
+[runbook atual](CI-DEPLOY-RUNBOOK.md). A escrita de releases permanece opcional
+e depende de configuração própria. A [lista consolidada](ROADMAP-STATUS.md)
+separa entregas de critérios ainda abertos. Esta revisão não releu configurações
+remotas nem ativou workflows.
+
+## Proposta original (histórico)
+
+Estado na elaboração: proposta para revisão, sem ativação de regras ou novos workflows.
 
 ## Base verificada
 
