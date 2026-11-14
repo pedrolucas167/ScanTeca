@@ -1,5 +1,6 @@
 export { readOracleCompletion } from "./completion";
 export { answerOracleQuestion } from "./query";
+export { requestsBibliographicSearch } from "./bibliographic-search";
 export { hasOracleChatKey, usesMaritaca } from "./chat";
 export { directChatResponse, toolExecutionResponse } from "./responses";
 export { getOracleHome, clearOracleHistory } from "./home";

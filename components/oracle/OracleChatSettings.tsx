@@ -74,8 +74,9 @@ export function OracleChatSettings(props: Props) {
             <legend className="mb-2 text-sm text-on-surface-variant">Onde buscar livros?</legend>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" aria-pressed={props.scope === "library"} onClick={() => props.onScopeChange("library")} className={`${control} ${props.scope === "library" ? "border-primary text-primary" : ""}`}>Meu acervo</button>
-              <button type="button" aria-pressed={props.scope === "all"} onClick={() => props.onScopeChange("all")} className={`${control} ${props.scope === "all" ? "border-primary text-primary" : ""}`}>Acervo + catálogo</button>
+              <button type="button" aria-pressed={props.scope === "all"} onClick={() => props.onScopeChange("all")} className={`${control} ${props.scope === "all" ? "border-primary text-primary" : ""}`}>Escopo ampliado</button>
             </div>
+            <p className="mt-2 text-xs text-on-surface-variant">Para consultar o Google Books, experimente “Pesquise na internet ISBN 9780141439518”.</p>
           </fieldset>
           <label className="block text-sm">
             Criatividade da resposta <span className="text-primary">{props.temperature.toFixed(1)}</span>

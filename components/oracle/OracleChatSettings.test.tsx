@@ -33,7 +33,7 @@ describe("ajustes da conversa", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ajustes da conversa" }));
     expect(screen.getByRole("button", { name: "Explorar" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Comparar" }));
-    fireEvent.click(screen.getByRole("button", { name: "Acervo + catálogo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escopo ampliado" }));
     fireEvent.change(screen.getByRole("slider"), { target: { value: "0.7" } });
     fireEvent.click(screen.getByRole("button", { name: "Ativar voz" }));
     expect(callbacks.onModeChange).toHaveBeenCalledWith("COMPARE");

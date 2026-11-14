@@ -193,12 +193,90 @@ describe("grounded answers and evidence", () => {
   });
 });
 
-function questionRequest(question: string, signal?: AbortSignal) {
+function questionRequest(question: string, signal?: AbortSignal, scope = "library") {
   return new NextRequest("http://localhost/api/oracle", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ question }), signal,
+    body: JSON.stringify({ question, scope }), signal,
   });
 }
+
+describe("explicit Google Books search", () => {
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("GOOGLE_BOOKS_API_KEY", "fixture-google");
+  });
+
+  it.each([
+    ["Pesquise na internet ISBN 9780141439518", "isbn:9780141439518"],
+    ['Busque no Google Books autor: "Jane Austen"', 'inauthor:"Jane Austen"'],
+    ['Consulte no catálogo externo edições: “Pride and Prejudice”', 'intitle:"Pride and Prejudice"'],
+  ])("streams linkable evidence for %s", async (question, query) => {
+    vi.stubEnv("PERFORMANCE_DIAGNOSTICS", "1");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "www.googleapis.com") {
+        expect(url.pathname).toBe("/books/v1/volumes");
+        expect(url.searchParams.get("q")).toBe(query);
+        expect(options?.signal).toBeInstanceOf(AbortSignal);
+        return Response.json({ items: [{ id: "test-volume", volumeInfo: {
+          title: "Pride and Prejudice", authors: ["Jane Austen"], publisher: "Penguin",
+          publishedDate: "2003", industryIdentifiers: [{ type: "ISBN_13", identifier: "9780141439518" }],
+        } }] });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[1].content).toContain("[1] Pride and Prejudice — Jane Austen");
+      expect(payload.messages[1].content).toContain("ISBN-13: 9780141439518");
+      return new Response('data: {"choices":[{"delta":{"content":"Jane Austen é a autora [1]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(questionRequest(question));
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    const body = await response.text();
+    expect(body).toContain('"stage":"external"');
+    expect(body).toContain('"url":"https://books.google.com/books?id=test-volume"');
+    expect(body).toContain('"citations":[1]');
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toContain("fixture-google");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(info).toHaveBeenCalledWith("oracle-performance", expect.objectContaining({
+      outcome: "completed", stages: expect.objectContaining({ external: expect.any(Number), generation: expect.any(Number) }),
+    }));
+  });
+
+  it("does not send conversational context to Google even with expanded scope", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      new Response('data: {"choices":[{"delta":{"content":"Orgulho e Preconceito foi escrito por Jane Austen."}}]}\n\ndata: [DONE]\n\n'));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Quem escreveu Orgulho e Preconceito?", undefined, "all"))).text();
+    expect(body).toContain("Conhecimento geral");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://chat.maritaca.ai/api/chat/completions");
+  });
+
+  it("rejects extra private context after a bibliographic field without making provider requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(
+      'Pesquise na internet autor: "Jane Austen". Meu diário é privado.',
+    ))).text();
+    expect(body).toContain("Para consultar o Google Books");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([429, 200])("reports a provider response with no evidence (%s)", async status => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ items: [] }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Pesquise na internet ISBN 9780141439518"))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei registros correspondentes" : "Não consegui consultar");
+    expect(body).toContain('"sources":[]');
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
 
 describe("Oracle actions and interrupted providers", () => {
   it.each([

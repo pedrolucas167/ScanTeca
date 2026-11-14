@@ -9,11 +9,12 @@ import {
   splitTitleAndAuthor,
   uniqueVolumes,
   type SearchVolume,
-} from "./search-rules";
+} from "./book-search-rules";
 
 interface GoogleBooksItem extends SearchVolume {
   volumeInfo: SearchVolume["volumeInfo"] & {
     publishedDate?: string;
+    publisher?: string;
     description?: string;
     pageCount?: number;
     categories?: string[];
@@ -26,17 +27,22 @@ interface GoogleBooksItem extends SearchVolume {
 
 const maxResults = 20;
 
-async function fetchVolumes(query: string): Promise<GoogleBooksItem[] | null> {
+export async function fetchGoogleBooksVolumes(query: string, options?: {
+  signal: AbortSignal;
+  limit: number;
+}): Promise<GoogleBooksItem[] | null> {
   const url = new URL("https://www.googleapis.com/books/v1/volumes");
   url.searchParams.set("q", query);
-  url.searchParams.set("maxResults", String(maxResults));
+  url.searchParams.set("maxResults", String(options?.limit ?? maxResults));
   const key = process.env.GOOGLE_BOOKS_API_KEY;
   if (key) url.searchParams.set("key", key);
 
-  const response = await fetchWithRetry(url.toString(), { maxRetries: 3, baseDelay: 500 });
+  const response = await fetchWithRetry(url.toString(), {
+    maxRetries: options ? 0 : 3, baseDelay: 500, signal: options?.signal,
+  });
   if (!response.ok) return null;
   const data: { items?: GoogleBooksItem[] } = await response.json();
-  return (data.items ?? []).filter((item) => cleanTitle(item.volumeInfo.title));
+  return (data.items ?? []).filter((item) => cleanTitle(item.volumeInfo?.title));
 }
 
 function quoteField(text: string): string {
@@ -44,9 +50,9 @@ function quoteField(text: string): string {
 }
 
 async function searchByIsbn(isbn: string, exactIsbn: string): Promise<GoogleBooksItem[] | null> {
-  const exact = (await fetchVolumes(`isbn:${isbn}`))?.filter((item) => matchesEdition(item, exactIsbn));
+  const exact = (await fetchGoogleBooksVolumes(`isbn:${isbn}`))?.filter((item) => matchesEdition(item, exactIsbn));
   if (exact?.length) return exact;
-  const fallback = await fetchVolumes(isbn);
+  const fallback = await fetchGoogleBooksVolumes(isbn);
   return fallback && fallback.filter((item) => matchesEdition(item, exactIsbn));
 }
 
@@ -56,15 +62,15 @@ async function searchByText(query: string): Promise<GoogleBooksItem[] | null> {
   let items: GoogleBooksItem[] | null;
   if (parts) {
     const fields = `intitle:${quoteField(parts.title)} inauthor:${quoteField(parts.author)}`;
-    items = await fetchVolumes(fields);
+    items = await fetchGoogleBooksVolumes(fields);
     // If both fields don't match well, the separator may be part of a title or name.
     if (!hasStrongFieldMatch(items ?? [], relevance)) {
-      const fallback = await fetchVolumes(query);
+      const fallback = await fetchGoogleBooksVolumes(query);
       if (fallback) items = [...fallback, ...(items ?? [])];
       else if (!items?.length) return null;
     }
   } else {
-    items = await fetchVolumes(query);
+    items = await fetchGoogleBooksVolumes(query);
   }
 
   return items && rankVolumes(items, relevance);

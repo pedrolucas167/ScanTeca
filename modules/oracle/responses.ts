@@ -94,10 +94,10 @@ export async function toolExecutionResponse(routing: RoutingDecision, transcript
   });
 }
 
-export function groundedFallbackResponse() {
+export function groundedFallbackResponse(message =
+  "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário."
+) {
   const encoder = new TextEncoder();
-  const message =
-    "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.";
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: [] })}\n\n`));

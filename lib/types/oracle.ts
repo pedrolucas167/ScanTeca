@@ -12,6 +12,7 @@ export interface Source {
   evidence?: string | null;
   sourceType?: "book" | "diary" | "review";
   external?: boolean;
+  url?: string;
 }
 
 export interface Message {

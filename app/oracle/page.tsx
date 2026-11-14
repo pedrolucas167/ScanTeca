@@ -970,7 +970,7 @@ export default function OraclePage() {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold"><span className="md:hidden">Oráculo</span><span className="hidden md:inline">Oráculo de Bolso</span></h1>
-            <p className="truncate text-xs text-on-surface-variant">{ORACLE_MODES.find(item => item.id === mode)?.label} · {scope === "library" ? "Meu acervo" : "Acervo + catálogo"}</p>
+            <p className="truncate text-xs text-on-surface-variant">{ORACLE_MODES.find(item => item.id === mode)?.label} · {scope === "library" ? "Meu acervo" : "Escopo ampliado"}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center">
@@ -1282,7 +1282,7 @@ export default function OraclePage() {
                         <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
                           <span>Escopo</span>
                           <strong className="font-mono text-on-surface">
-                            {msg.retrievalStats.scope === "all" ? "Acervo + mundo" : "Todo o acervo"}
+                            {msg.sources?.some(source => source.url) ? "Google Books" : msg.retrievalStats.scope === "all" ? "Escopo ampliado" : "Meu acervo"}
                           </strong>
                         </div>
                       </div>
@@ -1319,7 +1319,9 @@ export default function OraclePage() {
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
-                                  {source.external
+                                  {source.url
+                                    ? "Google Books"
+                                    : source.external
                                     ? "Fora do acervo"
                                     : source.sourceType === "diary"
                                       ? "Memória do diário"
@@ -1395,7 +1397,16 @@ export default function OraclePage() {
                                   {copiedSourceId === source.id ? "Copiado" : "Copiar evidência"}
                                 </button>
                               )}
-                              {source.external ? (
+                              {source.url ? (
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
+                                >
+                                  <Icon decorative name="open_in_new" className="text-xs" /> Abrir no Google Books
+                                </a>
+                              ) : source.external ? (
                                 <Link
                                   href="/search-add"
                                   className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
