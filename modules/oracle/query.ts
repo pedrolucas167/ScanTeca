@@ -45,7 +45,7 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     if (mediaRequested || placeRequested || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed)) {
       const mediaQuery = parseMediaQuery(trimmed);
       if (mediaRequested && !mediaQuery) return groundedFallbackResponse(
-        'Informe um tema público, por exemplo: “Notícias recentes sobre literatura” ou “Vídeos de entrevistas com Conceição Evaristo”.'
+        'Posso buscar notícias e vídeos e trazer links nas fontes. Informe um tema público, livro ou autor, por exemplo: “Me mostre resenhas em vídeo de livros” ou “Notícias recentes sobre literatura”.'
       );
       const placeQuery = parsePlaceQuery(trimmed);
       if (placeQuery && !placeQuery.area) return groundedFallbackResponse(

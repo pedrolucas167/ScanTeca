@@ -2,31 +2,43 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { createEvidenceRegistry } from "./evidence";
 import { cleanSearchText } from "./web-search";
 
-const command = /^(?:por favor,?\s+)?(?:(?:(?:traga|mostre|encontre|busque|procure|pesquise)(?:\s+para mim)?|(?:pode|poderia)\s+(?:me\s+)?(?:mostrar|buscar)|quero ver)\s+)?(?:(?:as|os|algumas|alguns)\s+)?(notícias|noticias|vídeos|videos|entrevistas em v[ií]deo)(?=$|[\s:?.!])/iu;
+const requestPrefix = /^(?:por favor,?\s+)?(?:(?:(?:me\s+)?(?:traga|mostre|encontre|busque|procure|pesquise|indique|recomende|exiba)(?:-me|\s+para mim)?|(?:voc[eê]\s+)?(?:pode|poderia|consegue|conseguiria)\s+(?:me\s+)?(?:mostrar|buscar|trazer|encontrar|indicar|recomendar|exibir)|(?:eu\s+)?(?:quero|gostaria de)\s+(?:ver|assistir(?:\s+a)?|encontrar)|(?:voc[eê]\s+)?(?:tem|conhece)|(?:onde|como)\s+(?:posso|podemos)\s+(?:ver|assistir(?:\s+a)?|encontrar))\s+)?(?:(?:a|as|o|os|um|uma|algum|alguma|algumas|alguns)\s+)?/iu;
+const mediaNoun = /^(not[ií]cias?|v[ií]deos?|(?:entrevistas?|resenhas?) em v[ií]deo)(?=$|[\s:?.!])/iu;
+
+function mediaCommand(question: string) {
+  const rest = question.trim().replace(requestPrefix, "");
+  const match = mediaNoun.exec(rest);
+  if (match?.[1]) return { noun: match[1], terms: rest.slice(match[0].length).trim() };
+  // Accept the same request with the medium after its subject: resenhas de livros em vídeo.
+  const suffix = /^(resenhas?|entrevistas?)\s+(.+?)\s+em v[ií]deo[?.!]?$/iu.exec(rest);
+  return suffix?.[1] && suffix[2] ? { noun: `${suffix[1]} em vídeo`, terms: suffix[2] } : null;
+}
 
 export type MediaQuery = { kind: "news" | "videos"; query: string; freshness?: "pd" | "pw" | "pm" };
 
-export function requestsMediaSearch(question: string) { return command.test(question); }
+export function requestsMediaSearch(question: string) { return mediaCommand(question) !== null; }
 
 export function parseMediaQuery(question: string): MediaQuery | null {
-  const prefix = command.exec(question);
-  if (!prefix?.[1]) return null;
-  const kind = /^not[ií]cias$/iu.test(prefix[1]) ? "news" : "videos";
-  let terms = question.slice(prefix[0].length).trim();
+  const prefix = mediaCommand(question);
+  if (!prefix) return null;
+  const kind = /^not[ií]cias?$/iu.test(prefix.noun) ? "news" : "videos";
+  let terms = prefix.terms;
   let freshness: MediaQuery["freshness"];
   const period = /^(recentes|de hoje|desta semana|deste mês)(?=$|\s|:)/iu.exec(terms);
   if (period?.[1]) {
     freshness = /hoje/iu.test(period[1]) ? "pd" : /semana/iu.test(period[1]) ? "pw" : "pm";
     terms = terms.slice(period[0].length).trim();
   }
-  terms = terms.replace(/^(?::\s*|(?:sobre|de|do|da|dos|das)\s+)/iu, "").trim();
+  const relation = /^(?:sobre|de|do|da|dos|das|com)\s+/iu.exec(terms)?.[0].trim();
+  terms = terms.replace(/^(?::\s*|(?:sobre|de|do|da|dos|das|com)\s+)/iu, "").trim();
   const quoted = /^(?:"([^"“”\p{C}]+)"|“([^"“”\p{C}]+)”)[?.!]?$/u.exec(terms);
   const plain = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’–-]*[?.!]?$/u.test(terms) ? terms.replace(/[?.!]$/, "") : "";
   let query = (quoted?.[1] ?? quoted?.[2] ?? plain).trim();
   if (!query || query.length > 200 || query.split(/\s+/).length > 30) return null;
   // Only the explicit public search terms leave the app, never library or history context.
   if (!quoted && /\b(?:meu|minha|meus|minhas|nosso|nossa|acervo|diário|histórico|inclua|envie|adicione)\b/iu.test(query)) return null;
-  if (/^entrevistas/iu.test(prefix[1])) query = `entrevistas ${query}`;
+  const format = /^(entrevistas?|resenhas?) em/iu.exec(prefix.noun)?.[1];
+  if (format) query = `${format}${relation ? ` ${relation}` : ""} ${query}`;
   return { kind, query, ...(freshness ? { freshness } : {}) };
 }
 
