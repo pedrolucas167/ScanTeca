@@ -5,14 +5,32 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("explicit news and video searches", () => {
   it.each([
+    ["Me mostre resenhas em vídeo de livros", { kind: "videos", query: "resenhas de livros" }],
+    ["Você pode me mostrar resenhas em vídeo de Duna?", { kind: "videos", query: "resenhas de Duna" }],
+    ["Mostre-me uma resenha em vídeo de Dom Casmurro", { kind: "videos", query: "resenha de Dom Casmurro" }],
+    ["Me traga um vídeo sobre literatura", { kind: "videos", query: "literatura" }],
+    ["Você consegue buscar entrevistas em vídeo com Conceição Evaristo?", { kind: "videos", query: "entrevistas com Conceição Evaristo" }],
     ["Notícias recentes sobre literatura", { kind: "news", query: "literatura", freshness: "pm" }],
     ["Traga notícias desta semana sobre o Prêmio Jabuti", { kind: "news", query: "o Prêmio Jabuti", freshness: "pw" }],
     ["Notícias de hoje sobre livros", { kind: "news", query: "livros", freshness: "pd" }],
     ["Vídeos de entrevistas com Conceição Evaristo", { kind: "videos", query: "entrevistas com Conceição Evaristo" }],
-    ['Mostre entrevistas em vídeo de "Octavia Butler"', { kind: "videos", query: "entrevistas Octavia Butler" }],
+    ['Mostre entrevistas em vídeo de "Octavia Butler"', { kind: "videos", query: "entrevistas de Octavia Butler" }],
+    ["Tem algum vídeo sobre livros?", { kind: "videos", query: "livros" }],
+    ["Onde posso assistir a vídeos sobre literatura?", { kind: "videos", query: "literatura" }],
+    ["Gostaria de ver resenhas de livros em vídeo", { kind: "videos", query: "resenhas de livros" }],
+    ["Me recomende vídeos sobre livros", { kind: "videos", query: "livros" }],
   ])("parses %s", (question, expected) => {
     expect(requestsMediaSearch(question)).toBe(true);
     expect(parseMediaQuery(question)).toEqual(expected);
+  });
+
+  it.each(["Você consegue buscar vídeos?", "Me mostre resenhas em vídeo", "Você tem notícias?"])("asks for a topic instead of falling through to chat: %s", question => {
+    expect(requestsMediaSearch(question)).toBe(true);
+    expect(parseMediaQuery(question)).toBeNull();
+  });
+
+  it.each(["Não quero vídeos sobre livros", "Eu vi vídeos sobre livros ontem", "O que é uma resenha em vídeo?"])("does not mistake discussion or negation for a search: %s", question => {
+    expect(requestsMediaSearch(question)).toBe(false);
   });
 
   it.each(["Notícias", "Vídeos sobre meu diário", 'Notícias sobre "literatura" e inclua meu histórico',

@@ -439,6 +439,9 @@ describe("explicit Brave news and video search", () => {
   it.each([
     ["Notícias recentes sobre literatura", "news", "literatura"],
     ["Vídeos de entrevistas com Conceição Evaristo", "videos", "entrevistas com Conceição Evaristo"],
+    ["Me mostre resenhas em vídeo de livros", "videos", "resenhas de livros"],
+    ["Onde posso assistir a vídeos sobre literatura?", "videos", "literatura"],
+    ["Gostaria de ver resenhas de livros em vídeo", "videos", "resenhas de livros"],
   ])("streams cited results and persists sources for %s", async (question, kind, query) => {
     const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
       const url = new URL(String(input));
@@ -481,6 +484,16 @@ describe("explicit Brave news and video search", () => {
     vi.stubEnv("key_brave_api", "");
     expect(await (await POST(questionRequest("Notícias sobre literatura"))).text()).toContain("ainda não foi configurada");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("asks for a topic for generic video requests without calling chat or search", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Você consegue buscar vídeos?"))).text();
+    expect(body).toContain("Posso buscar notícias e vídeos e trazer links nas fontes");
+    expect(body).toContain("Informe um tema público");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(saveOracleAnswer).not.toHaveBeenCalled();
   });
 });
 

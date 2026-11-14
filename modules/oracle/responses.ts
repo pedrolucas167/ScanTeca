@@ -4,6 +4,7 @@ import type { OracleStreamEvent, Source } from "@/lib/types/oracle";
 import { oracleChat } from "./chat";
 import { readOracleCompletion } from "./completion";
 import { CHAT_MODEL } from "./config";
+import { oracleSearchCapabilities } from "./prompt";
 
 export async function directChatResponse(question: string, apiKey: string, requestSignal: AbortSignal) {
   const cancellation = new AbortController();
@@ -20,7 +21,7 @@ export async function directChatResponse(question: string, apiKey: string, reque
         messages: [
           {
             role: "system",
-            content: "Você é o Oráculo de uma biblioteca pessoal. Responda de forma natural e amigável a saudações e conversas casuais. Seja breve e direto.",
+            content: `Você é o Oráculo de uma biblioteca pessoal. Responda de forma natural e amigável a saudações e conversas casuais. Seja breve e direto. ${oracleSearchCapabilities}`,
           },
           {
             role: "user",

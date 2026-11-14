@@ -8,6 +8,21 @@ endpoints específicos do Brave. Exemplos:
 - `Notícias de hoje sobre livros`
 - `Vídeos de entrevistas com Conceição Evaristo`
 - `Mostre entrevistas em vídeo de "Octavia Butler"`
+- `Me mostre resenhas em vídeo de livros`
+- `Onde posso assistir a vídeos sobre literatura?`
+- `Gostaria de ver resenhas de livros em vídeo`
+
+O reconhecimento cobre famílias de pedidos diretos, perguntas e pedidos
+indiretos, com singular/plural e o formato antes ou depois do tema. Pedidos sem
+tema recebem esclarecimento sem chamar o Brave nem o modelo. Negação e menção
+a vídeos em uma conversa não são, por si só, autorização de busca. O
+reconhecimento continua delimitado; não interpreta toda formulação possível.
+
+Uma falha relatada no aceite manual mostrou que “Me mostre resenhas em vídeo de
+livros” caía na conversa comum. O teste da rota reproduziu a ausência da busca;
+a correção mantém esse caso e variações de intenção como regressões. As
+instruções de conversa também descrevem a busca por links e seu limite de
+reprodução, para evitar negar uma capacidade disponível.
 
 “Recentes” e “deste mês” limitam a idade da página a 31 dias, “desta semana” a
 sete dias e “de hoje” a 24 horas. Sem período explícito, não há esse filtro.
