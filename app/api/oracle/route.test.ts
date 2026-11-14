@@ -542,7 +542,7 @@ describe("explicit Brave place search", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockResolvedValue(new Response('data: {"choices":[{"delta":{"content":"Informe uma região para pesquisar."}}]}\n\ndata: [DONE]\n\n'));
     expect(await (await POST(questionRequest(question))).text()).not.toContain("requestLocationFor");
-    expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("api.search.brave.com"))).toBe(true);
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).hostname)).toEqual(["chat.maritaca.ai"]);
   });
 
   it("requires evidence of both categories for a café that doubles as a bookstore", async () => {
