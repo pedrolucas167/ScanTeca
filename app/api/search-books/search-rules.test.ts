@@ -9,7 +9,7 @@ import {
   uniqueVolumes,
   volumeIsbn,
   type SearchVolume,
-} from "./search-rules";
+} from "@/lib/book-search-rules";
 
 it("mantém vírgulas do título e a pontuação das iniciais", () => {
   expect(splitTitleAndAuthor("Comer, Rezar, Amar, Elizabeth Gilbert")).toEqual({

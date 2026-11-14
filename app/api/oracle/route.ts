@@ -6,7 +6,7 @@ import { oracleHttpError } from "@/lib/oracle-http-error";
 import { readJson } from "@/lib/validation";
 import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
-import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, usesMaritaca } from "@/modules/oracle";
+import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, usesMaritaca, requestsBibliographicSearch, requestsWebSearch, requestsPlaceSearch, requestsImageSearch } from "@/modules/oracle";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
@@ -110,11 +110,13 @@ export async function POST(request: NextRequest) {
     const trimmed = question;
 
     // Jev Query Routing - decide se precisa de busca vetorial
-    const routing = await jevRouteQuery(trimmed);
+    const imageRequested = requestsImageSearch(trimmed);
+    const routing = imageRequested || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed) || requestsPlaceSearch(trimmed)
+      ? null : await jevRouteQuery(trimmed);
 
-    if (shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
-    if (!hasOracleChatKey(apiKey)) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
-    if (shouldDirectChat(routing)) return directChatResponse(trimmed, apiKey, request.signal);
+    if (routing && shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
+    if (!imageRequested && !hasOracleChatKey(apiKey)) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
+    if (routing && shouldDirectChat(routing)) return directChatResponse(trimmed, apiKey, request.signal);
     let prepared: Awaited<ReturnType<typeof prepareOracleSession>>;
     try {
       prepared = await prepareOracleSession({ userId, question: trimmed, mode,

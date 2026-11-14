@@ -193,12 +193,277 @@ describe("grounded answers and evidence", () => {
   });
 });
 
-function questionRequest(question: string, signal?: AbortSignal) {
+function questionRequest(question: string, signal?: AbortSignal, scope = "library") {
   return new NextRequest("http://localhost/api/oracle", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ question }), signal,
+    body: JSON.stringify({ question, scope }), signal,
   });
 }
+
+describe("explicit Google Books search", () => {
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("GOOGLE_BOOKS_API_KEY", "fixture-google");
+  });
+
+  it.each([
+    ["Pesquise na internet ISBN 9780141439518", "isbn:9780141439518"],
+    ['Busque no Google Books autor: "Jane Austen"', 'inauthor:"Jane Austen"'],
+    ['Consulte no catálogo externo edições: “Pride and Prejudice”', 'intitle:"Pride and Prejudice"'],
+  ])("streams linkable evidence for %s", async (question, query) => {
+    vi.stubEnv("PERFORMANCE_DIAGNOSTICS", "1");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "www.googleapis.com") {
+        expect(url.pathname).toBe("/books/v1/volumes");
+        expect(url.searchParams.get("q")).toBe(query);
+        expect(options?.signal).toBeInstanceOf(AbortSignal);
+        return Response.json({ items: [{ id: "test-volume", volumeInfo: {
+          title: "Pride and Prejudice", authors: ["Jane Austen"], publisher: "Penguin",
+          publishedDate: "2003", industryIdentifiers: [{ type: "ISBN_13", identifier: "9780141439518" }],
+        } }] });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[1].content).toContain("[1] Pride and Prejudice — Jane Austen");
+      expect(payload.messages[1].content).toContain("ISBN-13: 9780141439518");
+      return new Response('data: {"choices":[{"delta":{"content":"Jane Austen é a autora [1]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(questionRequest(question));
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    const body = await response.text();
+    expect(body).toContain('"stage":"external"');
+    expect(body).toContain('"url":"https://books.google.com/books?id=test-volume"');
+    expect(body).toContain('"citations":[1]');
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toContain("fixture-google");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(info).toHaveBeenCalledWith("oracle-performance", expect.objectContaining({
+      outcome: "completed", stages: expect.objectContaining({ external: expect.any(Number), generation: expect.any(Number) }),
+    }));
+  });
+
+  it("does not send conversational context to Google even with expanded scope", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      new Response('data: {"choices":[{"delta":{"content":"Orgulho e Preconceito foi escrito por Jane Austen."}}]}\n\ndata: [DONE]\n\n'));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Quem escreveu Orgulho e Preconceito?", undefined, "all"))).text();
+    expect(body).toContain("Conhecimento geral");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://chat.maritaca.ai/api/chat/completions");
+  });
+
+  it("rejects extra private context after a bibliographic field without making provider requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(
+      'Pesquise na internet autor: "Jane Austen". Meu diário é privado.',
+    ))).text();
+    expect(body).toContain("Para consultar o Google Books");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([429, 200])("reports a provider response with no evidence (%s)", async status => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ items: [] }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Pesquise na internet ISBN 9780141439518"))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei registros correspondentes" : "Não consegui consultar");
+    expect(body).toContain('"sources":[]');
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe("explicit Brave LLM Context search", () => {
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("key_brave_api", "fixture-brave");
+  });
+
+  const question = 'Pesquise na web: "Octavia Butler Kindred interview"';
+
+  it("calls Brave once with the delimited terms and streams cited evidence", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "api.search.brave.com") {
+        expect(url.pathname).toBe("/res/v1/llm/context");
+        expect(url.searchParams.get("q")).toBe("Octavia Butler Kindred interview");
+        expect(url.searchParams.get("maximum_number_of_tokens")).toBe("2048");
+        expect(options?.headers).toMatchObject({ "X-Subscription-Token": "fixture-brave" });
+        expect(options?.redirect).toBe("error");
+        return Response.json({ grounding: { generic: [
+          { url: "javascript:alert(1)", snippets: ["Unsafe source"] },
+          { url: "https://example.org/interview", title: "Interview", snippets: ["Butler researched slave narratives for Kindred."] },
+          { url: "https://example.org/interview#duplicate", snippets: ["Duplicate"] },
+        ] } });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[1].content).toContain('Butler researched slave narratives for Kindred.');
+      expect(payload.messages[1].content).not.toMatch(/Unsafe source|Duplicate|fixture-brave/);
+      return new Response('data: {"choices":[{"delta":{"content":"Butler pesquisou relatos de pessoas escravizadas para escrever Kindred [1]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain('"url":"https://example.org/interview"');
+    expect(body).toContain('"citations":[1]');
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toMatch(/javascript:|fixture-brave/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([429, 200])("reports unavailable or empty Brave evidence (%s)", async status => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ grounding: { generic: [] } }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei fontes relevantes" : "Não consegui consultar o Brave Search");
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("makes no outbound request if the key is missing or extra text follows the query", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await (await POST(questionRequest(question + " Veja também meu diário."))).text()).toContain("termos públicos da busca");
+    vi.stubEnv("key_brave_api", "");
+    expect(await (await POST(questionRequest(question))).text()).toContain("ainda não foi configurada");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("explicit Brave place search", () => {
+  const question = 'Encontre livrarias em "Pinheiros, São Paulo"';
+
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "fixture-brave");
+  });
+
+  it("streams only returned places and builds direct map links from valid destinations", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "api.search.brave.com") {
+        expect(url.searchParams.get("q")).toBe("livrarias em Pinheiros, São Paulo");
+        expect(url.pathname).toBe("/res/v1/local/place_search");
+        expect(url.searchParams.get("location")).toBe("Pinheiros São Paulo");
+        expect([...new Headers(options?.headers).keys()]).toEqual(["accept", "x-subscription-token"]);
+        const postal_address = { displayAddress: "Rua Exemplo, 100 - Pinheiros, São Paulo" };
+        return Response.json({ results: [
+          { title: "Livraria A", coordinates: [-23.56, -46.68], postal_address, url: "https://example.org/a" },
+          { title: "Livraria A", coordinates: [-23.56, -46.68], postal_address },
+          { title: "Livraria B", coordinates: [-91, -46.68], postal_address },
+          { title: "Livraria C", coordinates: [-23.56, -46.68], snippets: ["Endereço de outra unidade"], url: "javascript:alert(1)" },
+          { title: "Outra região", coordinates: [-8.05, -34.88], postal_address: { displayAddress: "Recife, PE" } },
+          { coordinates: [-23.56, -46.68], postal_address },
+        ] });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({ model: "S5-free", stream: true });
+      expect(payload.messages[1].content).not.toMatch(/outra unidade|Outra região/);
+      return new Response('data: {"choices":[{"delta":{"content":"O Brave encontrou a Livraria A [1] e a Livraria B [2]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    const events = body.split("\n").filter(line => line.startsWith("data: {")).map(line => JSON.parse(line.slice(6)));
+    const sources = events.find(event => event.sources)?.sources;
+    expect(sources).toHaveLength(3);
+    expect(sources[0].mapLinks).toEqual({
+      google: "https://www.google.com/maps/search/?api=1&query=-23.56%2C-46.68",
+      apple: "https://maps.apple.com/place?coordinate=-23.56%2C-46.68&name=Livraria%20A",
+      waze: "https://waze.com/ul?ll=-23.56%2C-46.68&navigate=yes",
+    });
+    expect(sources[1]).not.toHaveProperty("mapLinks");
+    expect(sources[2]).not.toHaveProperty("mapLinks");
+    expect(sources[2]).not.toHaveProperty("url");
+    expect(body).toContain('"citations":[1,2]');
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toMatch(/javascript:|Endereço de outra unidade/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks for an explicit area and keeps generic web results out of place answers", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ grounding: { generic: [{ title: "Resultado genérico" }], map: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const missingArea = await (await POST(questionRequest("Encontre bibliotecas perto de mim"))).text();
+    expect(missingArea).toContain("Informe a cidade ou o bairro");
+    const noPlaces = await (await POST(questionRequest('Encontre lugares: "museus" em "Recife"'))).text();
+    expect(noPlaces).toContain("Não encontrei lugares");
+    expect(noPlaces).toContain('"sources":[]');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("q")).toBe("museus em Recife");
+  });
+});
+
+describe("explicit Brave Image Search", () => {
+  beforeEach(() => {
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("key_brave_api", "fixture-brave");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    vi.stubEnv("MARITACA_API_KEY", "");
+    vi.stubEnv("key_maritaca_ai", "");
+  });
+
+  it("streams only HTTPS source pages with Brave thumbnails and keeps results transient", async () => {
+    vi.mocked(saveOracleAnswer).mockClear();
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/images/search");
+      expect(url.searchParams.get("q")).toBe("Bíblia de Gutenberg");
+      expect(url.searchParams.get("safesearch")).toBe("strict");
+      expect(options?.cache).toBe("no-store");
+      expect(options?.headers).toMatchObject({ "X-Subscription-Token": "fixture-brave" });
+      const thumbnail = { src: "https://imgs.search.brave.com/example" };
+      return Response.json({ results: [
+        { title: "Bíblia em exposição", url: "https://museum.example/exhibit", thumbnail },
+        { url: "https://museum.example/duplicate", thumbnail },
+        { url: "http://museum.example/exhibit", thumbnail: { src: "https://imgs.search.brave.com/other" } },
+        { url: "https://museum.example/exhibit", thumbnail: { src: "https://imgs.search.brave.com.evil.example/test" } },
+        { url: "https://library.example/item", thumbnail: { src: "https://imgs.search.brave.com/book" } },
+      ] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"));
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    const sources = body.split("\n").filter(line => line.startsWith("data: {"))
+      .map(line => JSON.parse(line.slice(6))).find(event => event.sources)?.sources;
+    expect(sources).toHaveLength(2);
+    expect(sources[0]).toMatchObject({ sourceType: "image", url: "https://museum.example/exhibit",
+      thumbnail: { url: "https://imgs.search.brave.com/example", alt: "Bíblia em exposição" } });
+    expect(sources[1].thumbnail.alt).toContain("Bíblia de Gutenberg");
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(saveOracleAnswer).not.toHaveBeenCalled();
+  });
+
+  it.each([200, 429])("handles an empty or failed image response (%s)", async status => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ results: [] }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei imagens" : "Não consegui buscar imagens");
+    expect(body).toContain('"sources":[]');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("asks for public terms and handles missing credentials before calling Brave", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await (await POST(questionRequest("Traga imagens do meu acervo"))).text()).toContain("Informe um tema público");
+    vi.stubEnv("key_brave_api", "");
+    expect(await (await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"))).text()).toContain("indisponível neste ambiente");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
 
 describe("Oracle actions and interrupted providers", () => {
   it.each([

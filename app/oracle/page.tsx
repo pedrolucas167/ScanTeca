@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
 import { OracleMemoryDialog } from "@/components/oracle/OracleMemoryDialog";
 import { OracleComposer } from "@/components/oracle/OracleComposer";
+import { OracleImageResults } from "@/components/oracle/OracleImageResults";
 import { useLocalDictation } from "@/components/oracle/useLocalDictation";
 import { useOnlineRecording } from "@/components/oracle/useOnlineRecording";
 import { useOracleViewport } from "@/components/oracle/useOracleViewport";
@@ -14,6 +15,13 @@ import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import { consumeOracleEvents } from "@/lib/oracle-stream";
 import { ORACLE_DEFAULT_SUGGESTIONS, ORACLE_MODES, ORACLE_STAGE_LABELS, type OracleMode } from "@/lib/constants/oracle";
 import type { Source, Message, OracleSession, OracleArtifact, OracleStreamEvent } from "@/lib/types/oracle";
+
+function restoreSource(source: Source): Source {
+  // Older place results may contain text-search links instead of verified destinations.
+  if (!source.id.startsWith("brave-place-") || source.sourceType === "place") return source;
+  const { mapLinks, url, ...rest } = source;
+  return { ...rest, sourceType: "place", ...(url && url !== mapLinks?.google ? { url } : {}) };
+}
 
 export default function OraclePage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -132,7 +140,7 @@ export default function OraclePage() {
               (m: { role: string; content: string; sources?: Source[] }) => ({
                 role: m.role as "user" | "assistant",
                 content: m.content,
-                sources: m.sources ?? undefined,
+                sources: m.sources?.map(restoreSource),
               })
             )
           );
@@ -849,7 +857,7 @@ export default function OraclePage() {
           (message: { role: string; content: string; sources?: Source[] }) => ({
             role: message.role as "user" | "assistant",
             content: message.content,
-            sources: message.sources ?? undefined,
+            sources: message.sources?.map(restoreSource),
           })
         )
       );
@@ -970,7 +978,7 @@ export default function OraclePage() {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold"><span className="md:hidden">Oráculo</span><span className="hidden md:inline">Oráculo de Bolso</span></h1>
-            <p className="truncate text-xs text-on-surface-variant">{ORACLE_MODES.find(item => item.id === mode)?.label} · {scope === "library" ? "Meu acervo" : "Acervo + catálogo"}</p>
+            <p className="truncate text-xs text-on-surface-variant">{ORACLE_MODES.find(item => item.id === mode)?.label} · {scope === "library" ? "Meu acervo" : "Escopo ampliado"}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center">
@@ -1282,14 +1290,15 @@ export default function OraclePage() {
                         <div className="flex items-center justify-between gap-2 font-caption text-caption text-on-surface-variant">
                           <span>Escopo</span>
                           <strong className="font-mono text-on-surface">
-                            {msg.retrievalStats.scope === "all" ? "Acervo + mundo" : "Todo o acervo"}
+                            {msg.sources?.find(source => source.url || source.sourceType === "place")?.matchedBy ?? (msg.retrievalStats.scope === "all" ? "Escopo ampliado" : "Meu acervo")}
                           </strong>
                         </div>
                       </div>
                     </details>
                   )}
 
-                  {msg.sources && msg.sources.length > 0 && (
+                  {msg.sources?.some(source => source.sourceType === "image") && <OracleImageResults sources={msg.sources} />}
+                  {msg.sources && msg.sources.some(source => source.sourceType !== "image") && (
                     <details className="group/sources min-w-0 max-w-full rounded-xl border border-outline-variant/30">
                       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-primary marker:hidden">
                         <span>Fontes usadas ({msg.sources.length})</span>
@@ -1319,7 +1328,9 @@ export default function OraclePage() {
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <span className={`font-caption text-caption font-semibold uppercase tracking-wider ${source.external ? "text-tertiary" : "text-primary"}`}>
-                                  {source.external
+                                  {source.url || source.sourceType === "place"
+                                    ? source.matchedBy ?? "Pesquisa externa"
+                                    : source.external
                                     ? "Fora do acervo"
                                     : source.sourceType === "diary"
                                       ? "Memória do diário"
@@ -1327,7 +1338,7 @@ export default function OraclePage() {
                                         ? "Avaliação do leitor"
                                         : "Fonte do acervo"}
                                 </span>
-                                {source.external ? (
+                              {source.external ? (
                                   <h3 className="mt-1 whitespace-normal font-quote-md text-quote-md font-semibold text-on-surface">
                                     {source.title}
                                   </h3>
@@ -1385,6 +1396,16 @@ export default function OraclePage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5">
+                              {source.mapLinks && [
+                                ["Google Maps", source.mapLinks.google],
+                                ["Apple Maps", source.mapLinks.apple],
+                                ["Waze", source.mapLinks.waze],
+                              ].map(([label, href]) => (
+                                <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20">
+                                  <Icon decorative name="open_in_new" className="text-xs" /> {label}
+                                </a>
+                              ))}
                               {source.evidence && (
                                 <button
                                   type="button"
@@ -1395,7 +1416,19 @@ export default function OraclePage() {
                                   {copiedSourceId === source.id ? "Copiado" : "Copiar evidência"}
                                 </button>
                               )}
-                              {source.external ? (
+                              {source.sourceType === "place" && !source.mapLinks && (
+                                <span className="px-2 py-1 font-caption text-caption text-on-surface-variant">Coordenadas não verificadas</span>
+                              )}
+                              {source.url && source.url !== source.mapLinks?.google ? (
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
+                                >
+                                  <Icon decorative name="open_in_new" className="text-xs" /> Abrir fonte
+                                </a>
+                              ) : source.external && source.sourceType !== "place" ? (
                                 <Link
                                   href="/search-add"
                                   className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 px-2.5 py-1 font-caption text-caption text-tertiary hover:bg-tertiary-container/20"
@@ -1484,14 +1517,14 @@ export default function OraclePage() {
                           />
                           {playingTtsIndex === i ? "Parar" : "Ouvir resposta"}
                         </button>
-                        <button
+                        {!msg.sources?.some(source => source.sourceType === "image") && <button
                           onClick={() => void saveArtifact(msg, i)}
                           disabled={savingArtifact === i}
                           className="flex items-center gap-1 font-caption text-caption text-outline transition-colors hover:text-primary disabled:opacity-50"
                         >
                           <Icon decorative name="bookmark_add" className="text-sm" />
                           {savingArtifact === i ? "Salvando..." : "Salvar resultado"}
-                        </button>
+                        </button>}
                         <button
                           onClick={() => void copyResponse(msg.content, i)}
                           title="Copiar resposta"

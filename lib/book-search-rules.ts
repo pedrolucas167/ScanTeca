@@ -1,4 +1,4 @@
-import { cleanIsbn, normalizeAuthor } from "@/lib/book-metadata";
+import { cleanIsbn, normalizeAuthor } from "./book-metadata";
 
 export interface SearchVolume {
   id: string;

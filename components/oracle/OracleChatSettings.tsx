@@ -74,8 +74,12 @@ export function OracleChatSettings(props: Props) {
             <legend className="mb-2 text-sm text-on-surface-variant">Onde buscar livros?</legend>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" aria-pressed={props.scope === "library"} onClick={() => props.onScopeChange("library")} className={`${control} ${props.scope === "library" ? "border-primary text-primary" : ""}`}>Meu acervo</button>
-              <button type="button" aria-pressed={props.scope === "all"} onClick={() => props.onScopeChange("all")} className={`${control} ${props.scope === "all" ? "border-primary text-primary" : ""}`}>Acervo + catálogo</button>
+              <button type="button" aria-pressed={props.scope === "all"} onClick={() => props.onScopeChange("all")} className={`${control} ${props.scope === "all" ? "border-primary text-primary" : ""}`}>Escopo ampliado</button>
             </div>
+            <p className="mt-2 text-xs text-on-surface-variant">Para consultar o Google Books, experimente “Pesquise na internet ISBN 9780141439518”.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Para buscar na web, envie <span className="font-medium">Pesquise na web: &quot;termos públicos&quot;</span>.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Para buscar lugares, envie <span className="font-medium">Encontre livrarias em &quot;Pinheiros, São Paulo&quot;</span>.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Para buscar imagens, experimente “Traga imagens da Bíblia de Gutenberg”.</p>
           </fieldset>
           <label className="block text-sm">
             Criatividade da resposta <span className="text-primary">{props.temperature.toFixed(1)}</span>

@@ -1,5 +1,6 @@
 import { ORACLE_ACTIONS, isOracleAction } from "@/lib/oracle-actions";
 import type { RoutingDecision } from "@/lib/jev-routing";
+import type { Source } from "@/lib/types/oracle";
 import { oracleChat } from "./chat";
 import { readOracleCompletion } from "./completion";
 import { CHAT_MODEL } from "./config";
@@ -94,13 +95,14 @@ export async function toolExecutionResponse(routing: RoutingDecision, transcript
   });
 }
 
-export function groundedFallbackResponse() {
+export function groundedFallbackResponse(message =
+  "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.",
+  sources: Source[] = [],
+) {
   const encoder = new TextEncoder();
-  const message =
-    "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.";
   const stream = new ReadableStream({
     start(controller) {
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: [] })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`));
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: message })}\n\n`));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();

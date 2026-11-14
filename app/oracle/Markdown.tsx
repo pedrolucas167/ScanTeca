@@ -1,17 +1,6 @@
 import type { ReactNode } from "react";
 
-interface Source {
-  id: string;
-  title: string;
-  author: string;
-  status?: string;
-  genre?: string | null;
-  relevance?: number | null;
-  matchedBy?: string;
-  evidence?: string | null;
-  sourceType?: "book" | "diary" | "review";
-  external?: boolean;
-}
+import type { Source } from "@/lib/types/oracle";
 
 interface MarkdownProps {
   content: string;
@@ -176,7 +165,12 @@ function renderInline(text: string, sources?: Source[]): ReactNode[] {
             className="ml-0.5 cursor-pointer rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
             title={`${source.title} — ${source.author}`}
           >
-            {citationNum}
+            {source.url ? (
+              <a href={source.url} target="_blank" rel="noopener noreferrer"
+                aria-label={`Fonte ${citationNum}: ${source.title}`}>
+                {citationNum}
+              </a>
+            ) : citationNum}
           </sup>
         );
       }

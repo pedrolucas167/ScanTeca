@@ -10,8 +10,8 @@ import {
 } from "@/lib/book-metadata";
 import { cleanSynopsis } from "@/lib/synopsis";
 import { z } from "zod";
-import { searchGoogleBooks } from "./google-books";
-import { volumeIsbn } from "./search-rules";
+import { searchGoogleBooks } from "@/lib/google-books";
+import { volumeIsbn } from "@/lib/book-search-rules";
 
 const searchBooksSchema = z.object({
   query: z
