@@ -2,7 +2,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import type { Source } from "@/lib/types/oracle";
 import { cleanSearchText } from "./web-search";
 
-const command = /^(?:por favor,?\s+)?(?:traga|mostre|encontre|busque|procure|pesquise)\s+imagens?(?=$|[\s:?.!])/iu;
+const command = /^(?:por favor,?\s+)?(?:(?:traga|mostre|encontre|busque|procure|pesquise)(?:-me|\s+para mim)?|me\s+(?:traga|mostre)|(?:pode|poderia|consegue)\s+(?:me\s+)?(?:mostrar|trazer|buscar|encontrar)|(?:quero|gostaria de)\s+ver)\s+(?:(?:a|as|uma|algumas)\s+)?(imagem|imagens|capas?)(?=$|[\s:?.!])/iu;
 
 export function requestsImageSearch(question: string) {
   return command.test(question);
@@ -16,9 +16,10 @@ export function parseImageQuery(question: string) {
   const plain = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’–-]*[?.!]?$/u.test(terms)
     ? terms.replace(/[?.!]$/, "") : "";
   const query = (quoted?.[1] ?? quoted?.[2] ?? plain).trim();
-  if (!query || query.length > 200 || query.split(/\s+/).length > 30) return null;
+  const searchQuery = prefix[1]?.toLowerCase().startsWith("capa") ? `capas de ${query}` : query;
+  if (!query || searchQuery.length > 200 || searchQuery.split(/\s+/).length > 30) return null;
   if (!quoted && /\b(?:meu|minha|meus|minhas|nosso|nossa|acervo|diário|histórico|inclua|envie|adicione)\b/iu.test(query)) return null;
-  return query;
+  return searchQuery;
 }
 
 function httpsUrl(value: unknown) {

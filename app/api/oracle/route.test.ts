@@ -413,12 +413,19 @@ describe("explicit Brave Image Search", () => {
     vi.stubEnv("key_maritaca_ai", "");
   });
 
-  it("streams only HTTPS source pages with Brave thumbnails and keeps results transient", async () => {
+  it.each([
+    ["Traga imagens da Bíblia de Gutenberg", "Bíblia de Gutenberg"],
+    ["mostre capas da obra de Clarice Lispector", "capas de obra de Clarice Lispector"],
+    ['Por favor, mostre a capa de "A Hora da Estrela"', "capas de A Hora da Estrela"],
+    ["Me mostre as capas dos livros de Machado de Assis", "capas de livros de Machado de Assis"],
+    ["Pode me mostrar a capa de Dom Casmurro?", "capas de Dom Casmurro"],
+    ['Quero ver capas de “Conceição Evaristo”', "capas de Conceição Evaristo"],
+  ])("streams only HTTPS source pages with Brave thumbnails for %s", async (question, query) => {
     vi.mocked(saveOracleAnswer).mockClear();
     const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
       const url = new URL(String(input));
       expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/images/search");
-      expect(url.searchParams.get("q")).toBe("Bíblia de Gutenberg");
+      expect(url.searchParams.get("q")).toBe(query);
       expect(url.searchParams.get("safesearch")).toBe("strict");
       expect(options?.cache).toBe("no-store");
       expect(options?.headers).toMatchObject({ "X-Subscription-Token": "fixture-brave" });
@@ -432,7 +439,7 @@ describe("explicit Brave Image Search", () => {
       ] });
     });
     vi.stubGlobal("fetch", fetchMock);
-    const response = await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"));
+    const response = await POST(questionRequest(question));
     expect(response.status).toBe(200);
     const body = await response.text();
     const sources = body.split("\n").filter(line => line.startsWith("data: {"))
@@ -440,10 +447,18 @@ describe("explicit Brave Image Search", () => {
     expect(sources).toHaveLength(2);
     expect(sources[0]).toMatchObject({ sourceType: "image", url: "https://museum.example/exhibit",
       thumbnail: { url: "https://imgs.search.brave.com/example", alt: "Bíblia em exposição" } });
-    expect(sources[1].thumbnail.alt).toContain("Bíblia de Gutenberg");
+    expect(sources[1].thumbnail.alt).toContain(query);
     expect(body).toContain("data: [DONE]");
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(saveOracleAnswer).not.toHaveBeenCalled();
+  });
+
+  it("does not trigger image search for incidental mentions of covers", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(questionRequest("O que você sabe sobre as capas da obra de Clarice Lispector?"));
+    expect(response.status).toBe(503);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([200, 429])("handles an empty or failed image response (%s)", async status => {
@@ -459,6 +474,7 @@ describe("explicit Brave Image Search", () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal("fetch", fetchMock);
     expect(await (await POST(questionRequest("Traga imagens do meu acervo"))).text()).toContain("Informe um tema público");
+    expect(await (await POST(questionRequest("Mostre as capas do meu acervo"))).text()).toContain("Informe um tema público");
     vi.stubEnv("key_brave_api", "");
     expect(await (await POST(questionRequest("Traga imagens da Bíblia de Gutenberg"))).text()).toContain("indisponível neste ambiente");
     expect(fetchMock).not.toHaveBeenCalled();
