@@ -2,7 +2,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import type { Source } from "@/lib/types/oracle";
 import { cleanSearchText } from "./web-search";
 
-const command = /^(?:por favor,?\s+)?(?:traga|mostre|encontre|busque|procure|pesquise)\s+(?:(?:a|as|uma|algumas)\s+)?(imagem|imagens|capas?)(?=$|[\s:?.!])/iu;
+const command = /^(?:por favor,?\s+)?(?:(?:traga|mostre|encontre|busque|procure|pesquise)(?:-me|\s+para mim)?|me\s+(?:traga|mostre)|(?:pode|poderia|consegue)\s+(?:me\s+)?(?:mostrar|trazer|buscar|encontrar)|(?:quero|gostaria de)\s+ver)\s+(?:(?:a|as|uma|algumas)\s+)?(imagem|imagens|capas?)(?=$|[\s:?.!])/iu;
 
 export function requestsImageSearch(question: string) {
   return command.test(question);

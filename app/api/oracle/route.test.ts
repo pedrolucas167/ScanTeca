@@ -417,6 +417,9 @@ describe("explicit Brave Image Search", () => {
     ["Traga imagens da Bíblia de Gutenberg", "Bíblia de Gutenberg"],
     ["mostre capas da obra de Clarice Lispector", "capas de obra de Clarice Lispector"],
     ['Por favor, mostre a capa de "A Hora da Estrela"', "capas de A Hora da Estrela"],
+    ["Me mostre as capas dos livros de Machado de Assis", "capas de livros de Machado de Assis"],
+    ["Pode me mostrar a capa de Dom Casmurro?", "capas de Dom Casmurro"],
+    ['Quero ver capas de “Conceição Evaristo”', "capas de Conceição Evaristo"],
   ])("streams only HTTPS source pages with Brave thumbnails for %s", async (question, query) => {
     vi.mocked(saveOracleAnswer).mockClear();
     const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
