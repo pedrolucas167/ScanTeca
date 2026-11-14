@@ -20,6 +20,11 @@ cenários autenticados e a avaliação representativa definidos abaixo.
 
 ## Próxima etapa — aceite autenticado e avaliação representativa
 
+A busca local do Oráculo é voltada a livrarias, sebos, bibliotecas e cafés que
+também sejam livraria ou sebo. Ela aceita cidade ou bairro. A localização do
+dispositivo só é solicitada após clique, segue apenas para a busca no Brave e
+fica fora do histórico e do modelo. Os links de mapas usam coordenadas do local retornado.
+
 **Prioridade atual:** validar o fluxo completo do Oráculo e a qualidade das
 respostas antes de considerar encerrado o roadmap. Em 05/11/2026, passaram os
 sete cenários do Oráculo (seis autenticados e um sem sessão) com PostgreSQL
