@@ -1,5 +1,8 @@
 # Oráculo: roadmap de qualidade
 
+Busca explícita de notícias e vídeos: [funcionamento e validação](ORACLE-NEWS-VIDEOS.md).
+O aceite de qualidade e de produção permanece separado da implementação.
+
 Estado consolidado em 14/11/2026: veja [prioridades atuais](ROADMAP-STATUS.md).
 As pesquisas externa, de capas e de lugares de leitura estão integradas e
 publicadas. Persistência e isolamento já têm aceite autenticado local com IA

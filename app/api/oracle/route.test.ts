@@ -428,6 +428,62 @@ describe("explicit Brave LLM Context search", () => {
   });
 });
 
+describe("explicit Brave news and video search", () => {
+  beforeEach(() => {
+    vi.stubEnv("ORACLE_CHAT_PROVIDER", "maritaca");
+    vi.stubEnv("MARITACA_API_KEY", "fixture-maritaca");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "fixture-brave");
+    vi.mocked(saveOracleAnswer).mockClear();
+  });
+
+  it.each([
+    ["Notícias recentes sobre literatura", "news", "literatura"],
+    ["Vídeos de entrevistas com Conceição Evaristo", "videos", "entrevistas com Conceição Evaristo"],
+  ])("streams cited results and persists sources for %s", async (question, kind, query) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+      const url = new URL(String(input));
+      if (url.hostname === "api.search.brave.com") {
+        expect(url.pathname).toBe(`/res/v1/${kind}/search`);
+        expect(url.searchParams.get("q")).toBe(query);
+        return Response.json({ results: [{ title: "Literatura em debate", url: "https://example.org/literatura", description: "Conversa sobre livros" }] });
+      }
+      expect(url.hostname).toBe("chat.maritaca.ai");
+      const payload = JSON.parse(String(options?.body));
+      expect(payload.messages).toHaveLength(2);
+      expect(payload.messages[0].content).toContain("não afirme ter lido matérias completas");
+      expect(payload.messages[1].content).toContain("Conversa sobre livros");
+      expect(payload.messages[1].content).not.toContain("fixture-brave");
+      return new Response('data: {"choices":[{"delta":{"content":"Literatura em debate apresenta uma conversa sobre livros [1]."}}]}\n\ndata: [DONE]\n\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest(question))).text();
+    expect(body).toContain('"url":"https://example.org/literatura"');
+    expect(body).toContain('"citations":[1]');
+    expect(body).toContain("data: [DONE]");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(saveOracleAnswer).toHaveBeenCalled();
+  });
+
+  it.each([429, 200])("reports failed or empty news searches without generation (%s)", async status => {
+    const fetchMock = vi.fn(async () => Response.json({ results: [] }, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("Notícias recentes sobre literatura"))).text();
+    expect(body).toContain(status === 200 ? "Não encontrei notícias ou vídeos" : "Não consegui consultar o Brave Notícias");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(saveOracleAnswer).not.toHaveBeenCalled();
+  });
+
+  it("does not search with private context or a missing key", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await (await POST(questionRequest("Vídeos sobre meu diário"))).text()).toContain("Informe um tema público");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("key_brave_api", "");
+    expect(await (await POST(questionRequest("Notícias sobre literatura"))).text()).toContain("ainda não foi configurada");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("explicit Brave place search", () => {
   const question = 'Encontre livrarias em "Pinheiros, São Paulo"';
 

@@ -80,6 +80,8 @@ export function OracleChatSettings(props: Props) {
             <p className="mt-1 text-xs text-on-surface-variant">Para buscar na web, envie <span className="font-medium">Pesquise na web: &quot;termos públicos&quot;</span>.</p>
             <p className="mt-1 text-xs text-on-surface-variant">Para buscar lugares, envie <span className="font-medium">Encontre livrarias em &quot;Pinheiros, São Paulo&quot;</span>.</p>
             <p className="mt-1 text-xs text-on-surface-variant">Para buscar imagens, experimente “Traga imagens da Bíblia de Gutenberg”.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Para notícias, experimente “Notícias recentes sobre literatura” ou “Notícias desta semana sobre o Prêmio Jabuti”.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Para vídeos, experimente “Vídeos de entrevistas com Conceição Evaristo”. Abra as fontes para ler a matéria ou assistir ao vídeo original.</p>
           </fieldset>
           <label className="block text-sm">
             Criatividade da resposta <span className="text-primary">{props.temperature.toFixed(1)}</span>

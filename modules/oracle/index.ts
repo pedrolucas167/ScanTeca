@@ -6,6 +6,7 @@ export { requestsPlaceSearch } from "./place-search";
 export { parsePlaceQuery, lookupPlaceEvidence } from "./place-search";
 export { braveSearchKey } from "./web-search";
 export { requestsImageSearch } from "./image-search";
+export { requestsMediaSearch } from "./media-search";
 export { hasOracleChatKey, usesMaritaca } from "./chat";
 export { directChatResponse, toolExecutionResponse, groundedFallbackResponse } from "./responses";
 export { getOracleHome, clearOracleHistory } from "./home";
