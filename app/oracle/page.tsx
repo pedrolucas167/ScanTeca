@@ -8,6 +8,8 @@ import { OracleChatSettings } from "@/components/oracle/OracleChatSettings";
 import { OracleMemoryDialog } from "@/components/oracle/OracleMemoryDialog";
 import { OracleComposer } from "@/components/oracle/OracleComposer";
 import { OracleImageResults } from "@/components/oracle/OracleImageResults";
+import { OracleYouTubeVideo } from "@/components/oracle/OracleYouTubeVideo";
+import { youtubeVideoId } from "@/lib/youtube-player";
 import { OracleLocationChoice } from "@/components/oracle/OracleLocationChoice";
 import { useLocalDictation } from "@/components/oracle/useLocalDictation";
 import { useOnlineRecording } from "@/components/oracle/useOnlineRecording";
@@ -1320,6 +1322,7 @@ export default function OraclePage() {
                         const isBookSource = !source.external && !source.sourceType;
                         const selected = isBookSource && selectedCompare.some((item) => item.id === source.id);
                         const busy = actionBookId === source.id;
+                        const videoId = source.external ? youtubeVideoId(source.url) : null;
                         return (
                           <div
                             key={source.id}
@@ -1430,7 +1433,7 @@ export default function OraclePage() {
                               {source.sourceType === "place" && !source.mapLinks && (
                                 <span className="px-2 py-1 font-caption text-caption text-on-surface-variant">Coordenadas não verificadas</span>
                               )}
-                              {source.url && source.url !== source.mapLinks?.google ? (
+                              {videoId ? null : source.url && source.url !== source.mapLinks?.google ? (
                                 <a
                                   href={source.url}
                                   target="_blank"
@@ -1482,6 +1485,7 @@ export default function OraclePage() {
                                 </>
                               ) : null}
                             </div>
+                            {videoId && <OracleYouTubeVideo videoId={videoId} title={source.title} />}
                           </div>
                         );
                       })}
