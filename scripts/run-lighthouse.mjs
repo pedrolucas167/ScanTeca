@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { chromium } from "@playwright/test";
 import { developmentClerkKeys } from "./e2e-clerk-keys.mjs";
 import { aggregateLighthouse, publicPerformancePages } from "./lighthouse-policy.mjs";
+import { checkPublicPage, LighthousePreflightError } from "./lighthouse-preflight.mjs";
 
 const root = process.cwd();
 fs.mkdirSync(path.resolve("reports"), { recursive: true });
@@ -38,7 +39,7 @@ async function ready(base) {
   throw new Error("Servidor descartável indisponível.");
 }
 try {
-  for (const name of ["metrics.json", "summary.md"]) fs.rmSync(path.join(output, name), { force: true });
+  for (const name of ["metrics.json", "summary.md", "diagnostic.json"]) fs.rmSync(path.join(output, name), { force: true });
   const keys = developmentClerkKeys(process.env);
   if (!/^pk_test_[A-Za-z0-9_-]{20,}$/u.test(publicKey || "") || !/^sk_test_[A-Za-z0-9_-]{20,}$/u.test(keys.CLERK_SECRET_KEY)) throw new Error("Configure as duas chaves Clerk de desenvolvimento.");
   dockerEnv = { ...environment, ...keys };
@@ -57,14 +58,14 @@ try {
   const base = `http://${binding}`;
   stage = "readiness";
   await ready(base);
-  stage = "browser-preflight";
+  stage = "browser-launch";
   browser = await chromium.launch({ headless: true, env: environment });
   const chromiumVersion = browser.version();
+  stage = "browser-preflight";
   const page = await browser.newPage();
-  for (const [route, marker] of [["/", "Sua estante de livros físicos"], ["/manifesto", "O Fim do Caos Literário"]]) {
-    const response = await page.goto(`${base}${route}`, { waitUntil: "domcontentloaded" });
-    fs.writeFileSync(path.join(directory, "preflight.json"), JSON.stringify({ route, status: response?.status() }));
-    if (response?.status() !== 200 || !(await page.locator("h1").textContent())?.includes(marker)) throw new Error("Página pública incorreta; medição cancelada.");
+  for (const route of publicPerformancePages) {
+    const diagnostic = await checkPublicPage(page, base, route);
+    fs.writeFileSync(path.join(directory, "preflight.json"), JSON.stringify(diagnostic));
   }
   await browser.close(); browser = undefined;
   const config = { ci: { collect: { url: publicPerformancePages.map(route => `${base}${route}`), numberOfRuns: 3,
@@ -87,12 +88,16 @@ try {
   fs.writeFileSync(path.join(output, "summary.md"), summary);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
   process.stdout.write(summary);
-} catch {
+} catch (error) {
   fs.writeFileSync(path.join(directory, "failure.json"), JSON.stringify({ stage }));
-  const summary = `## Lighthouse\n\nExecução reprovada na etapa \`${stage}\`. Logs e relatórios brutos permanecem no diretório local de diagnóstico.\n`;
+  const diagnostic = { stage, ...(error instanceof LighthousePreflightError ? error.diagnostic : {}) };
+  fs.writeFileSync(path.join(output, "diagnostic.json"), JSON.stringify(diagnostic, null, 2));
+  const detail = error instanceof LighthousePreflightError
+    ? ` Motivo: \`${diagnostic.reason}\`; rota esperada: \`${diagnostic.route}\`; HTTP: ${diagnostic.status ?? "indisponível"}.` : "";
+  const summary = `## Lighthouse\n\nExecução reprovada na etapa \`${stage}\`.${detail} Logs e relatórios brutos permanecem no diretório local de diagnóstico.\n`;
   fs.writeFileSync(path.join(output, "summary.md"), summary);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
-  console.error(`Medição Lighthouse reprovada na etapa: ${stage}.`);
+  console.error(`Medição Lighthouse reprovada na etapa: ${stage}.${detail}`);
   process.exitCode = 1;
 } finally {
   if (browser) {
