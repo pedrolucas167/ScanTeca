@@ -31,18 +31,38 @@ não comprovam a data do evento. Os resultados não são uma lista exaustiva.
 
 São consultados até dez resultados e selecionadas até cinco fontes HTTPS,
 com URLs únicas. Título, domínio, descrição e, quando fornecidos, data da página,
-criador e duração entram nas fontes e no contexto numerado. O Oráculo apresenta
+criador e duração entram nas fontes numeradas. O Oráculo apresenta
 os resultados sem alegar leitura integral, reprodução ou transcrição dos vídeos.
 Os links dos cartões de fontes abrem as páginas originais; não há player embutido.
 
 Apenas os termos explícitos da busca são enviados ao Brave, sem acrescentar
 acervo, perfil ou histórico. Pedidos ambíguos de contexto privado recebem uma
 orientação para informar tema público. Autenticação, rate limit, cancelamento,
-validação de citações e persistência de respostas seguem o fluxo existente.
+e persistência de respostas seguem o fluxo existente. Os números das citações
+são construídos diretamente a partir da lista de fontes, sem geração pelo modelo.
 Falha, cota indisponível ou resultado vazio não dispara outra busca nem geração.
 É usada a chave Brave já configurada; não há novo secret.
 
 ## Validação
+
+### Correção da entrega dos resultados — 15/11/2026
+
+A consulta pública “mostre resenhas em vídeo de memórias póstumas de Brás Cubas”
+foi reproduzida com Brave e Maritaca, sem banco ou contexto privado. Retornou
+cinco fontes e citações válidas, mas a resposta gerada foi rejeitada pelo
+validador textual. Não era falta de vídeos nem falha no reconhecimento do pedido.
+
+Pedidos de listagem de notícias e vídeos agora entregam os resultados diretamente,
+com texto fixo, fontes numeradas e persistência no histórico. Não chamam o modelo
+de chat nem dependem de sua chave; a chave do Brave continua necessária. Isso
+remove a reescrita intermediária e sua possibilidade de reprovação, sem relaxar
+os validadores das respostas que continuam sendo geradas. A listagem não é uma
+análise ou síntese do conteúdo dos vídeos/matérias.
+
+As regressões verificam a frase relatada, metadados preservados, ausência de
+chave do chat, cancelamento e falha de persistência sem conclusão falsa.
+
+### Validação inicial
 
 Em 14/11/2026, os 80 testes direcionados de parsing, filtragem, cancelamento e
 rota passaram. Duas consultas reais com termos públicos retornaram cinco
