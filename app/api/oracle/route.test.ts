@@ -442,29 +442,27 @@ describe("explicit Brave news and video search", () => {
     ["Me mostre resenhas em vídeo de livros", "videos", "resenhas de livros"],
     ["Onde posso assistir a vídeos sobre literatura?", "videos", "literatura"],
     ["Gostaria de ver resenhas de livros em vídeo", "videos", "resenhas de livros"],
+    ["mostre resenhas em vídeo de memórias póstumas de Brás Cubas", "videos", "resenhas de memórias póstumas de Brás Cubas"],
   ])("streams cited results and persists sources for %s", async (question, kind, query) => {
-    const fetchMock = vi.fn<typeof fetch>(async (input, options) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = new URL(String(input));
-      if (url.hostname === "api.search.brave.com") {
-        expect(url.pathname).toBe(`/res/v1/${kind}/search`);
-        expect(url.searchParams.get("q")).toBe(query);
-        return Response.json({ results: [{ title: "Literatura em debate", url: "https://example.org/literatura", description: "Conversa sobre livros" }] });
-      }
-      expect(url.hostname).toBe("chat.maritaca.ai");
-      const payload = JSON.parse(String(options?.body));
-      expect(payload.messages).toHaveLength(2);
-      expect(payload.messages[0].content).toContain("não afirme ter lido matérias completas");
-      expect(payload.messages[1].content).toContain("Conversa sobre livros");
-      expect(payload.messages[1].content).not.toContain("fixture-brave");
-      return new Response('data: {"choices":[{"delta":{"content":"Literatura em debate apresenta uma conversa sobre livros [1]."}}]}\n\ndata: [DONE]\n\n');
+      expect(url.hostname).toBe("api.search.brave.com");
+      expect(url.pathname).toBe(`/res/v1/${kind}/search`);
+      expect(url.searchParams.get("q")).toBe(query);
+      return Response.json({ results: [{ title: "Literatura em debate", url: "https://example.org/literatura", description: "Conversa sobre livros" }] });
     });
     vi.stubGlobal("fetch", fetchMock);
     const body = await (await POST(questionRequest(question))).text();
     expect(body).toContain('"url":"https://example.org/literatura"');
     expect(body).toContain('"citations":[1]');
     expect(body).toContain("data: [DONE]");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(saveOracleAnswer).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(body).toContain("Encontrei 1 resultado na busca");
+    expect(body).not.toContain("Não consegui gerar uma resposta confiável");
+    expect(saveOracleAnswer).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining("Encontrei 1 resultado na busca"),
+      sources: [expect.objectContaining({ url: "https://example.org/literatura" })],
+    }));
   });
 
   it.each([429, 200])("reports failed or empty news searches without generation (%s)", async status => {
@@ -494,6 +492,44 @@ describe("explicit Brave news and video search", () => {
     expect(body).toContain("Informe um tema público");
     expect(fetchMock).not.toHaveBeenCalled();
     expect(saveOracleAnswer).not.toHaveBeenCalled();
+  });
+
+  it("delivers original metadata without a chat key or generated answer", async () => {
+    vi.stubEnv("MARITACA_API_KEY", "");
+    vi.stubEnv("key_maritaca_ai", "");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    const sourceUrl = `https://example.org/${"long-video-identifier".repeat(5)}`;
+    const fetchMock = vi.fn(async () => Response.json({ results: [{
+      title: "MEMÓRIAS PÓSTUMAS DE BRÁS CUBAS — RESENHA", url: sourceUrl,
+      description: "Resenha do romance", video: { duration: "15:30", creator: "Canal de leitura" },
+    }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await POST(questionRequest("mostre resenhas em vídeo de memórias póstumas de Brás Cubas"))).text();
+    expect(body).toContain(sourceUrl);
+    expect(body).toContain("15:30");
+    expect(body).toContain("Canal de leitura");
+    expect(body).toContain("data: [DONE]");
+    expect(body).not.toContain("resposta confiável");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(saveOracleAnswer).toHaveBeenCalledOnce();
+  });
+
+  it("does not persist a cancelled media search", async () => {
+    const controller = new AbortController();
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      controller.abort();
+      return Response.json({ results: [{ title: "Resenha", url: "https://example.org/video" }] });
+    }));
+    await (await POST(questionRequest("Mostre vídeos sobre livros", controller.signal))).text();
+    expect(saveOracleAnswer).not.toHaveBeenCalled();
+  });
+
+  it("does not report completion when media persistence fails", async () => {
+    vi.mocked(saveOracleAnswer).mockRejectedValueOnce(new Error("fixture persistence failure"));
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ results: [{ title: "Resenha", url: "https://example.org/video" }] })));
+    const body = await (await POST(questionRequest("Mostre vídeos sobre livros"))).text();
+    expect(body).toContain("Não foi possível concluir");
+    expect(body).not.toContain("data: [DONE]");
   });
 });
 

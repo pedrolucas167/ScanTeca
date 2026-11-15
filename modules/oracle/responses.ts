@@ -99,7 +99,7 @@ export async function toolExecutionResponse(routing: RoutingDecision, transcript
 export function groundedFallbackResponse(message =
   "Não encontrei evidências suficientes no seu acervo para responder com segurança. Tente mencionar um título, autor, gênero ou registrar uma reflexão no diário.",
   sources: Source[] = [],
-  event?: Pick<OracleStreamEvent, "requestLocationFor">,
+  event?: Pick<OracleStreamEvent, "requestLocationFor" | "citations">,
 ) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

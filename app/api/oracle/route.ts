@@ -139,11 +139,12 @@ export async function POST(request: NextRequest) {
 
     // Jev Query Routing - decide se precisa de busca vetorial
     const imageRequested = requestsImageSearch(trimmed);
-    const routing = imageRequested || requestsMediaSearch(trimmed) || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed) || requestsPlaceSearch(trimmed)
+    const mediaRequested = requestsMediaSearch(trimmed);
+    const routing = imageRequested || mediaRequested || requestsBibliographicSearch(trimmed) || requestsWebSearch(trimmed) || requestsPlaceSearch(trimmed)
       ? null : await jevRouteQuery(trimmed);
 
     if (routing && shouldExecuteTool(routing)) return toolExecutionResponse(routing, trimmed);
-    if (!imageRequested && !hasOracleChatKey(apiKey)) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
+    if (!imageRequested && !mediaRequested && !hasOracleChatKey(apiKey)) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
     if (routing && shouldDirectChat(routing)) return directChatResponse(trimmed, apiKey, request.signal);
     let prepared: Awaited<ReturnType<typeof prepareOracleSession>>;
     try {
