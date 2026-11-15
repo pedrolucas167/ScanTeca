@@ -33,7 +33,22 @@ São consultados até dez resultados e selecionadas até cinco fontes HTTPS,
 com URLs únicas. Título, domínio, descrição e, quando fornecidos, data da página,
 criador e duração entram nas fontes numeradas. O Oráculo apresenta
 os resultados sem alegar leitura integral, reprodução ou transcrição dos vídeos.
-Os links dos cartões de fontes abrem as páginas originais; não há player embutido.
+Os links dos cartões de fontes abrem as páginas originais. URLs reconhecidas do
+YouTube também oferecem **Assistir aqui**, que carrega o player oficial somente
+após clique, sem autoplay. **Abrir no YouTube** permanece sempre disponível.
+
+O player usa o domínio de privacidade aprimorada do YouTube e informa a origem
+da aplicação, exigida pela plataforma. Isso não significa ausência de comunicação
+com o YouTube após o clique. Os dados da biblioteca não são enviados ao player.
+Erros de incorporação bloqueada, vídeo removido/privado, erro de configuração,
+script indisponível e timeout mantêm a alternativa externa com uma mensagem.
+Fechar o vídeo desmonta o player. Não há tentativa de contornar restrições do autor.
+
+Somente IDs válidos de URLs HTTPS com domínio YouTube reconhecido podem criar
+um player; URLs de outras plataformas continuam como links. A integração usa
+a [API oficial de incorporação](https://developers.google.com/youtube/iframe_api_reference),
+sem chave adicional. Testes simulam bloqueios e indisponibilidade; não comprovam
+que todo vídeo real permita incorporação em todo navegador ou região.
 
 Apenas os termos explícitos da busca são enviados ao Brave, sem acrescentar
 acervo, perfil ou histórico. Pedidos ambíguos de contexto privado recebem uma
