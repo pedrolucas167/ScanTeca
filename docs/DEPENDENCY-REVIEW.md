@@ -1,5 +1,14 @@
 # Revisão de atualizações — 05/11/2026
 
+## Correções essenciais — 16/11/2026
+
+- Next.js 16.4.4 → 16.4.6: inclui as correções de segurança publicadas em 16.4.5.
+- Override restrito `minimatch@^10.2.0` → `11.0.8`: corrige GHSA-g3hv-75wg-m249 nas ferramentas de desenvolvimento. A linha 3.x usada por plugins antigos não é substituída.
+- O minimatch 11 remove APIs como `makeRe` e `AST`. Os consumidores instalados da linha 10 (ESLint, config-array e typescript-estree) usam `Minimatch`/`match` e `minimatch`, preservados na nova versão. A integração depende de lint completo, testes, build e CI aprovados; o override deve ser removido quando os consumidores adotarem versões corrigidas nativamente.
+- As demais atualizações de produção/desenvolvimento e a migração para web-push 4 ficam adiadas. Nenhuma PR agrupada é integrada por inteiro nesta correção.
+
+Referências: [Next.js 16.4.5](https://github.com/vercel/next.js/releases/tag/v16.4.5), [advisory minimatch](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249), [mudanças do minimatch](https://github.com/isaacs/minimatch/blob/main/changelog.md).
+
 | Atualização | Causa e encaminhamento |
 | --- | --- |
 | Actions dos workflows de migrations | As referências v7 já eram usadas nos demais workflows. Diff revisado e checks aprovados antes da integração da PR 195. |
