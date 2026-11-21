@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "@clerk/nextjs";
 import { Download, MoreVertical, PlusSquare, RefreshCw, Share, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -12,9 +13,19 @@ type Platform = "ios" | "android" | "other";
 
 const DISMISS_KEY = "pwa-install-dismissed";
 
-function isDismissed() {
+function isDismissedForSession(sessionId: string) {
   try {
-    return localStorage.getItem(DISMISS_KEY) !== null;
+    const dismissedSessionId = localStorage.getItem(DISMISS_KEY);
+    if (dismissedSessionId === sessionId) return true;
+
+    // Migra dispensas antigas para a sessão atual; uma sessão futura poderá
+    // voltar a receber o aviso.
+    if (dismissedSessionId === "1") {
+      localStorage.setItem(DISMISS_KEY, sessionId);
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -40,86 +51,99 @@ function detectPlatform(): Platform {
 }
 
 export default function PwaRegister() {
+  const { isLoaded, session } = useSession();
+  const sessionId = session?.id ?? null;
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [platform, setPlatform] = useState<Platform | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [promptSessionId, setPromptSessionId] = useState<string | null>(null);
+  const [dismissedSessionId, setDismissedSessionId] = useState<string | null>(null);
+  const [appInstalled, setAppInstalled] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
 
   useEffect(() => {
-    let swCleanup: (() => void) | undefined;
+    if (!("serviceWorker" in navigator)) return;
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then((registration) => {
-          if (registration.waiting) {
-            setWaitingWorker(registration.waiting);
-            setUpdateReady(true);
-          }
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        if (registration.waiting) {
+          setWaitingWorker(registration.waiting);
+          setUpdateReady(true);
+        }
 
-          registration.addEventListener("updatefound", () => {
-            const newWorker = registration.installing;
-            if (!newWorker) return;
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
 
-            newWorker.addEventListener("statechange", () => {
-              if (
-                newWorker.state === "installed" &&
-                navigator.serviceWorker.controller
-              ) {
-                setWaitingWorker(newWorker);
-                setUpdateReady(true);
-              }
-            });
+          newWorker.addEventListener("statechange", () => {
+            if (
+              newWorker.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              setWaitingWorker(newWorker);
+              setUpdateReady(true);
+            }
           });
-        })
-        .catch(() => {});
+        });
+      })
+      .catch(() => {});
 
-      const onControllerChange = () => window.location.reload();
-      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    const onControllerChange = () => window.location.reload();
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    };
+  }, []);
 
-      swCleanup = () => {
-        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      };
-    }
-
-    if (isDismissed() || isStandalone()) return swCleanup;
-
-    const p = detectPlatform();
-
+  useEffect(() => {
     const onPrompt = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
-      setVisible(true);
     };
     const onInstalled = () => {
+      setAppInstalled(true);
       setDeferred(null);
-      setVisible(false);
+      setPromptSessionId(null);
     };
+
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);
-
-    // iOS nunca dispara beforeinstallprompt — mostra o tutorial direto.
-    // Android espera um instante pelo evento; se não vier (Firefox ou o
-    // Chrome ainda não liberou), cai no tutorial do menu ⋮.
-    const delay = p === "ios" ? 0 : 2500;
-    const t = setTimeout(() => {
-      setPlatform(p);
-      if (p !== "other") setVisible(true);
-    }, delay);
-
     return () => {
-      swCleanup?.();
-      clearTimeout(t);
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 
+  useEffect(() => {
+    if (!isLoaded || !sessionId || appInstalled || isStandalone()) return;
+    if (dismissedSessionId === sessionId || isDismissedForSession(sessionId)) return;
+
+    const currentPlatform = detectPlatform();
+
+    if (deferred) {
+      const t = setTimeout(() => setPromptSessionId(sessionId), 0);
+      return () => clearTimeout(t);
+    }
+
+    // iOS nunca dispara beforeinstallprompt — mostra o tutorial direto.
+    // Android espera um instante pelo evento; se não vier, mostra o tutorial.
+    const delay = currentPlatform === "ios" ? 0 : 2500;
+    const t = setTimeout(() => {
+      if (currentPlatform !== "other") {
+        setPlatform(currentPlatform);
+        setPromptSessionId(sessionId);
+      }
+    }, delay);
+
+    return () => clearTimeout(t);
+  }, [appInstalled, deferred, dismissedSessionId, isLoaded, sessionId]);
+
   const dismiss = () => {
-    setVisible(false);
+    setPromptSessionId(null);
+    if (sessionId) setDismissedSessionId(sessionId);
     try {
-      localStorage.setItem(DISMISS_KEY, "1");
+      if (sessionId) localStorage.setItem(DISMISS_KEY, sessionId);
     } catch {}
   };
 
@@ -129,7 +153,10 @@ export default function PwaRegister() {
     const choice = await deferred.userChoice;
     if (choice.outcome === "accepted") {
       setDeferred(null);
-      setVisible(false);
+      setAppInstalled(true);
+      setPromptSessionId(null);
+    } else {
+      dismiss();
     }
   };
 
@@ -141,60 +168,77 @@ export default function PwaRegister() {
 
   const dismissUpdate = () => setUpdateReady(false);
 
-  if (!visible || (!deferred && platform === "other")) return null;
+  const showInstallPrompt =
+    isLoaded &&
+    Boolean(sessionId) &&
+    promptSessionId === sessionId &&
+    dismissedSessionId !== sessionId &&
+    !appInstalled;
+  if (!showInstallPrompt && !updateReady) return null;
 
   const icon =
     "inline h-3.5 w-3.5 align-[-2px] text-indigo-600 dark:text-indigo-400";
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Fechar"
-        className="absolute right-2 top-2 rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-800"
-      >
-        <X className="h-4 w-4" />
-      </button>
-      <p className="pr-6 text-sm font-semibold text-foreground">
-        Instalar o Scanteca
-      </p>
-      {deferred ? (
-        <>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Adicione à tela inicial para abrir como app, sem barra do navegador.
-          </p>
+    <>
+      {showInstallPrompt && (
+        <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
           <button
             type="button"
-            onClick={install}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
+            onClick={dismiss}
+            aria-label="Adiar até a próxima autenticação"
+            className="absolute right-2 top-2 rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-800"
           >
-            <Download className="h-3.5 w-3.5" />
-            Instalar
+            <X className="h-4 w-4" />
           </button>
-        </>
-      ) : platform === "ios" ? (
-        <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-          <li>
-            Toque em <Share className={icon} /> Compartilhar na barra do
-            navegador
-          </li>
-          <li>
-            Toque em <PlusSquare className={icon} /> &quot;Adicionar à Tela de
-            Início&quot;
-          </li>
-          <li>Confirme em &quot;Adicionar&quot;</li>
-        </ol>
-      ) : (
-        <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-          <li>
-            Toque no menu <MoreVertical className={icon} /> do navegador
-          </li>
-          <li>
-            Toque em &quot;Instalar app&quot; ou &quot;Adicionar à tela
-            inicial&quot;
-          </li>
-        </ol>
+          <p className="pr-6 text-sm font-semibold text-foreground">
+            Instalar o Scanteca
+          </p>
+          {deferred ? (
+            <>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                Adicione à tela inicial para abrir como app, sem barra do navegador.
+              </p>
+              <button
+                type="button"
+                onClick={install}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Instalar
+              </button>
+            </>
+          ) : platform === "ios" ? (
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <li>
+                Toque em <Share className={icon} /> Compartilhar na barra do
+                navegador
+              </li>
+              <li>
+                Toque em <PlusSquare className={icon} /> &quot;Adicionar à Tela de
+                Início&quot;
+              </li>
+              <li>Confirme em &quot;Adicionar&quot;</li>
+            </ol>
+          ) : (
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <li>
+                Toque no menu <MoreVertical className={icon} /> do navegador
+              </li>
+              <li>
+                Toque em &quot;Instalar app&quot; ou &quot;Adicionar à tela
+                inicial&quot;
+              </li>
+            </ol>
+          )}
+          <button
+            type="button"
+            onClick={dismiss}
+            className="mt-3 rounded-full px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Agora não
+          </button>
+        </div>
       )}
 
       {updateReady && (
@@ -224,6 +268,6 @@ export default function PwaRegister() {
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
