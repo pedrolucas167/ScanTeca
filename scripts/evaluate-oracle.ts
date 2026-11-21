@@ -47,7 +47,7 @@ async function main() {
   }
   const selectedCases = caseId ? oracleEvaluationCases.filter(item => item.id === caseId) : oracleEvaluationCases;
   if (!selectedCases.length) throw new Error("Cenário desconhecido.");
-  const model = process.env.ORACLE_CHAT_MODEL || "google/gemini-2.5-flash";
+  const model = process.env.ORACLE_CHAT_MODEL || "google/gemini-3.5-flash-lite";
   const judgeModel = process.env.ORACLE_EVAL_JUDGE_MODEL || model;
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (live && !apiKey) throw new Error("Configure OPENROUTER_API_KEY para a avaliação real.");

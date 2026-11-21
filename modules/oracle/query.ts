@@ -10,7 +10,6 @@ import { buildOracleSystemPrompt, literaryConversationPrompt } from "./prompt";
 import { needsLibraryEvidence } from "./library-intent";
 import { generateOracleResponse, type OracleChatMessage } from "./generation";
 import { createOraclePipeline } from "./pipeline";
-import { usesMaritaca } from "./chat";
 import { lookupBibliographicEvidence, parseBibliographicQuery, requestsBibliographicSearch } from "./bibliographic-search";
 import { braveSearchKey, lookupWebEvidence, parseWebQuery, requestsWebSearch } from "./web-search";
 import { lookupPlaceEvidence, parsePlaceQuery, requestsPlaceSearch } from "./place-search";
@@ -119,7 +118,7 @@ export async function answerOracleQuestion({ userId, question: trimmed, mode, se
     ));
     const retrievalStartedAt = Date.now();
     stage("search");
-    const questionEmbedding = usesMaritaca() ? null : await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
+    const questionEmbedding = await metrics.measure("embedding", () => generateEmbedding(retrievalQuery, {
       signal, onUsage: usage => metrics.recordUsage("embedding", usage),
     }));
     signal.throwIfAborted();
