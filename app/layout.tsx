@@ -304,8 +304,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <Show when="signed-in">
             <PushOptIn />
           </Show>
+          <PwaRegister />
         </ClerkProvider>
-        <PwaRegister />
         <RoutePrefetch />
       </body>
     </html>
