@@ -13,6 +13,16 @@ it("keeps fixed-model requests unchanged when free rotation is disabled", async 
   await openRouterChat(input());
   expect(JSON.parse(String(vi.mocked(fetchWithTimeout).mock.calls[0]?.[1]?.body)).model).toBe("fixture/paid");
 });
+it("keeps production on the configured model even if free rotation is set", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  vi.mocked(fetchWithTimeout).mockResolvedValueOnce(new Response("ok"));
+  const data = input();
+  await openRouterChat(data);
+  const body = JSON.parse(String(vi.mocked(fetchWithTimeout).mock.calls[0]?.[1]?.body));
+  expect(body.model).toBe("fixture/paid");
+  expect(body.provider).toBeUndefined();
+  expect(fetchWithTimeout).toHaveBeenCalledOnce();
+});
 it("rotates and bounds failover to free models, cancelling the rejected body", async () => {
   const cancel = vi.fn();
   vi.mocked(fetchWithTimeout).mockResolvedValueOnce(new Response(new ReadableStream({ cancel }), { status: 503 })).mockResolvedValueOnce(new Response("ok"));

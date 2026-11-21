@@ -4,13 +4,13 @@ import { createModelPool, parseFreeModels, PoolUnavailable, FREE_MODELS_WITH_OPT
 
 export type ModelAttempt = { model: string; status: number; durationMs: number };
 
-/** Free rotation is opt-in per environment; fixed/production callers keep their configured model. */
+/** Free rotation is development-only; production always uses the configured model. */
 export async function openRouterChat({ apiKey, body, signal, timeoutMs = 60000, onAttempt }: {
   apiKey: string; body: Record<string, unknown>; signal?: AbortSignal; timeoutMs?: number;
   onAttempt?: (attempt: ModelAttempt) => void;
 }) {
   const combined = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeoutMs)]);
-  const configured = process.env.ORACLE_FREE_MODELS?.trim();
+  const configured = process.env.NODE_ENV === "production" ? "" : process.env.ORACLE_FREE_MODELS?.trim();
   const models = configured ? parseFreeModels(configured) : null;
   const positiveLimit = (value: string | undefined, fallback: number, maximum: number) => {
     if (value === undefined || value === "") return fallback;

@@ -1,6 +1,6 @@
 # Oráculo: modelos gratuitos em desenvolvimento
 
-## Decisão atual — 04/11/2026
+## Registro da decisão anterior — 04/11/2026
 
 O uso gratuito é viável para desenvolvimento de baixo volume, mas **a seleção
 de modelos ainda não está aprovada**. A conta consultada informou limite de
@@ -8,13 +8,15 @@ de modelos ainda não está aprovada**. A conta consultada informou limite de
 evidência de que seja obrigatório usar modelos pagos; há evidência de que a
 cota atual não sustenta uma bateria extensa de avaliações no mesmo dia.
 
-As variáveis e a escolha de modelo em produção não foram alteradas. A rotação é optativa por ambiente:
+Naquele momento, as variáveis e a escolha de modelo em produção não foram alteradas. A rotação era optativa por ambiente:
 `ORACLE_FREE_MODELS` contém uma lista explícita de IDs terminados em `:free`.
 Sem essa variável, o modelo existente de `ORACLE_CHAT_MODEL` permanece em uso.
-O arquivo local ignorado `.env.development.local` mantém provisoriamente apenas
-`nvidia/nemotron-3.5-super-vl:free`. Um segundo modelo só entra após avaliação.
-Com um único candidato não existe distribuição real entre modelos, embora o
-algoritmo e seus testes suportem listas maiores.
+
+## Estado atual — 21/11/2026
+
+O Oráculo usa o OpenRouter com `google/gemini-3.5-flash-lite` como modelo
+padrão. A rotação `ORACLE_FREE_MODELS` é aceita somente fora de produção;
+em produção, o modelo configurado prevalece. Maritaca S5 está desativada.
 
 ## Rotação e limites
 

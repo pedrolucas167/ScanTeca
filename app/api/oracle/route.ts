@@ -8,7 +8,7 @@ import { rateLimitGuard, rateLimits } from "@/lib/rate-limit";
 import { jevRouteQuery, shouldDirectChat, shouldExecuteTool } from "@/lib/jev-routing";
 import { braveSearchKey, createOraclePipeline, groundedFallbackResponse, lookupPlaceEvidence, parsePlaceQuery } from "@/modules/oracle";
 import { requestsMediaSearch } from "@/modules/oracle";
-import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, usesMaritaca, requestsBibliographicSearch, requestsWebSearch, requestsPlaceSearch, requestsImageSearch } from "@/modules/oracle";
+import { prepareOracleSession, OracleSessionError, answerOracleQuestion, directChatResponse, toolExecutionResponse, getOracleHome, clearOracleHistory, hasOracleChatKey, requestsBibliographicSearch, requestsWebSearch, requestsPlaceSearch, requestsImageSearch } from "@/modules/oracle";
 
 const ORACLE_MODES = ["RECOMMEND", "EXPLORE", "COMPARE", "JOURNEY", "CURATE", "LOCATE", "ASSISTANT"] as const;
 
@@ -66,9 +66,6 @@ export async function POST(request: NextRequest) {
 
     let question = parsed.data.question?.trim() ?? "";
 
-    if (!question && audio?.data && usesMaritaca()) {
-      return Response.json({ error: "Use texto ou ditado no aparelho para testar o Oráculo com a Maritaca." }, { status: 400 });
-    }
     if (!question && audio?.data && !apiKey) return Response.json({ error: "O Oráculo está indisponível no momento. Tente novamente mais tarde." }, { status: 503 });
 
     if (!question && audio?.data) {
@@ -181,7 +178,7 @@ export async function GET(request: NextRequest) {
 
     const sessionId = request.nextUrl.searchParams.get("sessionId");
     return new Response(
-      JSON.stringify({ ...await getOracleHome(userId, sessionId), ...(usesMaritaca() ? { browserTts: true } : {}) }),
+      JSON.stringify(await getOracleHome(userId, sessionId)),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
