@@ -19,7 +19,6 @@ import AccentPicker from "@/components/ui/AccentPicker";
 import PwaRegister from "@/components/ui/PwaRegister";
 import UnifiedNotifications from "@/components/ui/UnifiedNotifications";
 import PushOptIn from "@/components/ui/PushOptIn";
-import InstallPrompt from "@/components/ui/InstallPrompt";
 import AdminLink from "@/components/ui/AdminLink";
 import MobileNav from "@/components/ui/MobileNav";
 import NavigationDropdown from "@/components/ui/NavigationDropdown";
@@ -304,7 +303,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </footer>
           <Show when="signed-in">
             <PushOptIn />
-            <InstallPrompt />
           </Show>
         </ClerkProvider>
         <PwaRegister />
